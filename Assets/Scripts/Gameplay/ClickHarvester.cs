@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-// Sol tıkla bir kaynağa (ağaç...) tıklayınca kaynak doğrudan kuyuya eklenir.
+// Sol tıkla bir kaynağa (ağaç...) tıklayınca kaynak kuyuya fırlatılır.
 [RequireComponent(typeof(Camera))]
 public class ClickHarvester : MonoBehaviour
 {
@@ -37,6 +37,7 @@ public class ClickHarvester : MonoBehaviour
         if (taken <= 0)
             return;
         node.PlayHitFeedback();
-        well.Deposit(node.Type, taken);
+        // Tıklanan noktadan kuyuya fırlatılır; miktar kuyuya düşünce artar.
+        well.Throw(node.Type, taken, hit.point);
     }
 }

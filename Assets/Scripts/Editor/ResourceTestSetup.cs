@@ -265,9 +265,7 @@ public static class ResourceTestSetup
             ground.isStatic = true;
         }
 
-        // Kuyu: köyün ortası.
-        var well = Primitive(PrimitiveType.Cylinder, "Well", root.transform, new Vector3(0f, 0.25f, 0f), new Vector3(3f, 0.25f, 3f), new Color(0.45f, 0.45f, 0.5f));
-        well.AddComponent<Well>();
+        BuildWell(root.transform);
 
         // Orman: köyün solu (-X).
         // Kamera 45° döndüğü için orman da 45° döndürülür, böylece ekranda köyün tam soluna düşer.
@@ -304,6 +302,45 @@ public static class ResourceTestSetup
 
         EditorSceneManager.MarkSceneDirty(root.scene);
         Selection.activeGameObject = root;
+    }
+
+    // Köyün ortasındaki kuyu: taş bloklardan halka, ortada karanlık boşluk ve içine düşeni yakalayan tetikleyici.
+    static void BuildWell(Transform parent)
+    {
+        const int blockCount = 14;
+        const float ringRadius = 1.6f;
+        const float wallHeight = 0.9f;
+
+        var well = new GameObject("Well");
+        well.transform.SetParent(parent, false);
+        well.AddComponent<Well>();
+
+        var stone = new Color(0.5f, 0.5f, 0.54f);
+        for (int i = 0; i < blockCount; i++)
+        {
+            float angle = i * 360f / blockCount;
+            var direction = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+            var block = Primitive(PrimitiveType.Cube, $"Wall {i + 1}", well.transform, direction * ringRadius + Vector3.up * wallHeight * 0.5f,
+                new Vector3(0.78f, wallHeight, 0.42f), i % 2 == 0 ? stone : stone * 0.88f);
+            block.transform.localRotation = Quaternion.LookRotation(direction);
+        }
+
+        var hole = Primitive(PrimitiveType.Cylinder, "Hole", well.transform, new Vector3(0f, 0.02f, 0f), new Vector3(2.9f, 0.01f, 2.9f), new Color(0.05f, 0.05f, 0.07f));
+        Object.DestroyImmediate(hole.GetComponent<Collider>());
+
+        var intake = new GameObject("Intake", typeof(BoxCollider), typeof(WellIntake));
+        intake.transform.SetParent(well.transform, false);
+        var trigger = intake.GetComponent<BoxCollider>();
+        trigger.isTrigger = true;
+        trigger.center = new Vector3(0f, wallHeight * 0.5f, 0f);
+        trigger.size = new Vector3(2.4f, wallHeight, 2.4f);
+
+        var mouth = new GameObject("Drop Point").transform;
+        mouth.SetParent(well.transform, false);
+        mouth.localPosition = new Vector3(0f, wallHeight, 0f);
+        var so = new SerializedObject(well.GetComponent<Well>());
+        so.FindProperty("dropPoint").objectReferenceValue = mouth;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     // Prefab'ı verilen yüksekliğe ölçekler ve tabanını zemine oturtur.
