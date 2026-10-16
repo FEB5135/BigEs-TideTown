@@ -288,7 +288,7 @@ public static class ResourceTestSetup
         // Odun toplayan köylüler.
         for (int i = 0; i < 3; i++)
         {
-            var villager = Primitive(PrimitiveType.Capsule, $"Woodcutter {i + 1}", root.transform, new Vector3(-3f, 1f, -2f + i * 2f), Vector3.one * 0.8f, new Color(0.85f, 0.7f, 0.5f));
+            var villager = Primitive(PrimitiveType.Capsule, $"Woodcutter {i + 1}", root.transform, new Vector3(-8f, 1f, -2f + i * 2f), Vector3.one * 0.8f, new Color(0.85f, 0.7f, 0.5f));
             Object.DestroyImmediate(villager.GetComponent<Collider>());
             var log = Primitive(PrimitiveType.Cube, "Carried Wood", villager.transform, Vector3.zero, Vector3.one, new Color(0.4f, 0.25f, 0.1f));
             Object.DestroyImmediate(log.GetComponent<Collider>());
@@ -304,43 +304,75 @@ public static class ResourceTestSetup
         Selection.activeGameObject = root;
     }
 
-    // Köyün ortasındaki kuyu: taş bloklardan halka, ortada karanlık boşluk ve içine düşeni yakalayan tetikleyici.
+    const string WellModelPath = "Assets/Meshes/well.obj";
+    // well.obj'de iç duvar yarıçapı dış yarıçapın ~%78'i (3.62 / 4.64 m),
+    // içerideki taban ise yüksekliğin ~%34'ünde (0.98 / 2.85 m).
+    const float WellInnerRatio = 0.78f;
+    const float WellFloorRatio = 0.344f;
+
+    // Köyün ortasındaki kuyu: ekibin modeli (yoksa taş halka), ortada karanlık boşluk ve içine düşeni yakalayan tetikleyici.
     static void BuildWell(Transform parent)
     {
-        const int blockCount = 14;
-        const float ringRadius = 1.6f;
-        const float wallHeight = 0.9f;
-
         var well = new GameObject("Well");
         well.transform.SetParent(parent, false);
         well.AddComponent<Well>();
 
-        var stone = new Color(0.5f, 0.5f, 0.54f);
-        for (int i = 0; i < blockCount; i++)
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(WellModelPath);
+        float outerRadius, innerRadius, height, floorHeight = 0f;
+        if (model != null)
         {
-            float angle = i * 360f / blockCount;
-            var direction = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-            var block = Primitive(PrimitiveType.Cube, $"Wall {i + 1}", well.transform, direction * ringRadius + Vector3.up * wallHeight * 0.5f,
-                new Vector3(0.78f, wallHeight, 0.42f), i % 2 == 0 ? stone : stone * 0.88f);
-            block.transform.localRotation = Quaternion.LookRotation(direction);
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(model, well.transform);
+            instance.name = "Model";
+            foreach (var filter in instance.GetComponentsInChildren<MeshFilter>())
+                filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+            var bounds = RendererBounds(instance);
+            outerRadius = Mathf.Max(bounds.extents.x, bounds.extents.z);
+            innerRadius = outerRadius * WellInnerRatio;
+            height = bounds.size.y;
+            floorHeight = height * WellFloorRatio;
+        }
+        else
+        {
+            outerRadius = 1.8f;
+            innerRadius = 1.4f;
+            height = 0.9f;
+            BuildStoneRing(well.transform, (outerRadius + innerRadius) * 0.5f, outerRadius - innerRadius, height);
         }
 
-        var hole = Primitive(PrimitiveType.Cylinder, "Hole", well.transform, new Vector3(0f, 0.02f, 0f), new Vector3(2.9f, 0.01f, 2.9f), new Color(0.05f, 0.05f, 0.07f));
+        // Karanlık disk tabanın hemen üstünde: kuyu derin bir boşluk gibi görünür.
+        var hole = Primitive(PrimitiveType.Cylinder, "Hole", well.transform, new Vector3(0f, floorHeight + 0.02f, 0f),
+            new Vector3(innerRadius * 2f, 0.01f, innerRadius * 2f), new Color(0.05f, 0.05f, 0.07f));
         Object.DestroyImmediate(hole.GetComponent<Collider>());
 
+        // Kare tetikleyici iç çembere sığsın diye kenarı yarıçap * √2.
+        float intakeSize = innerRadius * 1.41f;
         var intake = new GameObject("Intake", typeof(BoxCollider), typeof(WellIntake));
         intake.transform.SetParent(well.transform, false);
         var trigger = intake.GetComponent<BoxCollider>();
         trigger.isTrigger = true;
-        trigger.center = new Vector3(0f, wallHeight * 0.5f, 0f);
-        trigger.size = new Vector3(2.4f, wallHeight, 2.4f);
+        trigger.center = new Vector3(0f, height * 0.5f, 0f);
+        trigger.size = new Vector3(intakeSize, height, intakeSize);
 
         var mouth = new GameObject("Drop Point").transform;
         mouth.SetParent(well.transform, false);
-        mouth.localPosition = new Vector3(0f, wallHeight, 0f);
+        mouth.localPosition = new Vector3(0f, height, 0f);
         var so = new SerializedObject(well.GetComponent<Well>());
         so.FindProperty("dropPoint").objectReferenceValue = mouth;
+        so.FindProperty("approachRadius").floatValue = outerRadius + 0.8f;
         so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    static void BuildStoneRing(Transform well, float ringRadius, float thickness, float height)
+    {
+        const int blockCount = 14;
+        var stone = new Color(0.5f, 0.5f, 0.54f);
+        for (int i = 0; i < blockCount; i++)
+        {
+            var direction = Quaternion.Euler(0f, i * 360f / blockCount, 0f) * Vector3.forward;
+            var block = Primitive(PrimitiveType.Cube, $"Wall {i + 1}", well, direction * ringRadius + Vector3.up * height * 0.5f,
+                new Vector3(0.78f, height, thickness), i % 2 == 0 ? stone : stone * 0.88f);
+            block.transform.localRotation = Quaternion.LookRotation(direction);
+        }
     }
 
     // Prefab'ı verilen yüksekliğe ölçekler ve tabanını zemine oturtur.

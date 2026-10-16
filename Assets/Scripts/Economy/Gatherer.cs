@@ -49,7 +49,7 @@ public class Gatherer : MonoBehaviour
                 continue;
 
             SetCarrying(true);
-            yield return MoveTo(well.transform.position, wellStopDistance);
+            yield return MoveTo(well.transform.position, Mathf.Max(wellStopDistance, well.ApproachRadius));
             SetCarrying(false);
             if (well != null)
                 well.Throw(resourceType, carried, transform.position + Vector3.up);

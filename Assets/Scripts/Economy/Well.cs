@@ -10,6 +10,8 @@ public class Well : MonoBehaviour
 
     [Tooltip("Kuyunun ağzının ortası. Kaynaklar bunun tam üstünden bırakılır. Boşsa kuyunun kendi pozisyonu kullanılır.")]
     [SerializeField] Transform dropPoint;
+    [Tooltip("Köylülerin kaynağı atmak için kuyunun merkezine en fazla ne kadar yaklaşacağı (duvarın dışı).")]
+    [SerializeField] float approachRadius = 3f;
     [Tooltip("Kaynağın kuyunun ne kadar üstünden serbest düşüşe bırakılacağı.")]
     [SerializeField] float releaseHeight = 3.5f;
     [Tooltip("Atış kavisinin, başlangıç ile bırakma noktası arasındaki en yüksek ek yüksekliği.")]
@@ -46,6 +48,8 @@ public class Well : MonoBehaviour
         if (Instance == this)
             Instance = null;
     }
+
+    public float ApproachRadius => approachRadius;
 
     public int Get(ResourceType type) => amounts[(int)type];
 
