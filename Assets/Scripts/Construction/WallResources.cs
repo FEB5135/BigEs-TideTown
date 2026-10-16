@@ -41,7 +41,7 @@ namespace IdleTown.Construction
 
             Wood -= wood;
             Stone -= stone;
-            Changed?.Invoke();
+            NotifyChanged();
             return true;
         }
 
@@ -49,7 +49,27 @@ namespace IdleTown.Construction
         {
             Wood = (int)Math.Min(int.MaxValue, Math.Max(0L, (long)Wood + wood));
             Stone = (int)Math.Min(int.MaxValue, Math.Max(0L, (long)Stone + stone));
-            Changed?.Invoke();
+            NotifyChanged();
+        }
+
+        void NotifyChanged()
+        {
+            var subscribers = Changed?.GetInvocationList();
+            if (subscribers == null)
+                return;
+
+            for (var i = 0; i < subscribers.Length; i++)
+            {
+                try
+                {
+                    ((Action)subscribers[i])();
+                }
+                catch (Exception exception)
+                {
+                    // Resource mutation is already complete; observers cannot roll it back.
+                    Debug.LogException(exception, this);
+                }
+            }
         }
     }
 }

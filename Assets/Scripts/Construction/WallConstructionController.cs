@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.InputSystem;
+
+[assembly: InternalsVisibleTo("IdleTown.EditModeTests")]
 
 namespace IdleTown.Construction
 {
     public sealed class WallConstructionController : MonoBehaviour
     {
+        static readonly Rect ConstructionPanelRect = new(16f, 16f, 440f, 225f);
+
         [Header("Scene references")]
         [SerializeField] World world;
         [Tooltip("Must implement IWallResourceStore.")]
@@ -36,10 +41,18 @@ namespace IdleTown.Construction
         bool hasStart;
         Vector2Int startNode;
         string status = "İlk düğümü seçin.";
+        string confirmationStatus = "Henüz kalıcı inşa yapılmadı.";
         bool previewValid;
         int previewWood;
         int previewStone;
         bool buildInProgress;
+        bool hasPreviewEndpoint;
+        Vector2Int previewEndpoint;
+        bool hasLastValidPreviewEndpoint;
+        Vector2Int lastValidPreviewEndpoint;
+        int lastValidPreviewCount;
+        int lastValidPreviewWood;
+        int lastValidPreviewStone;
 
         public IReadOnlyCollection<WallEdge> Edges => model.Edges;
         public LayerMask ObstacleLayers
@@ -66,21 +79,34 @@ namespace IdleTown.Construction
 
         void Update()
         {
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            var keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            {
                 CancelSelection();
+                return;
+            }
 
             var mouse = Mouse.current;
-            if (mouse == null)
-                return;
-
-            if (mouse.rightButton.wasPressedThisFrame)
+            if (mouse != null && mouse.rightButton.wasPressedThisFrame)
+            {
                 CancelSelection();
+                return;
+            }
 
-            var hasNode = TryGetNode(mouse.position.ReadValue(), out var hoveredNode);
-            if (hasStart)
+            var pointerOverPanel = mouse != null && IsPointerOverConstructionPanel(mouse.position.ReadValue());
+            var hoveredNode = default(Vector2Int);
+            var hasNode = mouse != null && TryGetNode(mouse.position.ReadValue(), out hoveredNode);
+            if (hasStart && !pointerOverPanel)
                 RefreshPreview(hasNode ? hoveredNode : (Vector2Int?)null);
 
-            if (!mouse.leftButton.wasPressedThisFrame)
+            if (keyboard != null &&
+                (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
+            {
+                ConfirmHoveredPreview();
+                return;
+            }
+
+            if (mouse == null || !mouse.leftButton.wasPressedThisFrame || pointerOverPanel)
                 return;
 
             if (!hasNode)
@@ -89,45 +115,37 @@ namespace IdleTown.Construction
                 return;
             }
 
-            if (!hasStart)
-            {
-                hasStart = true;
-                startNode = hoveredNode;
-                status = "Bitiş düğümünü seçin.";
-                RefreshPreview(hoveredNode);
-                return;
-            }
-
-            if (TryBuild(startNode, hoveredNode, out var reason))
-            {
-                hasStart = false;
-                previewPath.Clear();
-                previewLine.positionCount = 0;
-                status = "Duvar inşa edildi. Yeni bir başlangıç düğümü seçin.";
-            }
-            else
-            {
-                status = reason;
-            }
+            HandleNodeClick(hoveredNode);
         }
 
         void OnGUI()
         {
-            const int width = 440;
-            GUILayout.BeginArea(new Rect(16f, 16f, width, 145f), GUI.skin.box);
+            GUILayout.BeginArea(ConstructionPanelRect, GUI.skin.box);
             GUILayout.Label("DUVAR İNŞASI");
-            GUILayout.Label("Sol tık: başlangıç / bitiş   •   Sağ tık veya Esc: iptal");
+            GUILayout.Label("Sol tık: başlangıç / bitiş   •   Enter: ön izlemeyi inşa et");
+            GUILayout.Label("Sağ tık veya Esc: iptal");
             if (resourceStore != null)
                 GUILayout.Label($"Merkez depo — Odun: {resourceStore.Wood}   Taş: {resourceStore.Stone}");
             else
                 GUILayout.Label("Merkez depo bağlantısı yok (IWallResourceStore gerekli).");
 
+            GUILayout.Label($"Kalıcı duvar — {model.Edges.Count} parça");
             if (hasStart)
-                GUILayout.Label($"Ön izleme — {previewPath.Count} parça, {previewWood} odun, {previewStone} taş");
+                GUILayout.Label($"Ön izleme (henüz inşa edilmedi) — {previewPath.Count} parça, {previewWood} odun, {previewStone} taş");
+
+            var wasEnabled = GUI.enabled;
+            GUI.enabled = hasStart && hasLastValidPreviewEndpoint;
+            var buildButtonLabel = hasLastValidPreviewEndpoint
+                ? $"İnşa Et — son geçerli: {lastValidPreviewCount} parça, {lastValidPreviewWood} odun, {lastValidPreviewStone} taş"
+                : "İnşa Et — geçerli ön izleme gerekli";
+            if (GUILayout.Button(buildButtonLabel))
+                ConfirmLastValidPreview();
+            GUI.enabled = wasEnabled;
 
             var oldColor = GUI.contentColor;
             GUI.contentColor = hasStart && !previewValid ? new Color(1f, 0.45f, 0.35f) : Color.white;
-            GUILayout.Label(status);
+            GUILayout.Label($"Durum: {status}");
+            GUILayout.Label($"Son onay: {confirmationStatus}");
             GUI.contentColor = oldColor;
             GUILayout.EndArea();
         }
@@ -210,6 +228,10 @@ namespace IdleTown.Construction
                 // Resource spend and model mutation are the commit point. All visuals already exist.
                 model.Add(path);
                 stagingRoot.name = "Wall Build";
+                // Instantiate preserves the prefab root's activeSelf value. A prefab kept inactive as
+                // a scene template would otherwise remain invisible after its staging parent commits.
+                for (var i = 0; i < stagedWalls.Count; i++)
+                    stagedWalls[i].SetActive(true);
                 stagingRoot.SetActive(true);
 
                 reason = string.Empty;
@@ -220,6 +242,86 @@ namespace IdleTown.Construction
             {
                 buildInProgress = false;
             }
+        }
+
+        internal void HandleNodeClick(Vector2Int node)
+        {
+            if (!hasStart)
+            {
+                hasStart = true;
+                startNode = node;
+                hasPreviewEndpoint = false;
+                hasLastValidPreviewEndpoint = false;
+                status = "Bitiş düğümünü seçin.";
+                confirmationStatus = "Ön izleme henüz onaylanmadı.";
+                RefreshPreview(node);
+                return;
+            }
+
+            ConfirmEndpoint(node);
+        }
+
+        internal bool ConfirmEndpoint(Vector2Int endpoint)
+        {
+            if (!hasStart)
+            {
+                status = "Önce bir başlangıç düğümü seçin.";
+                confirmationStatus = "Başarısız: başlangıç düğümü seçilmedi; kaynak harcanmadı.";
+                return false;
+            }
+
+            if (!TryBuild(startNode, endpoint, out var reason))
+            {
+                status = reason;
+                confirmationStatus = $"Başarısız: {reason}";
+                previewValid = false;
+                hasLastValidPreviewEndpoint = false;
+                return false;
+            }
+
+            var builtCount = WallConstructionModel.CreateSnappedPath(startNode, endpoint).Count;
+            var spentWood = woodCost * builtCount;
+            var spentStone = stoneCost * builtCount;
+            hasStart = false;
+            hasPreviewEndpoint = false;
+            hasLastValidPreviewEndpoint = false;
+            previewValid = false;
+            previewPath.Clear();
+            previewLine.positionCount = 0;
+            status = $"İnşa tamamlandı: {builtCount} parça eklendi; {spentWood} odun ve {spentStone} taş harcandı.";
+            confirmationStatus = status;
+            return true;
+        }
+
+        internal bool ConfirmHoveredPreview()
+        {
+            if (!hasStart)
+            {
+                status = "Enter ile inşa etmeden önce bir başlangıç düğümü seçin.";
+                confirmationStatus = $"Başarısız: {status}";
+                return false;
+            }
+
+            if (!previewValid || !hasPreviewEndpoint)
+            {
+                status = "Enter ile inşa etmek için geçerli bir ön izleme seçin.";
+                confirmationStatus = $"Başarısız: {status}";
+                return false;
+            }
+
+            return ConfirmEndpoint(previewEndpoint);
+        }
+
+        internal bool ConfirmLastValidPreview()
+        {
+            if (!hasStart || !hasLastValidPreviewEndpoint)
+            {
+                status = "İnşa etmek için geçerli bir ön izleme seçin.";
+                confirmationStatus = $"Başarısız: {status}";
+                return false;
+            }
+
+            return ConfirmEndpoint(lastValidPreviewEndpoint);
         }
 
         void ResolveReferences()
@@ -234,9 +336,12 @@ namespace IdleTown.Construction
             hasStart = false;
             previewPath.Clear();
             previewValid = false;
+            hasPreviewEndpoint = false;
+            hasLastValidPreviewEndpoint = false;
             if (previewLine != null)
                 previewLine.positionCount = 0;
             status = "İnşa iptal edildi. İlk düğümü seçin.";
+            confirmationStatus = "Seçim iptal edildi; kaynak harcanmadı.";
         }
 
         bool TryGetNode(Vector2 screenPosition, out Vector2Int node)
@@ -257,9 +362,10 @@ namespace IdleTown.Construction
             return node.x >= 0 && node.y >= 0 && node.x <= world.Width && node.y <= world.Height;
         }
 
-        void RefreshPreview(Vector2Int? hoveredNode)
+        internal void RefreshPreview(Vector2Int? hoveredNode)
         {
             previewPath.Clear();
+            hasPreviewEndpoint = hoveredNode.HasValue;
             if (!hoveredNode.HasValue)
             {
                 previewLine.positionCount = 0;
@@ -268,10 +374,28 @@ namespace IdleTown.Construction
                 return;
             }
 
+            previewEndpoint = hoveredNode.Value;
             previewPath.AddRange(WallConstructionModel.CreateSnappedPath(startNode, hoveredNode.Value));
             previewValid = Validate(previewPath, out var reason, out previewWood, out previewStone);
-            status = previewValid ? "Geçerli: inşa etmek için sol tıklayın." : reason;
+            if (previewValid)
+            {
+                hasLastValidPreviewEndpoint = true;
+                lastValidPreviewEndpoint = hoveredNode.Value;
+                lastValidPreviewCount = previewPath.Count;
+                lastValidPreviewWood = previewWood;
+                lastValidPreviewStone = previewStone;
+            }
+            status = previewValid
+                ? "Geçerli ön izleme: sol tık, Enter veya İnşa Et ile onaylayın."
+                : reason;
             DrawPreview();
+        }
+
+        internal static bool IsPointerOverConstructionPanel(Vector2 screenPosition)
+        {
+            // Input System screen coordinates start at bottom-left; IMGUI starts at top-left.
+            var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            return ConstructionPanelRect.Contains(guiPosition);
         }
 
         bool Validate(IReadOnlyList<WallEdge> path, out string reason, out int wood, out int stone)

@@ -117,7 +117,7 @@ Köyün ortasında bulunan delik, toplanan kaynakların depolandığı merkezdir
 1. Unity'de proje açıldıktan sonra **Tools > Idle Town > Create Wall Construction Demo Scene** komutunu çalıştırın.
 2. Komut, `SampleScene` dosyasına dokunmadan `Assets/Scenes/WallConstructionDemo.unity` (isim doluysa benzersiz yeni bir ad) oluşturur ve açar.
 3. Play'e basın. Perspektif kamera, görünür grid, zemin, merkezi başlangıç deposu ve durum/kontrol paneli hazırdır.
-4. Sol tıkla başlangıç ve bitiş düğümlerini seçin. Yeşil ön izleme geçerli, kırmızı ön izleme geçersizdir. Sağ tık veya `Esc` ile iptal edin.
+4. Sol tıkla başlangıç ve bitiş düğümlerini seçin. Yeşil ön izleme geçerli, kırmızı ön izleme geçersizdir. Geçerli ön izlemeyi ikinci sol tıkla, `Enter` ile veya paneldeki **İnşa Et** düğmesiyle onaylayın. Düğmeye giderken son geçerli hedef korunur; panel üzerindeki tıklamalar haritaya seçim olarak aktarılmaz. Sağ tık veya `Esc` ile iptal edin.
 
 ### Mevcut sahneye elle ekleme
 
