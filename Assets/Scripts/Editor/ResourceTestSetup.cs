@@ -1,12 +1,55 @@
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
-// Kaynak sistemini denemek için açık sahneye geçici placeholder objeler kurar.
+// Kaynak sistemini denemek için geçici placeholder objeler kurar.
+// Assets/Scenes/ResourceTest.unity yoksa editör açılınca bir kez otomatik oluşturur.
 // Modeller gelince bu objelerin görselleri değiştirilir, script'ler aynen kalır.
+[InitializeOnLoad]
 public static class ResourceTestSetup
 {
     const string RootName = "[Placeholder] Resource Test";
+    const string ScenePath = "Assets/Scenes/ResourceTest.unity";
+
+    static ResourceTestSetup()
+    {
+        EditorApplication.delayCall += CreateSceneAssetIfMissing;
+    }
+
+    static void CreateSceneAssetIfMissing()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || File.Exists(ScenePath))
+            return;
+
+        var current = SceneManager.GetActiveScene();
+        bool currentIsEmptyUntitled = string.IsNullOrEmpty(current.path) && !current.isDirty;
+        if (!currentIsEmptyUntitled && string.IsNullOrEmpty(current.path))
+        {
+            Debug.Log($"{ScenePath} oluşturulamadı: açık sahne kaydedilmemiş. Sahneyi kaydedip Tools > BigEs > Kaynak Test Sahnesi Kur'u kullanın.");
+            return;
+        }
+
+        var mode = currentIsEmptyUntitled ? NewSceneMode.Single : NewSceneMode.Additive;
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, mode);
+        SceneManager.SetActiveScene(scene);
+        Build();
+        var camera = Camera.main;
+        if (camera != null)
+        {
+            camera.transform.position = new Vector3(-8f, 22f, -26f);
+            camera.transform.LookAt(new Vector3(-8f, 0f, 0f));
+        }
+        EditorSceneManager.SaveScene(scene, ScenePath);
+
+        if (mode == NewSceneMode.Additive)
+        {
+            SceneManager.SetActiveScene(current);
+            EditorSceneManager.CloseScene(scene, true);
+        }
+        Debug.Log($"Kaynak test sahnesi oluşturuldu: {ScenePath}");
+    }
 
     [MenuItem("Tools/BigEs/Kaynak Test Sahnesi Kur")]
     static void Create()
@@ -16,7 +59,11 @@ public static class ResourceTestSetup
             Debug.LogWarning($"'{RootName}' zaten sahnede.");
             return;
         }
+        Build();
+    }
 
+    static void Build()
+    {
         var root = new GameObject(RootName);
         Undo.RegisterCreatedObjectUndo(root, "Kaynak Test Sahnesi Kur");
 
