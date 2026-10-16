@@ -34,11 +34,14 @@ Köyün ortasında bulunan delik, toplanan kaynakların depolandığı merkezdir
 
 ### Wall Construction — Duvar İnşası
 
-- [ ] Oyuncunun duvarın yerini ve şeklini belirleyebilmesi.
-- [ ] Duvar yerleştirme ön izlemesi ve geçerli alan kontrolü.
-- [ ] İnşa sırasında gereken kaynakların kontrol edilmesi ve harcanması.
+- [x] Oyuncunun iki grid düğümünü seçerek duvarın yerini ve şeklini belirleyebilmesi.
+- [x] Sekiz yönlü en yakın yol, geçerli/geçersiz ön izleme ve maliyet gösterimi.
+- [x] İnşa sırasında gereken odun/taşın tek işlemde kontrol edilip harcanması.
+- [x] Sınır, aynı/ters kenar ve aynı hücrede çapraz kesişme kontrolleri.
+- [x] Gelecekteki fizik için statik çarpıştırıcılı duvar parçaları.
 - [ ] Duvarın su ve dalga sistemiyle etkileşmesi.
-- [ ] Duvar şekillendirme yönteminin seçilmesi: parça yerleştirme, çizim veya başka bir yöntem.
+
+> Karar: Duvarlar hücrelerin üstüne değil, hücre köşelerindeki düğümler arasına yerleşir. İlk sol tık başlangıcı, ikinci sol tık bitişi seçer. Bitiş herhangi bir harita düğümü olabilir; sistem tek bir düz 45° başlığa zorlamak yerine Bresenham yaklaşımıyla yatay, dikey ve çapraz komşulardan oluşan 8-komşulu, gerektiğinde basamaklı bir yol üretir. Sağ tık veya `Esc` seçimi iptal eder.
 
 ### Resource Gathering — Kaynak Toplama
 
@@ -99,6 +102,32 @@ Köyün ortasında bulunan delik, toplanan kaynakların depolandığı merkezdir
 - [ ] Duvar inşası sırasında yerleşimin rahat görülebilmesi.
 - [ ] Tsunaminin geliş yönünün ve savunmaya etkisinin okunabilir olması.
 
+## 4.1 Teknik Karar ve Duvar Prototipini Kullanma
+
+- **Motor:** Unity `6000.6.6f1`, Universal Render Pipeline.
+- **Girdi:** Input System `1.20.0`; eski `UnityEngine.Input` API'si kullanılmaz.
+- **Harita uyumu:** Mevcut `World.Width`, `World.Height`, `World.CellSize` ve dünya dönüşümü kaynak kabul edilir. `MapView` ve hücrelerin 90° dönüş davranışı değiştirilmez. Duvarlar, mevcut hücre verisini değiştirmeyen ayrı bir düğüm/kenar katmanıdır.
+- **Maliyet:** Her kenarın odun ve taş maliyeti `WallConstructionController` Inspector alanlarından ayrı ayrı ayarlanır. Yolun tamamı geçerliyse `IWallResourceStore.TrySpend` bir kez çağrılır; kısmi inşa/harcama yapılmaz.
+- **İşlem güvenliği:** Tüm duvar görselleri önce etkin olmayan bir alanda hazırlanır. Hazırlama tamamlanmadan kaynak harcanmaz; harcama başarısızsa hazırlanan nesneler silinir. Kenarlar yalnızca başarılı harcamadan sonra modele eklenir. `WallBuilt` dinleyicilerindeki hatalar tamamlanmış inşayı geri alamaz ve aynı işlem içinden tekrar inşa çağrısı engellenir.
+- **Yapı engelleri:** `Obstacle Layers` varsayılan olarak **Nothing** değerindedir. Köy, maden, orman veya merkezi depoyu korumak için bu nesneleri özel bir “ConstructionObstacle” layer'ına taşıyıp yalnızca bu layer'ı maskeye ekleyin. Zemin ve duvar layer'larını maskeye eklemeyin; böylece zemin ve ortak duvar uçları yanlışlıkla engel sayılmaz. Bu kontrol hem ön izlemede hem kesin inşada çalışır; `Obstacle Padding` ek boşluğu ayarlar.
+- **Fizik:** Oluşan her parça statiktir ve en az bir 3D `Collider` içerir. Su/dalga ekibi parçaları fizik sorgularıyla bulabilir veya `WallBuilt` olayına abone olabilir.
+
+### Tek komutla demo
+
+1. Unity'de proje açıldıktan sonra **Tools > Idle Town > Create Wall Construction Demo Scene** komutunu çalıştırın.
+2. Komut, `SampleScene` dosyasına dokunmadan `Assets/Scenes/WallConstructionDemo.unity` (isim doluysa benzersiz yeni bir ad) oluşturur ve açar.
+3. Play'e basın. Perspektif kamera, görünür grid, zemin, merkezi başlangıç deposu ve durum/kontrol paneli hazırdır.
+4. Sol tıkla başlangıç ve bitiş düğümlerini seçin. Yeşil ön izleme geçerli, kırmızı ön izleme geçersizdir. Sağ tık veya `Esc` ile iptal edin.
+
+### Mevcut sahneye elle ekleme
+
+1. `World` nesnesinden ayrı bir GameObject oluşturup `WallConstructionController` ekleyin.
+2. `World`, kamera ve `IWallResourceStore` uygulayan `MonoBehaviour` referanslarını atayın.
+3. İsteğe bağlı `Wall Prefab` atayın. Prefabın merkezi pivotlu, ileri ekseni **+Z**, model ölçüsü **1×1×1** olmalıdır; controller kalınlığı X'e, yüksekliği Y'ye ve kenar uzunluğunu Z'ye uygular. Prefab verilmezse renkli küp parça üretilir.
+4. Kaynak sistemi hazır değilse prototip için `SimpleWallResourceStore` kullanın. Takım entegrasyonunda `IWallResourceStore` uygulaması `CanAfford` yanında özellikle `TrySpend` içinde odun ve taşı atomik kontrol edip azaltmalıdır. Oyun sırasında depo değiştirilecekse `SetResourceStore` kullanılabilir.
+
+Bu teslim yalnızca duvar inşa çekirdeğini kapsar; idle üretim, menü, tsunami/akışkan simülasyonu ve duvar hasarı eklenmemiştir.
+
 ## 5. Dört Kişilik Ekip İçin Önerilen Görev Dağılımı
 
 | Ekip üyesi | Ana sorumluluk | Ortak çalışma noktası |
@@ -138,9 +167,9 @@ Köyün ortasında bulunan delik, toplanan kaynakların depolandığı merkezdir
 
 ## 7. Kararlaştırılacak Konular
 
-- [ ] Oyun motoru, hedef platform ve game jam süresi.
-- [ ] Duvarın oyuncu tarafından nasıl şekillendirileceği.
-- [ ] Odun ve taşın duvar maliyetlerindeki rolleri.
+- [x] Oyun motoru: Unity. Hedef platform ve game jam süresi ayrıca netleştirilecek.
+- [x] Duvar şekillendirme: iki tıkla, düğüm/kenar tabanlı 8 yönlü yol.
+- [x] Odun ve taş: her duvar kenarı için Inspector'dan ayarlanabilen ayrı maliyetler.
 - [ ] Tsunaminin ne zaman başlayacağı ve dalga sayısı.
 - [ ] Köy hasarı, kazanma ve kaybetme koşulları.
 - [ ] Duvarların hasar alıp yıkılıp yıkılmayacağı.
