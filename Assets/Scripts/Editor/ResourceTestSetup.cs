@@ -269,7 +269,9 @@ public static class ResourceTestSetup
         BuildMountains(root.transform, screenFrame);
 
         BuildWell(root.transform);
-        BuildVillage(root.transform, screenFrame * Vector3.left);
+        BuildVillage(root.transform, screenFrame * Vector3.left, screenFrame * Vector3.right);
+        BuildQuarries(root.transform, screenFrame);
+        BuildMineCarts(root.transform, screenFrame);
 
         // Orman: kasabanın dışında, ekranın solunda.
         // Kamera 45° döndüğü için orman da 45° döndürülür, böylece ekranda köyün tam soluna düşer.
@@ -464,12 +466,104 @@ public static class ResourceTestSetup
         return mesh;
     }
 
+    // Dağ eteklerinde maden ocakları (taş kaynağı). Girişleri kasabaya bakar; tıklanabilir ve vagonlar burada yüklenir.
+    static void BuildQuarries(Transform parent, Quaternion screenFrame)
+    {
+        var quarries = new GameObject("Quarries").transform;
+        quarries.SetParent(parent, false);
+        var rock = ColorMaterial(new Color(0.46f, 0.43f, 0.4f));
+        var random = new System.Random(5);
+
+        float[] offsets = { -16f, 0f, 16f };
+        for (int i = 0; i < offsets.Length; i++)
+        {
+            var position = screenFrame * new Vector3(TownRadius + 9f, 0f, offsets[i]);
+            var quarry = new GameObject($"Quarry {i + 1}").transform;
+            quarry.SetParent(quarries, false);
+            quarry.localPosition = position;
+            quarry.localRotation = Quaternion.LookRotation(-new Vector3(position.x, 0f, position.z)); // +Z kasabaya bakar
+
+            var mound = new GameObject("Mound", typeof(MeshFilter), typeof(MeshRenderer));
+            mound.transform.SetParent(quarry, false);
+            mound.transform.localPosition = new Vector3(0f, 0f, -5f);
+            mound.GetComponent<MeshFilter>().sharedMesh = MountainMesh(random, 7f, 7f, 8);
+            mound.GetComponent<MeshRenderer>().sharedMaterials = new[] { rock, rock };
+
+            var wood = new Color(0.42f, 0.27f, 0.14f);
+            var parts = new[]
+            {
+                Primitive(PrimitiveType.Cube, "Entrance", quarry, new Vector3(0f, 1.4f, 0.6f), new Vector3(2.6f, 2.8f, 3f), new Color(0.06f, 0.05f, 0.05f)),
+                Primitive(PrimitiveType.Cube, "Post L", quarry, new Vector3(-1.5f, 1.6f, 2.1f), new Vector3(0.3f, 3.2f, 0.3f), wood),
+                Primitive(PrimitiveType.Cube, "Post R", quarry, new Vector3(1.5f, 1.6f, 2.1f), new Vector3(0.3f, 3.2f, 0.3f), wood),
+                Primitive(PrimitiveType.Cube, "Beam", quarry, new Vector3(0f, 3.25f, 2.1f), new Vector3(3.6f, 0.35f, 0.35f), wood),
+                Primitive(PrimitiveType.Sphere, "Stone Pile 1", quarry, new Vector3(2.6f, 0.35f, 3.2f), new Vector3(1.2f, 0.7f, 1f), new Color(0.55f, 0.56f, 0.6f)),
+                Primitive(PrimitiveType.Sphere, "Stone Pile 2", quarry, new Vector3(3.3f, 0.3f, 2.4f), new Vector3(0.9f, 0.6f, 0.8f), new Color(0.5f, 0.51f, 0.55f)),
+            };
+            foreach (var part in parts)
+                Object.DestroyImmediate(part.GetComponent<Collider>());
+
+            var node = quarry.gameObject.AddComponent<ResourceNode>();
+            var so = new SerializedObject(node);
+            so.FindProperty("type").enumValueIndex = (int)ResourceType.Stone;
+            so.FindProperty("capacity").intValue = 200;
+            so.FindProperty("regrowSeconds").floatValue = 15f;
+            so.FindProperty("maxGatherers").intValue = 3;
+            so.FindProperty("hitShakeAngle").floatValue = 1.5f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
+    // Maden vagonları: oduncular gibi otomatik çalışır, ocaktan taş yükleyip kuyuya götürür ve atar.
+    static void BuildMineCarts(Transform parent, Quaternion screenFrame)
+    {
+        var wood = new Color(0.45f, 0.3f, 0.16f);
+        var iron = new Color(0.2f, 0.2f, 0.22f);
+        var stone = new Color(0.55f, 0.56f, 0.6f);
+        for (int i = 0; i < 3; i++)
+        {
+            var cart = new GameObject($"Mine Cart {i + 1}").transform;
+            cart.SetParent(parent, false);
+            cart.localPosition = screenFrame * new Vector3(TownRadius + 2f, 0f, -4f + i * 4f);
+
+            var parts = new System.Collections.Generic.List<GameObject>
+            {
+                Primitive(PrimitiveType.Cube, "Body", cart, new Vector3(0f, 0.8f, 0f), new Vector3(1.3f, 0.7f, 2f), wood),
+                Primitive(PrimitiveType.Cube, "Rim", cart, new Vector3(0f, 1.18f, 0f), new Vector3(1.4f, 0.08f, 2.1f), iron),
+            };
+            foreach (var x in new[] { -0.72f, 0.72f })
+            foreach (var z in new[] { -0.65f, 0.65f })
+            {
+                var wheel = Primitive(PrimitiveType.Cylinder, "Wheel", cart, new Vector3(x, 0.35f, z), new Vector3(0.7f, 0.06f, 0.7f), iron);
+                wheel.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                parts.Add(wheel);
+            }
+
+            var load = new GameObject("Load").transform;
+            load.SetParent(cart, false);
+            parts.Add(Primitive(PrimitiveType.Sphere, "Stone", load, new Vector3(-0.25f, 1.25f, -0.4f), new Vector3(0.55f, 0.45f, 0.5f), stone));
+            parts.Add(Primitive(PrimitiveType.Sphere, "Stone", load, new Vector3(0.25f, 1.3f, 0.1f), new Vector3(0.6f, 0.5f, 0.55f), stone * 0.92f));
+            parts.Add(Primitive(PrimitiveType.Sphere, "Stone", load, new Vector3(-0.1f, 1.28f, 0.55f), new Vector3(0.5f, 0.4f, 0.45f), stone));
+            foreach (var part in parts)
+                Object.DestroyImmediate(part.GetComponent<Collider>());
+
+            var gatherer = cart.gameObject.AddComponent<Gatherer>();
+            var so = new SerializedObject(gatherer);
+            so.FindProperty("resourceType").enumValueIndex = (int)ResourceType.Stone;
+            so.FindProperty("carryCapacity").intValue = 8;
+            so.FindProperty("harvestDuration").floatValue = 3f;
+            so.FindProperty("moveSpeed").floatValue = 4f;
+            so.FindProperty("stopDistance").floatValue = 5f; // ocak girişinin önünde durur
+            so.FindProperty("carryVisual").objectReferenceValue = load.gameObject;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+    }
+
     // Kasabanın en dış halkasının yarıçapı; orman ve dağlar bunun dışına yerleşir.
     const float TownRadius = WellDiameter * 0.5f + 7f + 8f * 2f + 4f;
 
     // Kuyunun çevresinde kapıları kuyuya bakan ~50 konsept ev, iç içe 3 halka.
-    // Orman yönü köylülerin yolu olduğu için boş bırakılır.
-    static void BuildVillage(Transform parent, Vector3 forestDirection)
+    // Orman ve maden ocakları yönü köylülerin ve vagonların yolu olduğu için boş bırakılır.
+    static void BuildVillage(Transform parent, Vector3 forestDirection, Vector3 quarryDirection)
     {
         var village = new GameObject("Village").transform;
         village.SetParent(parent, false);
@@ -487,7 +581,7 @@ public static class ResourceTestSetup
             for (int i = 0; i < slots; i++)
             {
                 var direction = Quaternion.Euler(0f, ringOffset + i * 360f / slots + ((float)random.NextDouble() - 0.5f) * 6f, 0f) * Vector3.forward;
-                if (Vector3.Angle(direction, forestDirection) < 40f)
+                if (Vector3.Angle(direction, forestDirection) < 40f || Vector3.Angle(direction, quarryDirection) < 24f)
                     continue;
 
                 float distance = ringRadius + ((float)random.NextDouble() - 0.5f) * 2f;

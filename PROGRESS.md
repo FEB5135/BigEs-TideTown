@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17
+Son güncelleme: 2026-10-17 (01:45)
 
 ## Bağlam
 
@@ -17,6 +17,13 @@ Son güncelleme: 2026-10-17
 - `main`: Ekibin ortak branch'i. Son merge edilen commit: `22f7139 Simple Grid Worldmodel` (harita grid sistemi, `well.obj`, ProBuilder).
 - `feature/resource-gathering`: Bizim çalışmamız. Push edilmemiş commit'ler var; push etmeden önce kullanıcıya sor.
 - `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
+
+## ⚠ Yarım kalan iş (önce bunu bitir)
+
+**Maden ocakları + taş toplayan vagonlar** kodlandı, derlendi (hata yok), sahne kuruldu (3 ocak + 3 vagon) ve commit edildi. **Play'de henüz test edilmedi.**
+- İlgili dosyalar: `Assets/Scripts/Economy/ResourceNode.cs` (`maxGatherers`: bir kaynakta birden fazla toplayıcı), `Assets/Scripts/Editor/ResourceTestSetup.cs` (`BuildQuarries`, `BuildMineCarts`, köyde ocak yönüne ±24° yol boşluğu).
+- Tasarım: Ekranın sağında, kasabanın dışında (TownRadius+9) 3 ocak, girişleri kasabaya bakıyor. Her ocak bir Stone `ResourceNode` (kapasite 200, yenilenme 15 sn, en fazla 3 vagon); tıklayınca taş kuyuya atılır. 3 vagon (`Gatherer`, Stone, 8 taş, hız 4, girişin 5 m önünde durur) taşı kuyuya götürüp atar.
+- Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
 
 ## Son durum (yapılanlar)
 
@@ -41,7 +48,6 @@ Son güncelleme: 2026-10-17
 
 ## Sıradaki işler / açık konular
 
-- [ ] Taş: sağdaki dağlara maden/kaya `ResourceNode`'ları ve taş toplayan köylüler.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
 - [ ] Duvar ekibine `Well.TrySpend` / `ResourceCost` kullanımını anlatmak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.

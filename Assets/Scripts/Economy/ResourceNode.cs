@@ -13,19 +13,21 @@ public class ResourceNode : MonoBehaviour
     [SerializeField] int capacity = 20;
     [Tooltip("Tükendikten kaç saniye sonra yeniden çıkar. 0 = bir daha çıkmaz.")]
     [SerializeField] float regrowSeconds = 30f;
+    [Tooltip("Aynı anda kaç toplayıcı çalışabilir (ağaç 1, maden ocağı birkaç vagon).")]
+    [SerializeField] int maxGatherers = 1;
 
     [Header("Tıklama Geri Bildirimi")]
     [SerializeField] float hitShakeDuration = 0.2f;
     [SerializeField] float hitShakeAngle = 6f;
 
     int remaining;
-    Gatherer claimant;
+    readonly List<Gatherer> claimants = new();
     Coroutine shake;
     Quaternion restRotation;
 
     public ResourceType Type => type;
     public int Remaining => remaining;
-    public bool IsAvailable => remaining > 0 && claimant == null;
+    public bool IsAvailable => remaining > 0 && claimants.Count < maxGatherers;
 
     void Awake()
     {
@@ -61,7 +63,7 @@ public class ResourceNode : MonoBehaviour
     void OnDisable()
     {
         active.Remove(this);
-        claimant = null;
+        claimants.Clear();
     }
 
     public static ResourceNode FindNearestFree(ResourceType type, Vector3 position)
@@ -82,13 +84,13 @@ public class ResourceNode : MonoBehaviour
         return best;
     }
 
-    public void Claim(Gatherer gatherer) => claimant = gatherer;
-
-    public void Release(Gatherer gatherer)
+    public void Claim(Gatherer gatherer)
     {
-        if (claimant == gatherer)
-            claimant = null;
+        if (!claimants.Contains(gatherer))
+            claimants.Add(gatherer);
     }
+
+    public void Release(Gatherer gatherer) => claimants.Remove(gatherer);
 
     public int Harvest(int max)
     {
