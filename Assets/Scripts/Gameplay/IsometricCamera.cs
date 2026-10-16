@@ -13,18 +13,18 @@ public class IsometricCamera : MonoBehaviour
     [SerializeField] float yaw = 45f;
 
     [Header("Zoom")]
-    [SerializeField] float minDistance = 12f;
-    [SerializeField] float maxDistance = 90f;
-    [SerializeField] float distance = 30f;
+    [SerializeField] float minDistance = 15f;
+    [SerializeField] float maxDistance = 160f;
+    [SerializeField] float distance = 70f;
     [Tooltip("Tekerleğin her çentiğinde değişen mesafe.")]
-    [SerializeField] float zoomStep = 4f;
+    [SerializeField] float zoomStep = 8f;
     [SerializeField] float zoomSmoothTime = 0.12f;
 
     [Header("Kaydırma (sağ tık)")]
     [Tooltip("Odak noktasının gidebileceği alanın merkezi.")]
     [SerializeField] Vector3 panCenter = Vector3.zero;
     [Tooltip("Merkezden X ve Z yönünde en fazla ne kadar kayabileceği.")]
-    [SerializeField] Vector2 panExtents = new Vector2(70f, 70f);
+    [SerializeField] Vector2 panExtents = new Vector2(120f, 120f);
     [Tooltip("Kapalı: harita imleçle birlikte sürüklenir. Açık: kamera imlecin gittiği yöne kayar.")]
     [SerializeField] bool invertPan;
 

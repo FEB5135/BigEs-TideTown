@@ -263,7 +263,7 @@ public static class ResourceTestSetup
         var screenFrame = Quaternion.Euler(0f, 45f, 0f);
         if (Object.FindAnyObjectByType<Terrain>() == null)
         {
-            var ground = Primitive(PrimitiveType.Plane, "Ground", root.transform, Vector3.zero, new Vector3(16f, 1f, 16f), new Color(0.35f, 0.55f, 0.3f));
+            var ground = Primitive(PrimitiveType.Plane, "Ground", root.transform, Vector3.zero, new Vector3(30f, 1f, 30f), new Color(0.35f, 0.55f, 0.3f));
             ground.isStatic = true;
         }
         BuildMountains(root.transform, screenFrame);
@@ -271,17 +271,17 @@ public static class ResourceTestSetup
         BuildWell(root.transform);
         BuildVillage(root.transform, screenFrame * Vector3.left);
 
-        // Orman: köyün solu (-X).
+        // Orman: kasabanın dışında, ekranın solunda.
         // Kamera 45° döndüğü için orman da 45° döndürülür, böylece ekranda köyün tam soluna düşer.
         var forest = new GameObject("Forest").transform;
         forest.SetParent(root.transform);
         forest.localRotation = Quaternion.Euler(0f, 45f, 0f);
         var random = new System.Random(1234);
         var treePrefabs = FindTreePrefabs();
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < 34; i++)
         {
-            var pos = new Vector3(-16f - (float)random.NextDouble() * 14f, 0f, -12f + (float)random.NextDouble() * 24f);
-            float height = 5f + (float)random.NextDouble() * 2f;
+            var pos = new Vector3(-(TownRadius + 6f) - (float)random.NextDouble() * 30f, 0f, -28f + (float)random.NextDouble() * 56f);
+            float height = 6f + (float)random.NextDouble() * 3f;
             var tree = treePrefabs.Length > 0
                 ? TreeFromPrefab(treePrefabs[random.Next(treePrefabs.Length)], forest, pos, height, (float)random.NextDouble() * 360f)
                 : PlaceholderTree(forest, pos);
@@ -289,10 +289,11 @@ public static class ResourceTestSetup
             tree.AddComponent<ResourceNode>();
         }
 
-        // Odun toplayan köylüler.
-        for (int i = 0; i < 3; i++)
+        // Odun toplayan köylüler: kasabanın orman tarafındaki kenarında başlar.
+        for (int i = 0; i < 5; i++)
         {
-            var villager = Primitive(PrimitiveType.Capsule, $"Woodcutter {i + 1}", root.transform, new Vector3(-8f, 1f, -2f + i * 2f), Vector3.one * 0.8f, new Color(0.85f, 0.7f, 0.5f));
+            var start = screenFrame * new Vector3(-(TownRadius + 2f), 1f, -6f + i * 3f);
+            var villager = Primitive(PrimitiveType.Capsule, $"Woodcutter {i + 1}", root.transform, start, Vector3.one * 0.8f, new Color(0.85f, 0.7f, 0.5f));
             Object.DestroyImmediate(villager.GetComponent<Collider>());
             var log = Primitive(PrimitiveType.Cube, "Carried Wood", villager.transform, Vector3.zero, Vector3.one, new Color(0.4f, 0.25f, 0.1f));
             Object.DestroyImmediate(log.GetComponent<Collider>());
@@ -301,6 +302,7 @@ public static class ResourceTestSetup
             var gatherer = villager.AddComponent<Gatherer>();
             var so = new SerializedObject(gatherer);
             so.FindProperty("carryVisual").objectReferenceValue = log;
+            so.FindProperty("moveSpeed").floatValue = 5f; // harita büyüdü, yol uzun
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -314,6 +316,10 @@ public static class ResourceTestSetup
     // içerideki taban ise yüksekliğin ~%34'ünde (0.98 / 2.85 m).
     const float WellInnerRatio = 0.78f;
     const float WellFloorRatio = 0.344f;
+
+    // Ölçek: konsept evlerin ortalama genişliği ~3.8 m; kuyunun çapı 5 ev genişliği.
+    const float AverageHouseWidth = 3.8f;
+    const float WellDiameter = AverageHouseWidth * 5f;
 
     // Köyün ortasındaki kuyu: ekibin modeli (yoksa taş halka), ortada karanlık boşluk ve içine düşeni yakalayan tetikleyici.
     static void BuildWell(Transform parent)
@@ -337,6 +343,8 @@ public static class ResourceTestSetup
                 foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
                     renderer.sharedMaterials = System.Array.ConvertAll(renderer.sharedMaterials, _ => palette);
             var bounds = RendererBounds(instance);
+            instance.transform.localScale *= WellDiameter / (2f * Mathf.Max(bounds.extents.x, bounds.extents.z));
+            bounds = RendererBounds(instance);
             outerRadius = Mathf.Max(bounds.extents.x, bounds.extents.z);
             innerRadius = outerRadius * WellInnerRatio;
             height = bounds.size.y;
@@ -344,9 +352,9 @@ public static class ResourceTestSetup
         }
         else
         {
-            outerRadius = 1.8f;
-            innerRadius = 1.4f;
-            height = 0.9f;
+            outerRadius = WellDiameter * 0.5f;
+            innerRadius = outerRadius * WellInnerRatio;
+            height = 2.5f;
             BuildStoneRing(well.transform, (outerRadius + innerRadius) * 0.5f, outerRadius - innerRadius, height);
         }
 
@@ -386,12 +394,12 @@ public static class ResourceTestSetup
         var rock = ColorMaterial(new Color(0.46f, 0.43f, 0.4f));
         var snow = ColorMaterial(new Color(0.93f, 0.95f, 0.98f));
         var random = new System.Random(42);
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 12; i++)
         {
-            float t = i / 9f;
-            var position = new Vector3(36f + (float)random.NextDouble() * 18f, 0f, Mathf.Lerp(-34f, 60f, t) + ((float)random.NextDouble() - 0.5f) * 6f);
-            float radius = 10f + (float)random.NextDouble() * 7f;
-            float height = 16f + (float)random.NextDouble() * 16f;
+            float t = i / 11f;
+            var position = new Vector3(TownRadius + 16f + (float)random.NextDouble() * 24f, 0f, Mathf.Lerp(-55f, 110f, t) + ((float)random.NextDouble() - 0.5f) * 8f);
+            float radius = 18f + (float)random.NextDouble() * 10f;
+            float height = 32f + (float)random.NextDouble() * 26f;
 
             var mountain = new GameObject($"Mountain {i + 1}", typeof(MeshFilter), typeof(MeshRenderer));
             mountain.transform.SetParent(range, false);
@@ -404,8 +412,8 @@ public static class ResourceTestSetup
         // Vadinin sol duvarı: ormanın arkasında tek, büyük dağ.
         var valleyLeft = new GameObject("Valley Left Mountain", typeof(MeshFilter), typeof(MeshRenderer));
         valleyLeft.transform.SetParent(range, false);
-        valleyLeft.transform.localPosition = new Vector3(-26f, 0f, 50f);
-        valleyLeft.GetComponent<MeshFilter>().sharedMesh = MountainMesh(random, 17f, 32f, 10);
+        valleyLeft.transform.localPosition = new Vector3(-(TownRadius + 18f), 0f, 105f);
+        valleyLeft.GetComponent<MeshFilter>().sharedMesh = MountainMesh(random, 30f, 55f, 11);
         valleyLeft.GetComponent<MeshRenderer>().sharedMaterials = new[] { rock, snow };
     }
 
@@ -456,7 +464,11 @@ public static class ResourceTestSetup
         return mesh;
     }
 
-    // Kuyunun çevresinde kapıları kuyuya bakan konsept evler. Orman yönü köylülerin yolu olduğu için boş bırakılır.
+    // Kasabanın en dış halkasının yarıçapı; orman ve dağlar bunun dışına yerleşir.
+    const float TownRadius = WellDiameter * 0.5f + 7f + 8f * 2f + 4f;
+
+    // Kuyunun çevresinde kapıları kuyuya bakan ~50 konsept ev, iç içe 3 halka.
+    // Orman yönü köylülerin yolu olduğu için boş bırakılır.
     static void BuildVillage(Transform parent, Vector3 forestDirection)
     {
         var village = new GameObject("Village").transform;
@@ -465,37 +477,43 @@ public static class ResourceTestSetup
         var random = new System.Random(77);
         var walls = new[] { new Color(0.86f, 0.78f, 0.62f), new Color(0.8f, 0.7f, 0.55f), new Color(0.9f, 0.84f, 0.72f) };
         var roofs = new[] { new Color(0.6f, 0.25f, 0.18f), new Color(0.5f, 0.3f, 0.2f), new Color(0.42f, 0.22f, 0.16f) };
-        const int slots = 14;
+        const float houseSpacing = 7.2f; // halka üzerinde ev başına düşen yay uzunluğu
         int built = 0;
-        for (int i = 0; i < slots; i++)
+        for (int ring = 0; ring < 3; ring++)
         {
-            var direction = Quaternion.Euler(0f, i * 360f / slots + ((float)random.NextDouble() - 0.5f) * 10f, 0f) * Vector3.forward;
-            if (Vector3.Angle(direction, forestDirection) < 40f)
-                continue;
+            float ringRadius = WellDiameter * 0.5f + 7f + ring * 8f;
+            int slots = Mathf.FloorToInt(2f * Mathf.PI * ringRadius / houseSpacing);
+            float ringOffset = ring % 2 == 0 ? 0f : 180f / slots; // halkalar arasında evler kaydırılır
+            for (int i = 0; i < slots; i++)
+            {
+                var direction = Quaternion.Euler(0f, ringOffset + i * 360f / slots + ((float)random.NextDouble() - 0.5f) * 6f, 0f) * Vector3.forward;
+                if (Vector3.Angle(direction, forestDirection) < 40f)
+                    continue;
 
-            float distance = 13f + (float)random.NextDouble() * 5f;
-            float width = 3f + (float)random.NextDouble() * 1.6f;
-            float depth = 3f + (float)random.NextDouble() * 1.2f;
-            float wallHeight = 2.2f + (float)random.NextDouble() * 0.7f;
+                float distance = ringRadius + ((float)random.NextDouble() - 0.5f) * 2f;
+                float width = 3f + (float)random.NextDouble() * 1.6f;
+                float depth = 3f + (float)random.NextDouble() * 1.2f;
+                float wallHeight = 2.2f + (float)random.NextDouble() * 0.7f;
 
-            var house = new GameObject($"House {++built}").transform;
-            house.SetParent(village, false);
-            house.localPosition = direction * distance;
-            house.localRotation = Quaternion.LookRotation(-direction); // +Z kuyuya bakar
+                var house = new GameObject($"House {++built}").transform;
+                house.SetParent(village, false);
+                house.localPosition = direction * distance;
+                house.localRotation = Quaternion.LookRotation(-direction); // +Z kuyuya bakar
 
-            var body = Primitive(PrimitiveType.Cube, "Walls", house, new Vector3(0f, wallHeight * 0.5f, 0f),
-                new Vector3(width, wallHeight, depth), walls[random.Next(walls.Length)]);
-            // Çatı: 45° döndürülmüş küp, üst yarısı üçgen bir çatı sırtı gibi görünür.
-            float side = depth / Mathf.Sqrt(2f) * 1.08f;
-            var roof = Primitive(PrimitiveType.Cube, "Roof", house, new Vector3(0f, wallHeight, 0f),
-                new Vector3(width + 0.4f, side, side), roofs[random.Next(roofs.Length)]);
-            roof.transform.localRotation = Quaternion.Euler(45f, 0f, 0f);
-            var door = Primitive(PrimitiveType.Cube, "Door", house, new Vector3(0f, 0.75f, depth * 0.5f + 0.02f),
-                new Vector3(0.8f, 1.5f, 0.05f), new Color(0.3f, 0.18f, 0.1f));
+                var body = Primitive(PrimitiveType.Cube, "Walls", house, new Vector3(0f, wallHeight * 0.5f, 0f),
+                    new Vector3(width, wallHeight, depth), walls[random.Next(walls.Length)]);
+                // Çatı: 45° döndürülmüş küp, üst yarısı üçgen bir çatı sırtı gibi görünür.
+                float side = depth / Mathf.Sqrt(2f) * 1.08f;
+                var roof = Primitive(PrimitiveType.Cube, "Roof", house, new Vector3(0f, wallHeight, 0f),
+                    new Vector3(width + 0.4f, side, side), roofs[random.Next(roofs.Length)]);
+                roof.transform.localRotation = Quaternion.Euler(45f, 0f, 0f);
+                var door = Primitive(PrimitiveType.Cube, "Door", house, new Vector3(0f, 0.75f, depth * 0.5f + 0.02f),
+                    new Vector3(0.8f, 1.5f, 0.05f), new Color(0.3f, 0.18f, 0.1f));
 
-            // Köylülerin zemine yapışması ve tıklama için engel olmasınlar.
-            foreach (var part in new[] { body, roof, door })
-                Object.DestroyImmediate(part.GetComponent<Collider>());
+                // Köylülerin zemine yapışması ve tıklama için engel olmasınlar.
+                foreach (var part in new[] { body, roof, door })
+                    Object.DestroyImmediate(part.GetComponent<Collider>());
+            }
         }
     }
 
@@ -509,13 +527,13 @@ public static class ResourceTestSetup
 
     static void BuildStoneRing(Transform well, float ringRadius, float thickness, float height)
     {
-        const int blockCount = 14;
+        int blockCount = Mathf.CeilToInt(2f * Mathf.PI * ringRadius / 1.1f);
         var stone = new Color(0.5f, 0.5f, 0.54f);
         for (int i = 0; i < blockCount; i++)
         {
             var direction = Quaternion.Euler(0f, i * 360f / blockCount, 0f) * Vector3.forward;
             var block = Primitive(PrimitiveType.Cube, $"Wall {i + 1}", well, direction * ringRadius + Vector3.up * height * 0.5f,
-                new Vector3(0.78f, height, thickness), i % 2 == 0 ? stone : stone * 0.88f);
+                new Vector3(1.2f, height, thickness), i % 2 == 0 ? stone : stone * 0.88f);
             block.transform.localRotation = Quaternion.LookRotation(direction);
         }
     }
