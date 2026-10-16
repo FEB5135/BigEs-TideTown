@@ -20,8 +20,13 @@ public static class ResourceTestSetup
 
     static void CreateSceneAssetIfMissing()
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode || File.Exists(ScenePath))
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
             return;
+        if (File.Exists(ScenePath))
+        {
+            UpgradePlaceholderTreesIfOpen();
+            return;
+        }
 
         var current = SceneManager.GetActiveScene();
         bool currentIsEmptyUntitled = string.IsNullOrEmpty(current.path) && !current.isDirty;
@@ -49,6 +54,35 @@ public static class ResourceTestSetup
             EditorSceneManager.CloseScene(scene, true);
         }
         Debug.Log($"Kaynak test sahnesi oluşturuldu: {ScenePath}");
+    }
+
+    // Sahne ağaç paketi gelmeden oluşturulduysa, açıkken placeholder'ları gerçek ağaçlarla yeniden kurar.
+    static void UpgradePlaceholderTreesIfOpen()
+    {
+        var scene = SceneManager.GetActiveScene();
+        if (scene.path != ScenePath || FindTreePrefabs().Length == 0)
+            return;
+        var root = GameObject.Find(RootName);
+        var forest = root != null ? root.transform.Find("Forest") : null;
+        if (forest == null || forest.childCount == 0 || PrefabUtility.IsPartOfPrefabInstance(forest.GetChild(0).gameObject))
+            return;
+
+        Object.DestroyImmediate(root);
+        Build();
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("Kaynak test sahnesindeki placeholder ağaçlar gerçek ağaç modelleriyle değiştirildi.");
+    }
+
+    static GameObject[] FindTreePrefabs()
+    {
+        var prefabs = new System.Collections.Generic.List<GameObject>();
+        foreach (var guid in AssetDatabase.FindAssets("StandardTree t:Prefab"))
+        {
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            if (path.EndsWith("_LP.prefab"))
+                prefabs.Add(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+        }
+        return prefabs.ToArray();
     }
 
     [MenuItem("Tools/BigEs/Kaynak Test Sahnesi Kur")]
@@ -81,15 +115,16 @@ public static class ResourceTestSetup
         var forest = new GameObject("Forest").transform;
         forest.SetParent(root.transform);
         var random = new System.Random(1234);
+        var treePrefabs = FindTreePrefabs();
         for (int i = 0; i < 12; i++)
         {
-            var pos = new Vector3(-16f - (float)random.NextDouble() * 14f, 1.5f, -12f + (float)random.NextDouble() * 24f);
-            var tree = Primitive(PrimitiveType.Cylinder, $"Tree {i + 1}", forest, pos, new Vector3(0.5f, 1.5f, 0.5f), new Color(0.4f, 0.25f, 0.1f));
+            var pos = new Vector3(-16f - (float)random.NextDouble() * 14f, 0f, -12f + (float)random.NextDouble() * 24f);
+            float height = 5f + (float)random.NextDouble() * 2f;
+            var tree = treePrefabs.Length > 0
+                ? TreeFromPrefab(treePrefabs[random.Next(treePrefabs.Length)], forest, pos, height, (float)random.NextDouble() * 360f)
+                : PlaceholderTree(forest, pos);
+            tree.name = $"Tree {i + 1}";
             tree.AddComponent<ResourceNode>();
-            var leaves = Primitive(PrimitiveType.Sphere, "Leaves", tree.transform, Vector3.zero, Vector3.one, new Color(0.15f, 0.45f, 0.15f));
-            Object.DestroyImmediate(leaves.GetComponent<Collider>());
-            leaves.transform.localPosition = new Vector3(0f, 1.3f, 0f);
-            leaves.transform.localScale = new Vector3(5f, 1.6f, 5f);
         }
 
         // Odun toplayan köylüler.
@@ -109,6 +144,47 @@ public static class ResourceTestSetup
 
         EditorSceneManager.MarkSceneDirty(root.scene);
         Selection.activeGameObject = root;
+    }
+
+    // Prefab'ı verilen yüksekliğe ölçekler, tabanını zemine oturtur ve gövdeye collider ekler.
+    static GameObject TreeFromPrefab(GameObject prefab, Transform parent, Vector3 position, float height, float yRotation)
+    {
+        var tree = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+        tree.transform.SetLocalPositionAndRotation(position, Quaternion.Euler(0f, yRotation, 0f));
+
+        var bounds = RendererBounds(tree);
+        if (bounds.size.y > 0.01f)
+            tree.transform.localScale *= height / bounds.size.y;
+        bounds = RendererBounds(tree);
+        tree.transform.position += Vector3.up * (position.y - bounds.min.y);
+
+        float scale = tree.transform.lossyScale.y;
+        var collider = tree.AddComponent<CapsuleCollider>();
+        collider.radius = 0.4f / scale;
+        collider.height = height / scale;
+        collider.center = tree.transform.InverseTransformPoint(new Vector3(tree.transform.position.x, position.y + height * 0.5f, tree.transform.position.z));
+        return tree;
+    }
+
+    static Bounds RendererBounds(GameObject go)
+    {
+        var renderers = go.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+            return new Bounds(go.transform.position, Vector3.zero);
+        var bounds = renderers[0].bounds;
+        foreach (var r in renderers)
+            bounds.Encapsulate(r.bounds);
+        return bounds;
+    }
+
+    static GameObject PlaceholderTree(Transform parent, Vector3 position)
+    {
+        var tree = Primitive(PrimitiveType.Cylinder, "Tree", parent, position + Vector3.up * 1.5f, new Vector3(0.5f, 1.5f, 0.5f), new Color(0.4f, 0.25f, 0.1f));
+        var leaves = Primitive(PrimitiveType.Sphere, "Leaves", tree.transform, Vector3.zero, Vector3.one, new Color(0.15f, 0.45f, 0.15f));
+        Object.DestroyImmediate(leaves.GetComponent<Collider>());
+        leaves.transform.localPosition = new Vector3(0f, 1.3f, 0f);
+        leaves.transform.localScale = new Vector3(5f, 1.6f, 5f);
+        return tree;
     }
 
     static GameObject Primitive(PrimitiveType type, string name, Transform parent, Vector3 localPosition, Vector3 localScale, Color color)
