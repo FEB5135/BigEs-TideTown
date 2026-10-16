@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Toplanabilir kaynak noktası (ağaç, kaya...). Tükenince gizlenir, süre ayarlıysa yeniden çıkar.
+// Model değişebilir: üzerinde collider yoksa görselin sınırlarına göre otomatik eklenir,
+// böylece tıklama ve toplama yeni modelle de çalışır.
 public class ResourceNode : MonoBehaviour
 {
     static readonly List<ResourceNode> active = new();
@@ -12,8 +14,14 @@ public class ResourceNode : MonoBehaviour
     [Tooltip("Tükendikten kaç saniye sonra yeniden çıkar. 0 = bir daha çıkmaz.")]
     [SerializeField] float regrowSeconds = 30f;
 
+    [Header("Tıklama Geri Bildirimi")]
+    [SerializeField] float hitShakeDuration = 0.2f;
+    [SerializeField] float hitShakeAngle = 6f;
+
     int remaining;
     Gatherer claimant;
+    Coroutine shake;
+    Quaternion restRotation;
 
     public ResourceType Type => type;
     public int Remaining => remaining;
@@ -22,6 +30,30 @@ public class ResourceNode : MonoBehaviour
     void Awake()
     {
         remaining = capacity;
+        restRotation = transform.localRotation;
+        EnsureCollider();
+    }
+
+    void EnsureCollider()
+    {
+        if (GetComponentInChildren<Collider>() != null)
+            return;
+        var renderers = GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+            return;
+
+        var bounds = renderers[0].bounds;
+        foreach (var r in renderers)
+            bounds.Encapsulate(r.bounds);
+
+        // Sınırlar dünya biriminde, collider değerleri yerel birimde.
+        var capsule = gameObject.AddComponent<CapsuleCollider>();
+        var scale = transform.lossyScale;
+        float horizontalScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z), 0.0001f);
+        float verticalScale = Mathf.Max(Mathf.Abs(scale.y), 0.0001f);
+        capsule.center = transform.InverseTransformPoint(bounds.center);
+        capsule.height = bounds.size.y / verticalScale;
+        capsule.radius = Mathf.Min(bounds.extents.x, bounds.extents.z) / horizontalScale;
     }
 
     void OnEnable() => active.Add(this);
@@ -67,6 +99,27 @@ public class ResourceNode : MonoBehaviour
         return taken;
     }
 
+    public void PlayHitFeedback()
+    {
+        if (!isActiveAndEnabled)
+            return;
+        if (shake != null)
+            StopCoroutine(shake);
+        shake = StartCoroutine(ShakeRoutine());
+    }
+
+    IEnumerator ShakeRoutine()
+    {
+        for (float t = 0f; t < hitShakeDuration; t += Time.deltaTime)
+        {
+            float angle = Mathf.Sin(t / hitShakeDuration * Mathf.PI * 4f) * hitShakeAngle * (1f - t / hitShakeDuration);
+            transform.localRotation = restRotation * Quaternion.Euler(angle, 0f, 0f);
+            yield return null;
+        }
+        transform.localRotation = restRotation;
+        shake = null;
+    }
+
     IEnumerator DepleteRoutine()
     {
         SetVisible(false);
@@ -79,6 +132,12 @@ public class ResourceNode : MonoBehaviour
 
     void SetVisible(bool visible)
     {
+        if (!visible && shake != null)
+        {
+            StopCoroutine(shake);
+            shake = null;
+            transform.localRotation = restRotation;
+        }
         foreach (var r in GetComponentsInChildren<Renderer>())
             r.enabled = visible;
         foreach (var c in GetComponentsInChildren<Collider>())

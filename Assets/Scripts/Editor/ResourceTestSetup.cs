@@ -2,7 +2,10 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 // Kaynak sistemini denemek için geçici placeholder objeler kurar.
 // Assets/Scenes/ResourceTest.unity yoksa editör açılınca bir kez otomatik oluşturur.
@@ -24,7 +27,16 @@ public static class ResourceTestSetup
             return;
         if (File.Exists(ScenePath))
         {
-            UpgradePlaceholderTreesIfOpen();
+            var open = SceneManager.GetActiveScene();
+            if (open.path != ScenePath)
+                return;
+            bool changed = UpgradePlaceholderTrees();
+            changed |= EnsureGameplayFeatures();
+            if (changed)
+            {
+                EditorSceneManager.SaveScene(open);
+                Debug.Log("Kaynak test sahnesi güncellendi.");
+            }
             return;
         }
 
@@ -40,12 +52,7 @@ public static class ResourceTestSetup
         var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, mode);
         SceneManager.SetActiveScene(scene);
         Build();
-        var camera = Camera.main;
-        if (camera != null)
-        {
-            camera.transform.position = new Vector3(-8f, 22f, -26f);
-            camera.transform.LookAt(new Vector3(-8f, 0f, 0f));
-        }
+        EnsureGameplayFeatures();
         EditorSceneManager.SaveScene(scene, ScenePath);
 
         if (mode == NewSceneMode.Additive)
@@ -56,21 +63,142 @@ public static class ResourceTestSetup
         Debug.Log($"Kaynak test sahnesi oluşturuldu: {ScenePath}");
     }
 
-    // Sahne ağaç paketi gelmeden oluşturulduysa, açıkken placeholder'ları gerçek ağaçlarla yeniden kurar.
-    static void UpgradePlaceholderTreesIfOpen()
+    // Sahne ağaç paketi gelmeden oluşturulduysa placeholder'ları gerçek ağaçlarla yeniden kurar.
+    static bool UpgradePlaceholderTrees()
     {
-        var scene = SceneManager.GetActiveScene();
-        if (scene.path != ScenePath || FindTreePrefabs().Length == 0)
-            return;
+        if (FindTreePrefabs().Length == 0)
+            return false;
         var root = GameObject.Find(RootName);
         var forest = root != null ? root.transform.Find("Forest") : null;
         if (forest == null || forest.childCount == 0 || PrefabUtility.IsPartOfPrefabInstance(forest.GetChild(0).gameObject))
-            return;
+            return false;
 
         Object.DestroyImmediate(root);
         Build();
-        EditorSceneManager.SaveScene(scene);
-        Debug.Log("Kaynak test sahnesindeki placeholder ağaçlar gerçek ağaç modelleriyle değiştirildi.");
+        return true;
+    }
+
+    // İzometrik kamera, tıklayarak toplama, EventSystem ve sol alt kaynak paneli; eksik olanları ekler.
+    static bool EnsureGameplayFeatures()
+    {
+        bool changed = false;
+
+        var camera = Camera.main;
+        if (camera != null && camera.GetComponent<IsometricCamera>() == null)
+        {
+            var iso = camera.gameObject.AddComponent<IsometricCamera>();
+            // Köy ile orman arasına, ekranın biraz soluna bakar.
+            iso.FocusPoint = Quaternion.Euler(0f, 45f, 0f) * new Vector3(-8f, 0f, 0f);
+            changed = true;
+        }
+        if (camera != null && camera.GetComponent<ClickHarvester>() == null)
+        {
+            camera.gameObject.AddComponent<ClickHarvester>();
+            changed = true;
+        }
+
+        if (Object.FindAnyObjectByType<EventSystem>() == null)
+        {
+            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            changed = true;
+        }
+
+        if (Object.FindAnyObjectByType<ResourceHUD>() == null)
+        {
+            BuildHud();
+            changed = true;
+        }
+        return changed;
+    }
+
+    static void BuildHud()
+    {
+        var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        canvasGo.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+        var scaler = canvasGo.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        var panel = new GameObject("Resource Panel", typeof(RectTransform), typeof(HorizontalLayoutGroup)).GetComponent<RectTransform>();
+        panel.SetParent(canvasGo.transform, false);
+        panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.zero;
+        panel.anchoredPosition = new Vector2(24f, 24f);
+        panel.sizeDelta = new Vector2(428f, 80f);
+        var layout = panel.GetComponent<HorizontalLayoutGroup>();
+        layout.spacing = 12f;
+        layout.childControlWidth = layout.childControlHeight = false;
+        layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+
+        var hud = canvasGo.AddComponent<ResourceHUD>();
+        var entries = new ResourceHUD.Entry[]
+        {
+            ResourceButton(panel, ResourceType.Wood, "Assets/UI/Icons/Wood.png"),
+            ResourceButton(panel, ResourceType.Stone, "Assets/UI/Icons/Stone.png"),
+        };
+        var so = new SerializedObject(hud);
+        var list = so.FindProperty("entries");
+        list.arraySize = entries.Length;
+        for (int i = 0; i < entries.Length; i++)
+        {
+            var element = list.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("type").enumValueIndex = (int)entries[i].type;
+            element.FindPropertyRelative("amountText").objectReferenceValue = entries[i].amountText;
+            element.FindPropertyRelative("pulseTarget").objectReferenceValue = entries[i].pulseTarget;
+        }
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    static ResourceHUD.Entry ResourceButton(Transform parent, ResourceType type, string iconPath)
+    {
+        var button = new GameObject($"{type} Button", typeof(RectTransform), typeof(Image), typeof(Button)).GetComponent<RectTransform>();
+        button.SetParent(parent, false);
+        button.sizeDelta = new Vector2(208f, 80f);
+        var background = button.GetComponent<Image>();
+        background.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        background.type = Image.Type.Sliced;
+        background.color = new Color(0.12f, 0.1f, 0.08f, 0.85f);
+
+        var icon = new GameObject("Icon", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+        icon.SetParent(button, false);
+        icon.anchorMin = icon.anchorMax = icon.pivot = new Vector2(0f, 0.5f);
+        icon.anchoredPosition = new Vector2(10f, 0f);
+        icon.sizeDelta = new Vector2(64f, 64f);
+        var iconImage = icon.GetComponent<Image>();
+        iconImage.sprite = LoadSprite(iconPath);
+        iconImage.preserveAspect = true;
+        iconImage.raycastTarget = false;
+
+        var label = new GameObject("Amount", typeof(RectTransform), typeof(Text)).GetComponent<RectTransform>();
+        label.SetParent(button, false);
+        label.anchorMin = Vector2.zero;
+        label.anchorMax = Vector2.one;
+        label.offsetMin = new Vector2(84f, 0f);
+        label.offsetMax = new Vector2(-12f, 0f);
+        var text = label.GetComponent<Text>();
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = 36;
+        text.fontStyle = FontStyle.Bold;
+        text.alignment = TextAnchor.MiddleLeft;
+        text.color = Color.white;
+        text.text = "0";
+        text.raycastTarget = false;
+
+        return new ResourceHUD.Entry { type = type, amountText = text, pulseTarget = button };
+    }
+
+    static Sprite LoadSprite(string path)
+    {
+        var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer != null && importer.textureType != TextureImporterType.Sprite)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
     static GameObject[] FindTreePrefabs()
@@ -94,6 +222,7 @@ public static class ResourceTestSetup
             return;
         }
         Build();
+        EnsureGameplayFeatures();
     }
 
     static void Build()
@@ -112,8 +241,10 @@ public static class ResourceTestSetup
         well.AddComponent<Well>();
 
         // Orman: köyün solu (-X).
+        // Kamera 45° döndüğü için orman da 45° döndürülür, böylece ekranda köyün tam soluna düşer.
         var forest = new GameObject("Forest").transform;
         forest.SetParent(root.transform);
+        forest.localRotation = Quaternion.Euler(0f, 45f, 0f);
         var random = new System.Random(1234);
         var treePrefabs = FindTreePrefabs();
         for (int i = 0; i < 12; i++)
@@ -146,7 +277,7 @@ public static class ResourceTestSetup
         Selection.activeGameObject = root;
     }
 
-    // Prefab'ı verilen yüksekliğe ölçekler, tabanını zemine oturtur ve gövdeye collider ekler.
+    // Prefab'ı verilen yüksekliğe ölçekler ve tabanını zemine oturtur.
     static GameObject TreeFromPrefab(GameObject prefab, Transform parent, Vector3 position, float height, float yRotation)
     {
         var tree = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
@@ -157,12 +288,7 @@ public static class ResourceTestSetup
             tree.transform.localScale *= height / bounds.size.y;
         bounds = RendererBounds(tree);
         tree.transform.position += Vector3.up * (position.y - bounds.min.y);
-
-        float scale = tree.transform.lossyScale.y;
-        var collider = tree.AddComponent<CapsuleCollider>();
-        collider.radius = 0.4f / scale;
-        collider.height = height / scale;
-        collider.center = tree.transform.InverseTransformPoint(new Vector3(tree.transform.position.x, position.y + height * 0.5f, tree.transform.position.z));
+        // Collider eklenmez: ResourceNode oyunda modelin tamamına göre kendisi ekler.
         return tree;
     }
 
