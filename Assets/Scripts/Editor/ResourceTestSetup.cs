@@ -402,6 +402,10 @@ public static class ResourceTestSetup
             var position = new Vector3(TownRadius + 16f + (float)random.NextDouble() * 24f, 0f, Mathf.Lerp(-55f, 110f, t) + ((float)random.NextDouble() - 0.5f) * 8f);
             float radius = 18f + (float)random.NextDouble() * 10f;
             float height = 32f + (float)random.NextDouble() * 26f;
+            // Maden ocaklarının hizasındaki dağlar geri itilir; yoksa eteği ocağı kaplar ve kamerada önünü kapatır.
+            foreach (float offset in QuarryOffsets)
+                if (Mathf.Abs(position.z - offset) < radius + 10f)
+                    position.x = Mathf.Max(position.x, QuarryDistance + 12f + radius * 0.9f);
 
             var mountain = new GameObject($"Mountain {i + 1}", typeof(MeshFilter), typeof(MeshRenderer));
             mountain.transform.SetParent(range, false);
@@ -466,6 +470,10 @@ public static class ResourceTestSetup
         return mesh;
     }
 
+    // Ocakların kasaba merkezine uzaklığı ve ekranın derinlik yönündeki konumları (dağ sırası çerçevesinde).
+    const float QuarryDistance = TownRadius + 9f;
+    static readonly float[] QuarryOffsets = { -16f, 0f, 16f };
+
     // Dağ eteklerinde maden ocakları (taş kaynağı). Girişleri kasabaya bakar; tıklanabilir ve vagonlar burada yüklenir.
     static void BuildQuarries(Transform parent, Quaternion screenFrame)
     {
@@ -473,15 +481,28 @@ public static class ResourceTestSetup
         quarries.SetParent(parent, false);
         var rock = ColorMaterial(new Color(0.46f, 0.43f, 0.4f));
         var random = new System.Random(5);
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(QuarryModelPath);
 
-        float[] offsets = { -16f, 0f, 16f };
-        for (int i = 0; i < offsets.Length; i++)
+        for (int i = 0; i < QuarryOffsets.Length; i++)
         {
-            var position = screenFrame * new Vector3(TownRadius + 9f, 0f, offsets[i]);
+            var position = screenFrame * new Vector3(QuarryDistance, 0f, QuarryOffsets[i]);
             var quarry = new GameObject($"Quarry {i + 1}").transform;
             quarry.SetParent(quarries, false);
             quarry.localPosition = position;
             quarry.localRotation = Quaternion.LookRotation(-new Vector3(position.x, 0f, position.z)); // +Z kasabaya bakar
+
+            var node = quarry.gameObject.AddComponent<ResourceNode>();
+            var so = new SerializedObject(node);
+            so.FindProperty("type").enumValueIndex = (int)ResourceType.Stone;
+            so.FindProperty("capacity").intValue = 200;
+            so.FindProperty("regrowSeconds").floatValue = 15f;
+            so.FindProperty("maxGatherers").intValue = 3;
+            so.FindProperty("hitShakeAngle").floatValue = 1.5f;
+            if (model != null)
+                so.FindProperty("depletedHide").objectReferenceValue = QuarryModel(quarry, model);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            if (model != null)
+                continue;
 
             var mound = new GameObject("Mound", typeof(MeshFilter), typeof(MeshRenderer));
             mound.transform.SetParent(quarry, false);
@@ -501,16 +522,42 @@ public static class ResourceTestSetup
             };
             foreach (var part in parts)
                 Object.DestroyImmediate(part.GetComponent<Collider>());
-
-            var node = quarry.gameObject.AddComponent<ResourceNode>();
-            var so = new SerializedObject(node);
-            so.FindProperty("type").enumValueIndex = (int)ResourceType.Stone;
-            so.FindProperty("capacity").intValue = 200;
-            so.FindProperty("regrowSeconds").floatValue = 15f;
-            so.FindProperty("maxGatherers").intValue = 3;
-            so.FindProperty("hitShakeAngle").floatValue = 1.5f;
-            so.ApplyModifiedPropertiesWithoutUndo();
         }
+    }
+
+    const string QuarryModelPath = "Assets/Meshes/Quarry.fbx";
+
+    // Palet malzemesiyle boyanan ocak modeli (Art/Blender/quarry.py). Girişi +Z'de, raylar kasabaya uzanır.
+    // Tıklama yalnız kaya kütlesine ve taş kemere tutsun diye collider onlara eklenir; raylar ve süsler boşta kalır.
+    // Döndürdüğü taş istifi ocak tükenince gizlenir.
+    static GameObject QuarryModel(Transform quarry, GameObject model)
+    {
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(model, quarry);
+        instance.name = "Model";
+        // İzometrik kamera ocakları yandan görüyor; giriş kameraya biraz dönsün diye model çevrilir.
+        instance.transform.localRotation = Quaternion.Euler(0f, -35f, 0f);
+        var palette = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
+        foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
+        {
+            if (palette != null)
+                renderer.sharedMaterials = System.Array.ConvertAll(renderer.sharedMaterials, _ => palette);
+            switch (renderer.name)
+            {
+                case "Rocks":
+                case "Portal":
+                    renderer.gameObject.AddComponent<MeshCollider>().sharedMesh = renderer.GetComponent<MeshFilter>().sharedMesh;
+                    break;
+                case "Lantern":
+                case "PostLantern0":
+                case "PostLantern1":
+                case "Bucket":
+                    // Pivotları kancada; hafifçe sallanırlar.
+                    renderer.gameObject.AddComponent<Sway>();
+                    break;
+            }
+        }
+        var pile = System.Array.Find(instance.GetComponentsInChildren<Transform>(), t => t.name == "StonePile");
+        return pile != null ? pile.gameObject : null;
     }
 
     // Maden vagonları: oduncular gibi otomatik çalışır, ocaktan taş yükleyip kuyuya götürür ve atar.

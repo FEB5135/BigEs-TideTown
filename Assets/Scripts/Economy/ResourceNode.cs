@@ -15,6 +15,8 @@ public class ResourceNode : MonoBehaviour
     [SerializeField] float regrowSeconds = 30f;
     [Tooltip("Aynı anda kaç toplayıcı çalışabilir (ağaç 1, maden ocağı birkaç vagon).")]
     [SerializeField] int maxGatherers = 1;
+    [Tooltip("Tükenince yalnız bu gizlenir (örn. ocaktaki taş yığını). Boşsa tüm model gizlenir.")]
+    [SerializeField] GameObject depletedHide;
 
     [Header("Tıklama Geri Bildirimi")]
     [SerializeField] float hitShakeDuration = 0.2f;
@@ -140,8 +142,11 @@ public class ResourceNode : MonoBehaviour
             shake = null;
             transform.localRotation = restRotation;
         }
-        foreach (var r in GetComponentsInChildren<Renderer>())
-            r.enabled = visible;
+        if (depletedHide != null)
+            depletedHide.SetActive(visible);
+        else
+            foreach (var r in GetComponentsInChildren<Renderer>())
+                r.enabled = visible;
         foreach (var c in GetComponentsInChildren<Collider>())
             c.enabled = visible;
     }

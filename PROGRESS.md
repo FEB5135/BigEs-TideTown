@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (01:45)
+Son güncelleme: 2026-10-17 (02:45)
 
 ## Bağlam
 
@@ -44,10 +44,13 @@ Son güncelleme: 2026-10-17 (01:45)
   - Solda kasabanın dışında 34 ağaçlık orman (FinottiGames), 5 oduncu (hız 5).
   - Sağda dağ sırası (yükseklik 32–58 m). Kasabanın arkasında vadi: sağ duvarı dağ sırası, sol duvarı tek büyük dağ. **Tsunami bu vadiden gelecek.**
   - Zemin 300 m. Kamera zoom 15–160 (başlangıç 70), kaydırma ±120 m.
+- **Maden ocağı modeli (v2, detaylı):** `Assets/Meshes/Quarry.fbx` (~15.8k üçgen, `palette.png` UV'leriyle, kuyu stilinde). Blender 4.2 arka planda scriptle kuruldu: `Art/Blender/quarry.py` (+ `common.py`, `quarry.blend`, `quarry_preview*.png`). Yeniden üretmek için: `QUARRY_FBX=<yol> blender -b --python Art/Blender/quarry.py`. İçerik: katmanlı kaya kütlesi, kuyunun tuğla dilinde taş kemerli giriş, kemerli ve derine doğru kararan tünel, ahşap iç destekler, raylar, paletli taş istifi, vinç ve kova, alet sundurması, el arabası, fenerli direkler, tabela, sarı kristaller, bayrak. Alt nesneler: Rocks, Tunnel, Portal, Frame, Rails, StonePile, Crane, Bucket, Shed, Props, Sacks, Barrow, Sign, Posts, Crystals ve Lantern/PostLantern0/PostLantern1/Bucket (pivotları kancada, sallanabilir). Giriş Unity'de +Z'ye bakmalı (sahnede henüz doğrulanmadı). Sahnedeki placeholder ocaklar henüz bununla değiştirilmedi.
+  - **Sahnede:** `BuildQuarries` artık `Quarry.fbx`'i kullanıyor (yoksa eski placeholder). Model `Flat.mat` ile boyanıyor, kameraya dönsün diye -35° çevrili. Collider yalnız Rocks ve Portal'da (MeshCollider), raylar ve süsler tıklanmıyor. Fenerler ve kova `Sway` (`Assets/Scripts/Gameplay/Sway.cs`) ile hafifçe sallanıyor. Ocak tükenince yalnız taş istifi gizleniyor (`ResourceNode.depletedHide`, boşsa eskisi gibi tüm model). Ocak hizasındaki dağlar geri itildi (`BuildMountains`, `QuarryOffsets`), yoksa ortadaki ocağı kapatıyordu. Play'de vagonların taş taşıdığı görüldü (sayaç arttı). Sallanma Play'de gözle kontrol edilmedi.
 - **Kural uyumu:** `THIRD_PARTY.md`'de tüm hazır kaynaklar ve AI kullanımı yazılı. FinottiGames ağaç paketi (Asset Store EULA) `.gitignore`'da ve geçmişten silindi.
 
 ## Sıradaki işler / açık konular
 
+- [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
 - [ ] Duvar ekibine `Well.TrySpend` / `ResourceCost` kullanımını anlatmak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.

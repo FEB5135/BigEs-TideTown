@@ -31,7 +31,7 @@ Ses, metin, diğer: kullanılmadı (şimdilik).
 | Kategori | Kullanım | Araç | Amaç ve kullanım yeri |
 | --- | --- | --- | --- |
 | Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, kamera, tıklama ve arayüz scriptleri; test sahnesi kurulum scripti; Unity paket derleme hatasının çözümü. |
-| Görsel | Kullanılmadı | — | İlk sürümdeki AI tarafından çizilen ikonlar, saint11 CC0 ikonlarıyla değiştirildi. |
+| Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı 3B modeli (`Assets/Meshes/Quarry.fbx`): Claude, modeli Blender Python scriptiyle (`Art/Blender/quarry.py`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. İlk sürümdeki AI tarafından çizilen ikonlar ise saint11 CC0 ikonlarıyla değiştirildi. |
 | Ses | Kullanılmadı | — | — |
 | Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası ve kod içi açıklamalar. |
 | Diğer | Kullanılmadı | — | — |
