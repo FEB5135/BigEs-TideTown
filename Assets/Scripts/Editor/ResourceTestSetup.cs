@@ -259,17 +259,12 @@ public static class ResourceTestSetup
         var root = new GameObject(RootName);
         Undo.RegisterCreatedObjectUndo(root, "Kaynak Test Sahnesi Kur");
 
-        if (Object.FindAnyObjectByType<Terrain>() == null)
-        {
-            var ground = Primitive(PrimitiveType.Plane, "Ground", root.transform, Vector3.zero, new Vector3(16f, 1f, 16f), new Color(0.35f, 0.55f, 0.3f));
-            ground.isStatic = true;
-        }
-
-        BuildWell(root.transform);
-
         // Kamera 45° döndüğü için "ekranın sağı/solu" dünya eksenlerinin 45° döndürülmüşü.
         var screenFrame = Quaternion.Euler(0f, 45f, 0f);
-        BuildMountains(root.transform, screenFrame);
+        if (Object.FindAnyObjectByType<Terrain>() == null)
+            BuildIsland(root.transform, screenFrame);
+
+        BuildWell(root.transform);
         BuildVillage(root.transform, screenFrame * Vector3.left);
 
         // Orman: köyün solu (-X).
@@ -376,74 +371,102 @@ public static class ResourceTestSetup
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    // Ekranın sağında yüksek, karlı dağ sırası (konsept placeholder).
-    static void BuildMountains(Transform parent, Quaternion screenFrame)
+    // Haritanın genel şekli (konsept): ortada düz, yeşil bir çanak; çevresi yüksek dağ duvarı.
+    // Sağda dağ kasabaya yakın, solda çanak ormana yer açmak için uzar, önde denize inen alçak bir geçit var.
+    // Dağın dışı kumsal ve deniz.
+    static void BuildIsland(Transform parent, Quaternion screenFrame)
     {
-        var range = new GameObject("Mountains").transform;
-        range.SetParent(parent, false);
-        range.localRotation = screenFrame;
-
-        var rock = ColorMaterial(new Color(0.46f, 0.43f, 0.4f));
-        var snow = ColorMaterial(new Color(0.93f, 0.95f, 0.98f));
-        var random = new System.Random(42);
-        for (int i = 0; i < 8; i++)
+        var island = new GameObject("Island", typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider));
+        island.transform.SetParent(parent, false);
+        island.isStatic = true;
+        var mesh = IslandMesh(screenFrame, 95f, 120);
+        island.GetComponent<MeshFilter>().sharedMesh = mesh;
+        island.GetComponent<MeshCollider>().sharedMesh = mesh;
+        island.GetComponent<MeshRenderer>().sharedMaterials = new[]
         {
-            float t = i / 7f;
-            var position = new Vector3(36f + (float)random.NextDouble() * 18f, 0f, Mathf.Lerp(-34f, 34f, t) + ((float)random.NextDouble() - 0.5f) * 6f);
-            float radius = 10f + (float)random.NextDouble() * 7f;
-            float height = 16f + (float)random.NextDouble() * 16f;
+            ColorMaterial(new Color(0.62f, 0.8f, 0.42f)), // çimen
+            ColorMaterial(new Color(0.86f, 0.85f, 0.8f)), // kaya
+            ColorMaterial(new Color(0.9f, 0.85f, 0.66f)), // kum
+        };
 
-            var mountain = new GameObject($"Mountain {i + 1}", typeof(MeshFilter), typeof(MeshRenderer));
-            mountain.transform.SetParent(range, false);
-            mountain.transform.localPosition = position;
-            mountain.transform.localRotation = Quaternion.Euler(0f, (float)random.NextDouble() * 360f, 0f);
-            mountain.GetComponent<MeshFilter>().sharedMesh = MountainMesh(random, radius, height, 9);
-            mountain.GetComponent<MeshRenderer>().sharedMaterials = new[] { rock, snow };
-        }
+        var sea = Primitive(PrimitiveType.Plane, "Sea", parent, new Vector3(0f, -0.6f, 0f), new Vector3(60f, 1f, 60f), new Color(0.1f, 0.27f, 0.45f));
+        Object.DestroyImmediate(sea.GetComponent<Collider>());
     }
 
-    // Alçak poligonlu dağ: taban halkası, omuz halkası ve zirve. Omuzdan zirveye kadar olan kısım karlı (2. alt mesh).
-    static Mesh MountainMesh(System.Random random, float radius, float height, int sides)
+    // Kuyuya göre ekran yönündeki konumdan (sağ, yukarı) yükseklik. outside: dağ duvarının dışında mı.
+    static float IslandHeight(float right, float up, out bool outside)
     {
-        var bottom = new Vector3[sides];
-        var shoulder = new Vector3[sides];
-        for (int i = 0; i < sides; i++)
+        float angle = Mathf.Atan2(up, right); // 0 = ekranın sağı, π/2 = ekranın üstü
+        float distance = Mathf.Sqrt(right * right + up * up);
+        float noise = Mathf.PerlinNoise(Mathf.Cos(angle) * 2f + 10f, Mathf.Sin(angle) * 2f + 10f);
+
+        // Çanağın kenarı: sağda ~29 m, solda ~51 m (orman), önde ve arkada ~38 m.
+        float basinRadius = 40f - 11f * Mathf.Cos(angle) - 2f * Mathf.Sin(angle) + (noise - 0.5f) * 8f;
+        float fromWall = distance - basinRadius;
+        outside = fromWall > 0f;
+
+        // Önde (ekranın altı) denize inen alçak geçit.
+        float toFront = Mathf.DeltaAngle(angle * Mathf.Rad2Deg, -90f) * Mathf.Deg2Rad;
+        float gap = 1f - 0.85f * Mathf.Exp(-(toFront * toFront) / (0.3f * 0.3f));
+
+        if (!outside)
+            return Mathf.SmoothStep(0f, 1.5f * gap, (fromWall + 6f) / 6f); // duvarın dibinde hafifçe yükselir
+
+        float peak = (22f + noise * 14f) * gap;
+        float crag = (Mathf.PerlinNoise(right * 0.12f + 3f, up * 0.12f + 7f) - 0.5f) * 8f * gap;
+        float rise = Mathf.SmoothStep(0f, 1f, fromWall / 10f);
+        float fall = 1f - Mathf.SmoothStep(0f, 1f, (fromWall - 14f) / 14f);
+        // Kıyıdan sonra deniz tabanına iner.
+        return (peak + crag) * rise * fall - 3f * Mathf.SmoothStep(0f, 1f, (fromWall - 26f) / 8f);
+    }
+
+    // Izgaradan köşeli (düz gölgeli) ada meshi: çimen, kaya ve kum için üç alt mesh.
+    static Mesh IslandMesh(Quaternion screenFrame, float halfSize, int cells)
+    {
+        var screenRight = screenFrame * Vector3.right;
+        var screenUp = screenFrame * Vector3.forward;
+        float step = halfSize * 2f / cells;
+        int row = cells + 1;
+        var grid = new Vector3[row * row];
+        var outside = new bool[row * row];
+        for (int z = 0; z < row; z++)
+        for (int x = 0; x < row; x++)
         {
-            float angle = (i + ((float)random.NextDouble() - 0.5f) * 0.4f) * Mathf.PI * 2f / sides;
-            var direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
-            float bottomRadius = radius * (0.8f + (float)random.NextDouble() * 0.4f);
-            bottom[i] = direction * bottomRadius;
-            shoulder[i] = direction * bottomRadius * (0.38f + (float)random.NextDouble() * 0.15f)
-                + Vector3.up * height * (0.5f + (float)random.NextDouble() * 0.12f);
+            var p = new Vector3(-halfSize + x * step, 0f, -halfSize + z * step);
+            p.y = IslandHeight(Vector3.Dot(p, screenRight), Vector3.Dot(p, screenUp), out outside[z * row + x]);
+            grid[z * row + x] = p;
         }
-        var peak = new Vector3(((float)random.NextDouble() - 0.5f) * radius * 0.15f, height, ((float)random.NextDouble() - 0.5f) * radius * 0.15f);
 
         var vertices = new System.Collections.Generic.List<Vector3>();
-        var rockTriangles = new System.Collections.Generic.List<int>();
-        var snowTriangles = new System.Collections.Generic.List<int>();
-        var below = new Vector3(0f, -height, 0f);
-        void Triangle(System.Collections.Generic.List<int> list, Vector3 a, Vector3 b, Vector3 c)
+        var grass = new System.Collections.Generic.List<int>();
+        var rock = new System.Collections.Generic.List<int>();
+        var sand = new System.Collections.Generic.List<int>();
+        void Triangle(int ia, int ib, int ic)
         {
-            // Her üçgen kendi köşelerini alır (köşeli, düz gölgeli görünüm); yüzü dışa baksın.
-            if (Vector3.Dot(Vector3.Cross(b - a, c - a), (a + b + c) / 3f - below) < 0f)
-                (b, c) = (c, b);
+            Vector3 a = grid[ia], b = grid[ib], c = grid[ic];
+            float height = (a.y + b.y + c.y) / 3f;
+            float flatness = Vector3.Cross(b - a, c - a).normalized.y;
+            var list = height < 1.2f && outside[ia] && outside[ib] && outside[ic] ? sand
+                : height < 2.5f && flatness > 0.75f ? grass
+                : rock;
             list.Add(vertices.Count); vertices.Add(a);
             list.Add(vertices.Count); vertices.Add(b);
             list.Add(vertices.Count); vertices.Add(c);
         }
-        for (int i = 0; i < sides; i++)
+        for (int z = 0; z < cells; z++)
+        for (int x = 0; x < cells; x++)
         {
-            int next = (i + 1) % sides;
-            Triangle(rockTriangles, bottom[i], bottom[next], shoulder[next]);
-            Triangle(rockTriangles, bottom[i], shoulder[next], shoulder[i]);
-            Triangle(snowTriangles, shoulder[i], shoulder[next], peak);
+            int a = z * row + x, b = (z + 1) * row + x, c = (z + 1) * row + x + 1, d = z * row + x + 1;
+            Triangle(a, b, c); // yukarıdan bakınca saat yönünde: yüzü yukarı
+            Triangle(a, c, d);
         }
 
-        var mesh = new Mesh { name = "Mountain" };
+        var mesh = new Mesh { name = "Island", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
         mesh.SetVertices(vertices);
-        mesh.subMeshCount = 2;
-        mesh.SetTriangles(rockTriangles, 0);
-        mesh.SetTriangles(snowTriangles, 1);
+        mesh.subMeshCount = 3;
+        mesh.SetTriangles(grass, 0);
+        mesh.SetTriangles(rock, 1);
+        mesh.SetTriangles(sand, 2);
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         return mesh;

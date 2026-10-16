@@ -14,7 +14,7 @@ public class IsometricCamera : MonoBehaviour
 
     [Header("Zoom")]
     [SerializeField] float minDistance = 12f;
-    [SerializeField] float maxDistance = 70f;
+    [SerializeField] float maxDistance = 90f;
     [SerializeField] float distance = 30f;
     [Tooltip("Tekerleğin her çentiğinde değişen mesafe.")]
     [SerializeField] float zoomStep = 4f;
