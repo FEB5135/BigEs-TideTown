@@ -261,11 +261,16 @@ public static class ResourceTestSetup
 
         if (Object.FindAnyObjectByType<Terrain>() == null)
         {
-            var ground = Primitive(PrimitiveType.Plane, "Ground", root.transform, Vector3.zero, new Vector3(10f, 1f, 10f), new Color(0.35f, 0.55f, 0.3f));
+            var ground = Primitive(PrimitiveType.Plane, "Ground", root.transform, Vector3.zero, new Vector3(16f, 1f, 16f), new Color(0.35f, 0.55f, 0.3f));
             ground.isStatic = true;
         }
 
         BuildWell(root.transform);
+
+        // Kamera 45° döndüğü için "ekranın sağı/solu" dünya eksenlerinin 45° döndürülmüşü.
+        var screenFrame = Quaternion.Euler(0f, 45f, 0f);
+        BuildMountains(root.transform, screenFrame);
+        BuildVillage(root.transform, screenFrame * Vector3.left);
 
         // Orman: köyün solu (-X).
         // Kamera 45° döndüğü için orman da 45° döndürülür, böylece ekranda köyün tam soluna düşer.
@@ -366,7 +371,133 @@ public static class ResourceTestSetup
         var so = new SerializedObject(well.GetComponent<Well>());
         so.FindProperty("dropPoint").objectReferenceValue = mouth;
         so.FindProperty("approachRadius").floatValue = outerRadius + 0.8f;
+        so.FindProperty("innerRadius").floatValue = innerRadius;
+        so.FindProperty("targetDepth").floatValue = Mathf.Max(0.5f, (height - floorHeight) * 0.6f);
         so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // Ekranın sağında yüksek, karlı dağ sırası (konsept placeholder).
+    static void BuildMountains(Transform parent, Quaternion screenFrame)
+    {
+        var range = new GameObject("Mountains").transform;
+        range.SetParent(parent, false);
+        range.localRotation = screenFrame;
+
+        var rock = ColorMaterial(new Color(0.46f, 0.43f, 0.4f));
+        var snow = ColorMaterial(new Color(0.93f, 0.95f, 0.98f));
+        var random = new System.Random(42);
+        for (int i = 0; i < 8; i++)
+        {
+            float t = i / 7f;
+            var position = new Vector3(36f + (float)random.NextDouble() * 18f, 0f, Mathf.Lerp(-34f, 34f, t) + ((float)random.NextDouble() - 0.5f) * 6f);
+            float radius = 10f + (float)random.NextDouble() * 7f;
+            float height = 16f + (float)random.NextDouble() * 16f;
+
+            var mountain = new GameObject($"Mountain {i + 1}", typeof(MeshFilter), typeof(MeshRenderer));
+            mountain.transform.SetParent(range, false);
+            mountain.transform.localPosition = position;
+            mountain.transform.localRotation = Quaternion.Euler(0f, (float)random.NextDouble() * 360f, 0f);
+            mountain.GetComponent<MeshFilter>().sharedMesh = MountainMesh(random, radius, height, 9);
+            mountain.GetComponent<MeshRenderer>().sharedMaterials = new[] { rock, snow };
+        }
+    }
+
+    // Alçak poligonlu dağ: taban halkası, omuz halkası ve zirve. Omuzdan zirveye kadar olan kısım karlı (2. alt mesh).
+    static Mesh MountainMesh(System.Random random, float radius, float height, int sides)
+    {
+        var bottom = new Vector3[sides];
+        var shoulder = new Vector3[sides];
+        for (int i = 0; i < sides; i++)
+        {
+            float angle = (i + ((float)random.NextDouble() - 0.5f) * 0.4f) * Mathf.PI * 2f / sides;
+            var direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+            float bottomRadius = radius * (0.8f + (float)random.NextDouble() * 0.4f);
+            bottom[i] = direction * bottomRadius;
+            shoulder[i] = direction * bottomRadius * (0.38f + (float)random.NextDouble() * 0.15f)
+                + Vector3.up * height * (0.5f + (float)random.NextDouble() * 0.12f);
+        }
+        var peak = new Vector3(((float)random.NextDouble() - 0.5f) * radius * 0.15f, height, ((float)random.NextDouble() - 0.5f) * radius * 0.15f);
+
+        var vertices = new System.Collections.Generic.List<Vector3>();
+        var rockTriangles = new System.Collections.Generic.List<int>();
+        var snowTriangles = new System.Collections.Generic.List<int>();
+        var below = new Vector3(0f, -height, 0f);
+        void Triangle(System.Collections.Generic.List<int> list, Vector3 a, Vector3 b, Vector3 c)
+        {
+            // Her üçgen kendi köşelerini alır (köşeli, düz gölgeli görünüm); yüzü dışa baksın.
+            if (Vector3.Dot(Vector3.Cross(b - a, c - a), (a + b + c) / 3f - below) < 0f)
+                (b, c) = (c, b);
+            list.Add(vertices.Count); vertices.Add(a);
+            list.Add(vertices.Count); vertices.Add(b);
+            list.Add(vertices.Count); vertices.Add(c);
+        }
+        for (int i = 0; i < sides; i++)
+        {
+            int next = (i + 1) % sides;
+            Triangle(rockTriangles, bottom[i], bottom[next], shoulder[next]);
+            Triangle(rockTriangles, bottom[i], shoulder[next], shoulder[i]);
+            Triangle(snowTriangles, shoulder[i], shoulder[next], peak);
+        }
+
+        var mesh = new Mesh { name = "Mountain" };
+        mesh.SetVertices(vertices);
+        mesh.subMeshCount = 2;
+        mesh.SetTriangles(rockTriangles, 0);
+        mesh.SetTriangles(snowTriangles, 1);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    // Kuyunun çevresinde kapıları kuyuya bakan konsept evler. Orman yönü köylülerin yolu olduğu için boş bırakılır.
+    static void BuildVillage(Transform parent, Vector3 forestDirection)
+    {
+        var village = new GameObject("Village").transform;
+        village.SetParent(parent, false);
+
+        var random = new System.Random(77);
+        var walls = new[] { new Color(0.86f, 0.78f, 0.62f), new Color(0.8f, 0.7f, 0.55f), new Color(0.9f, 0.84f, 0.72f) };
+        var roofs = new[] { new Color(0.6f, 0.25f, 0.18f), new Color(0.5f, 0.3f, 0.2f), new Color(0.42f, 0.22f, 0.16f) };
+        const int slots = 14;
+        int built = 0;
+        for (int i = 0; i < slots; i++)
+        {
+            var direction = Quaternion.Euler(0f, i * 360f / slots + ((float)random.NextDouble() - 0.5f) * 10f, 0f) * Vector3.forward;
+            if (Vector3.Angle(direction, forestDirection) < 40f)
+                continue;
+
+            float distance = 13f + (float)random.NextDouble() * 5f;
+            float width = 3f + (float)random.NextDouble() * 1.6f;
+            float depth = 3f + (float)random.NextDouble() * 1.2f;
+            float wallHeight = 2.2f + (float)random.NextDouble() * 0.7f;
+
+            var house = new GameObject($"House {++built}").transform;
+            house.SetParent(village, false);
+            house.localPosition = direction * distance;
+            house.localRotation = Quaternion.LookRotation(-direction); // +Z kuyuya bakar
+
+            var body = Primitive(PrimitiveType.Cube, "Walls", house, new Vector3(0f, wallHeight * 0.5f, 0f),
+                new Vector3(width, wallHeight, depth), walls[random.Next(walls.Length)]);
+            // Çatı: 45° döndürülmüş küp, üst yarısı üçgen bir çatı sırtı gibi görünür.
+            float side = depth / Mathf.Sqrt(2f) * 1.08f;
+            var roof = Primitive(PrimitiveType.Cube, "Roof", house, new Vector3(0f, wallHeight, 0f),
+                new Vector3(width + 0.4f, side, side), roofs[random.Next(roofs.Length)]);
+            roof.transform.localRotation = Quaternion.Euler(45f, 0f, 0f);
+            var door = Primitive(PrimitiveType.Cube, "Door", house, new Vector3(0f, 0.75f, depth * 0.5f + 0.02f),
+                new Vector3(0.8f, 1.5f, 0.05f), new Color(0.3f, 0.18f, 0.1f));
+
+            // Köylülerin zemine yapışması ve tıklama için engel olmasınlar.
+            foreach (var part in new[] { body, roof, door })
+                Object.DestroyImmediate(part.GetComponent<Collider>());
+        }
+    }
+
+    static Material ColorMaterial(Color color)
+    {
+        var probe = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        var material = new Material(probe.GetComponent<Renderer>().sharedMaterial) { color = color };
+        Object.DestroyImmediate(probe);
+        return material;
     }
 
     static void BuildStoneRing(Transform well, float ringRadius, float thickness, float height)

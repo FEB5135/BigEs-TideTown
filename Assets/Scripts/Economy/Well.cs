@@ -8,16 +8,22 @@ public class Well : MonoBehaviour
 {
     public static Well Instance { get; private set; }
 
-    [Tooltip("Kuyunun ağzının ortası. Kaynaklar bunun tam üstünden bırakılır. Boşsa kuyunun kendi pozisyonu kullanılır.")]
+    [Tooltip("Kuyunun ağzının ortası (duvarın üst kenarı hizasında). Boşsa kuyunun kendi pozisyonu kullanılır.")]
     [SerializeField] Transform dropPoint;
+    [Tooltip("Kuyunun iç duvar yarıçapı. Atışın duvarın üstünden geçmesi bu değere göre hesaplanır.")]
+    [SerializeField] float innerRadius = 1.4f;
     [Tooltip("Köylülerin kaynağı atmak için kuyunun merkezine en fazla ne kadar yaklaşacağı (duvarın dışı).")]
     [SerializeField] float approachRadius = 3f;
-    [Tooltip("Kaynağın kuyunun ne kadar üstünden serbest düşüşe bırakılacağı.")]
-    [SerializeField] float releaseHeight = 3.5f;
-    [Tooltip("Atış kavisinin, başlangıç ile bırakma noktası arasındaki en yüksek ek yüksekliği.")]
+
+    [Header("Eğik atış")]
+    [Tooltip("Atışın hedeflediği nokta, kuyu ağzının bu kadar altında.")]
+    [SerializeField] float targetDepth = 1.2f;
+    [Tooltip("Yörüngenin tepe noktası, başlangıç ile kuyu ağzının yüksek olanının bu kadar üstünde.")]
     [SerializeField] float arcHeight = 3f;
-    [SerializeField] float minFlightTime = 0.45f;
-    [SerializeField] float flightTimePerMeter = 0.025f;
+    [Tooltip("Yörüngenin kuyu duvarının üstünden en az ne kadar yüksekten geçeceği.")]
+    [SerializeField] float rimClearance = 0.6f;
+    [Tooltip("Uçarken dönme hızı (derece/sn).")]
+    [SerializeField] float spinSpeed = 420f;
     [Tooltip("Kaynak kuyuya hiç düşmezse bu kadar saniye sonra yine de depoya eklenir.")]
     [SerializeField] float pickupTimeout = 6f;
     [Tooltip("ResourceType sırasıyla (Wood, Stone) atış görselleri. Boşsa basit bir kütük/taş oluşturulur.")]
@@ -90,7 +96,8 @@ public class Well : MonoBehaviour
 
     public bool TrySpend(ResourceType type, int amount) => TrySpend(new[] { new ResourceCost(type, amount) });
 
-    // Kaynağı "from" noktasından kavisle kuyunun üstüne uçurur, oradan kuyunun boşluğuna düşürür.
+    // Kaynağı "from" noktasından eğik atışla kuyuya fırlatır. Yörünge baştan hesaplanır
+    // (tek bir parabol), parça duvarın üstünden geçip kuyunun içine iner.
     // Miktar, parça kuyunun içindeki WellIntake tetikleyicisine girince artar.
     public void Throw(ResourceType type, int amount, Vector3 from)
     {
@@ -106,28 +113,59 @@ public class Well : MonoBehaviour
         piece.GetComponent<ResourcePickup>().Init(this, type, amount, pickupTimeout);
 
         var mouth = dropPoint != null ? dropPoint.position : transform.position;
-        var release = mouth + Vector3.up * releaseHeight;
-        float duration = minFlightTime + Vector3.Distance(from, release) * flightTimePerMeter;
-        var spin = UnityEngine.Random.onUnitSphere * 540f;
+        var target = mouth + Vector3.down * targetDepth;
+        var gravity = Physics.gravity;
+        var velocity = SolveLaunchVelocity(from, target, mouth.y, out float flightTime);
+        var spin = UnityEngine.Random.onUnitSphere * spinSpeed;
 
-        for (float t = 0f; t < 1f; t += Time.deltaTime / duration)
+        // p(t) = p0 + v0·t + ½·g·t²  — fizik adımlarıyla aynı anda ilerler.
+        for (float t = 0f; t < flightTime;)
         {
+            yield return new WaitForFixedUpdate();
             if (piece == null)
                 yield break;
-            var pos = Vector3.Lerp(from, release, t);
-            pos.y += Mathf.Sin(t * Mathf.PI) * arcHeight;
-            piece.transform.position = pos;
-            piece.transform.Rotate(spin * Time.deltaTime, Space.World);
-            yield return null;
+            t = Mathf.Min(t + Time.fixedDeltaTime, flightTime);
+            body.MovePosition(from + velocity * t + 0.5f * t * t * gravity);
+            body.MoveRotation(Quaternion.Euler(spin * Time.fixedDeltaTime) * body.rotation);
         }
         if (piece == null)
             yield break;
 
-        // Tepeden serbest düşüş: fizik devralır, kütük dönerek boşluğa düşer.
-        piece.transform.position = release;
+        // Hedefe varınca fizik devralır, aynı hızla devam edip kuyunun dibine düşer.
         body.isKinematic = false;
-        body.linearVelocity = Vector3.down * 2f;
-        body.angularVelocity = UnityEngine.Random.insideUnitSphere * 6f;
+        body.linearVelocity = velocity + gravity * flightTime;
+        body.angularVelocity = spin * Mathf.Deg2Rad;
+    }
+
+    // Başlangıçtan hedefe giden parabolün ilk hızını bulur.
+    // Tepe yüksekliği H seçilir: yukarı çıkış t1 = √(2(H−y0)/g), iniş t2 = √(2(H−yh)/g), T = t1 + t2.
+    // Dikey hız vy = g·t1, yatay hız = yatay mesafe / T. Yörünge duvarın üstünden geçmezse H artırılır.
+    Vector3 SolveLaunchVelocity(Vector3 from, Vector3 target, float rimY, out float flightTime)
+    {
+        float g = Mathf.Max(0.01f, -Physics.gravity.y);
+        var horizontal = new Vector3(target.x - from.x, 0f, target.z - from.z);
+        float distance = horizontal.magnitude;
+        float apex = Mathf.Max(from.y, rimY) + arcHeight;
+
+        Vector3 velocity = Vector3.zero;
+        flightTime = 0f;
+        for (int attempt = 0; attempt < 12; attempt++, apex += 1f)
+        {
+            float tUp = Mathf.Sqrt(2f * (apex - from.y) / g);
+            float tDown = Mathf.Sqrt(2f * (apex - target.y) / g);
+            flightTime = tUp + tDown;
+            float horizontalSpeed = distance / flightTime;
+            velocity = (distance > 0.0001f ? horizontal / distance * horizontalSpeed : Vector3.zero) + Vector3.up * g * tUp;
+
+            // Duvarı geçtiği an: hedefe yatayda innerRadius kaldığında.
+            if (distance <= innerRadius || horizontalSpeed <= 0.0001f)
+                break;
+            float tRim = (distance - innerRadius) / horizontalSpeed;
+            float heightAtRim = from.y + velocity.y * tRim - 0.5f * g * tRim * tRim;
+            if (heightAtRim >= rimY + rimClearance)
+                break;
+        }
+        return velocity;
     }
 
     GameObject CreatePiece(ResourceType type)
