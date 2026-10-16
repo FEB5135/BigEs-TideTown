@@ -9,6 +9,7 @@ Kural kitapçığı madde 3.4, 3.6 ve 4.2 için tutulan liste. Teslim formundaki
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
 | Resources 1 — saint11 | https://opengameart.org/content/resouces-pack-1 | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) | `Wood.png` ve `Stone.png`, sol alttaki kaynak panelinde ikon olarak (`Assets/UI/Icons/`). Değiştirilmedi. | Evet |
+| UI Pack: RPG Expansion — Kenney (kenney.nl) | https://kenney.nl/assets/ui-pack-rpg-expansion | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) | `buttonLong_brown`, `buttonLong_brown_pressed` ve `panelInset_beige`: sol alttaki odun/taş butonlarının çerçevesi ve ikon yuvası (`Assets/UI/Kenney/`). Değiştirilmedi, 9-slice ile ölçekleniyor. | Evet |
 | LowPoly Trees Game-Ready Free-Asset — FinottiGames | Unity Asset Store (Package Manager > My Assets) | Unity Asset Store Standard EULA (https://unity.com/legal/as-terms) | Ormandaki ağaç modelleri (`Assets/FinottiGames/`). Oyunda yeniden ölçekleniyor ve döndürülüyor. | **Hayır**, EULA ham dosyaların yeniden dağıtımına izin vermiyor. |
 
 ### Kod
