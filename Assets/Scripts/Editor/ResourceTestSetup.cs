@@ -305,6 +305,7 @@ public static class ResourceTestSetup
     }
 
     const string WellModelPath = "Assets/Meshes/well.obj";
+    const string PaletteMaterialPath = "Assets/Materials/Flat.mat";
     // well.obj'de iç duvar yarıçapı dış yarıçapın ~%78'i (3.62 / 4.64 m),
     // içerideki taban ise yüksekliğin ~%34'ünde (0.98 / 2.85 m).
     const float WellInnerRatio = 0.78f;
@@ -325,6 +326,12 @@ public static class ResourceTestSetup
             instance.name = "Model";
             foreach (var filter in instance.GetComponentsInChildren<MeshFilter>())
                 filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+            // Model renklerini UV'leriyle palette.png'den alıyor; .mtl repoda olmadığı için
+            // içe aktarılan malzeme beyaz kalıyor, ekibin palet malzemesi atanır.
+            var palette = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
+            if (palette != null)
+                foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
+                    renderer.sharedMaterials = System.Array.ConvertAll(renderer.sharedMaterials, _ => palette);
             var bounds = RendererBounds(instance);
             outerRadius = Mathf.Max(bounds.extents.x, bounds.extents.z);
             innerRadius = outerRadius * WellInnerRatio;
