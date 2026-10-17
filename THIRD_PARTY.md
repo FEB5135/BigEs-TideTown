@@ -44,8 +44,8 @@ Metin ve diğer kategorilerde hazır kaynak kullanılmadı.
 | Kategori | Kullanım | Araç | Amaç ve kullanım yeri |
 | --- | --- | --- | --- |
 | Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, kamera, tıklama, arayüz, ana menü, kamera giriş geçişi ve ayar scriptleri; sahne kurulum (editör) scriptleri; Unity paket derleme hatasının çözümü. |
-| Kod | Kullanıldı | Codex (OpenAI) | Köylülerin yürüme/odun kesme animasyonu, mevcut ekip modelinin kemik ağırlıkları, animasyonlu oduncu prefab kurulumu, SampleScene aktarımı ve Unity entegrasyon testleri. |
+| Kod | Kullanıldı | Codex (OpenAI) | Köylülerin yürüme/odun kesme animasyonu, mevcut ekip modelinin kemik ağırlıkları, animasyonlu oduncu prefab kurulumu, SampleScene aktarımı, karşılama rehberi (WelcomeParty), oyun başlangıç entegrasyonu ve Unity testleri. |
 | Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. Ana menünün ikonları, gölgesi, kenar karartması ve dalga amblemi (`Assets/UI/Menu/`) Claude'un yazdığı Python scriptiyle (`Art/UI/make_menu_sprites.py`) çizildi; Kenney parçalarını yeniden renklendiren script (`Art/UI/adapt_kenney.py`) de Claude'a aittir. |
 | Ses | Kullanılmadı | — | — |
-| Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası, menü metinleri ve kod içi açıklamalar. |
+| Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası, menü metinleri ve kod içi açıklamalar. Codex (OpenAI): oyun amacı, kaynak döngüsü ve kontroller için Türkçe karşılama rehberi metinleri. |
 | Diğer | Kullanılmadı | — | — |

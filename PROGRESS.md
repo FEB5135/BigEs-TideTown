@@ -28,11 +28,15 @@ Son güncelleme: 2026-10-17 (14:45)
 
 ## Aktif çalışma
 
-- Dal: `main`. `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
+- **welcomeparty:** Güncel origin/main 96be1c7 tabanından açıldı. Oyna/kamera geçişi sonrası dört adımlı Türkçe rehber: köyü tsunamiden koruma, kaynak döngüsü, duvar inşası, kamera. Okurken oyun ve dünya kontrolleri durur; bitir/geç sonrası GameStarted bir kez çağrılır. Sağ üst ? Rehber ile tekrar açılır.
+
+- Önceki çalışma: `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
 - Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
 - Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
+
+- **Karşılama rehberi:** WelcomeParty çalışma anında kendi canvas'ını kurar, menünün Baloo fontunu kullanır; mevcut SampleScene/orman/dağ verileri değişmez. MainMenu başlangıcı rehberin kapanmasını bekler. İleri/geri/geç, duraklatma ve giriş kilidi, tekrar açma ve sahne kapanışında temizleme testi eklendi. Unity: 38/38 test başarılı (Logs/welcomeparty-final-tests.xml). Dört sayfa, bitir ve oyun içinden tekrar açma canlı Play testinde doğrulandı. Yerel çalışma; push yapılmadı.
 
 - **WFC ağaçları ve zemin main'e (2026-10-17, `feature/wfc-forest`'tan yalnız ağaç/zemin görünümü):** Kullanıcı isteği: main'in SampleScene'i ve World'ü (128×128, 2 m) kullanılacak; ResourceTest ve inşa değişikliklerimiz alınmadı. `SampleSceneSetup.EnsureGridForest` (SampleScene kurulum menüsü de çağırır): MapView malzemesi TerrainGround yerine `Flat.mat` (çimenli karolar görünür), World'e `GridForest` eklenir, eski tek tek ağaçlı `Gameplay/Forest` kapatılır (silinmez), WFC'nin köy için ayırdığı başlangıç hücrelerinden orman alanına düşenler silinir, inşa grid'ine `ConstructionGridToggle` eklenir (çizgiler yalnız inşa modunda). `GridForest`: orman alanı (45° dönük, merkez kasabanın 6 m dışında solda, 30×55 m) dışını WFC'de zemine sabitler; alan içinde yalnız ağaç ve düz zemin kalır (yokuş/tepe karoları zemine çevrilir). Ağaçlar toplanabilir; kesilince zemin plakası olmadan, her ağaç ayrı, 8 yönden rastgele devrilir, 2 sn sonra `FlatFade.mat` ile saydamlaşıp kaybolur; tıklanınca ve oduncu vurunca (`Gatherer.hitInterval` 0.5 sn, yalnız odun) sallanır. `ResourceNode`'a `VisibilityChanged` ve `Hit` olayları eklendi. Play'de doğrulandı: orman köyün solunda, zemin çimenli ve grid'siz, oduncular odun getiriyor, konsol temiz. Ağaçlar ResourceTest'teki boyda: kurulum ekibin ağaç karolarından zemin plakasız, karo merkezi etrafında 2.5 kat büyütülmüş kopyalar üretir (`Assets/Prefabs/Map/tree_0_*_big.prefab` + `.asset` mesh; ekibin modeline dokunulmaz) ve MapView'daki id 5 modüllerini bunlarla değiştirir. Büyük ağaçlar üst üste binmesin diye GridForest ormanı seyreltir (`treeKeep` 0.45, ağaçlar arası en az 1 boş hücre); tıklama alanı `treeScale` ile büyür. Play'de doğrulandı: boy ve yoğunluk ResourceTest'e benziyor, devrilme çalışıyor.
 
@@ -93,6 +97,9 @@ Son güncelleme: 2026-10-17 (14:45)
 - **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
 ## Sıradaki işler / açık konular
+
+- [x] welcomeparty dalını güncel main'den aç ve oyun amacı/mekanik rehberini ekle.
+- [x] welcomeparty Unity testleri (38/38) ve dört sayfalı canlı görünüm doğrulandı.
 
 - [x] Köylü animasyonlarını ve SampleScene düzenini main'e birleştir.
 - [ ] Yerel main değişikliklerini paylaşmak için push (henüz yapılmadı).

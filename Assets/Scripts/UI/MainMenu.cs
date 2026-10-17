@@ -6,10 +6,10 @@ using UnityEngine.UI;
 
 // Ana menü: logo, en yüksek skor, Oyna / Ayarlar / Çıkış.
 // Arka planda harita uzaktan ve bulanık görünür (CameraIntro). Oyna deyince menü kaybolur,
-// kamera oyun duruşuna iner, kaynak paneli belirir ve GameStarted olayı çağrılır.
+// kamera oyun duruşuna iner; rehber kapanınca kaynak paneli ve GameStarted açılır.
 public class MainMenu : MonoBehaviour
 {
-    // Kamera oyuna indiğinde, oyuncu kontrolü aldığı anda çağrılır.
+    // Kamera geçişi ve karşılama rehberi bitip oyuncu kontrolü aldığında çağrılır.
     public static event Action GameStarted;
     public static bool IsOpen { get; private set; }
 
@@ -40,9 +40,14 @@ public class MainMenu : MonoBehaviour
 
     CanvasGroup currentPage;
     Coroutine pageSwitch;
+    WelcomeParty welcome;
 
     void Start()
     {
+        welcome = GetComponent<WelcomeParty>();
+        if (welcome == null)
+            welcome = gameObject.AddComponent<WelcomeParty>();
+        welcome.Initialize(highScoreText != null ? highScoreText.font : null);
         IsOpen = true;
         if (cameraIntro != null)
             cameraIntro.EnterMenu();
@@ -101,6 +106,11 @@ public class MainMenu : MonoBehaviour
     }
 
     void OnIntroFinished()
+    {
+        welcome.Show(BeginGameplay);
+    }
+
+    void BeginGameplay()
     {
         if (resetResourcesOnPlay && Well.Instance != null)
             Well.Instance.ResetAmounts();

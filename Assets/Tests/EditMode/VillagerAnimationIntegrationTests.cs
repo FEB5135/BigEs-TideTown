@@ -49,6 +49,9 @@ namespace IdleTown.Tests
             while (intro.InMenu && Time.realtimeSinceStartup < introDeadline)
                 yield return null;
             Assert.That(intro.InMenu, Is.False);
+            var welcome = Object.FindAnyObjectByType<WelcomeParty>();
+            Assert.That(welcome.IsOpen, Is.True);
+            welcome.Complete();
             var villagers = Object.FindObjectsByType<VillagerAnimation>();
             Assert.That(villagers.Length, Is.EqualTo(5));
             var well = Well.Instance;
