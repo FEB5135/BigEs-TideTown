@@ -28,7 +28,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge: tsunami WFC arazisi ve otomat
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
 - ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
 - Kullanıcı dağ/tepe düzeni için "tam böyle olmayacak, şimdilik beklesin" dedi; odun kesme animasyonu için "hâlâ garip ama şimdilik kalsın".
-- `collision-main-merge` dalı: collision + tsunami çalışmasının üstüne güncel main birleştirildi (2026-10-17). SampleScene main'den alındı; tsunami nesnesi kurulum komutuyla yeniden eklendi.
+- `collision-main-merge` dalı: collision + tsunami çalışmasının üstüne güncel main birleştirildi (2026-10-17). SampleScene main'den alındı; tsunami nesnesi kurulum komutuyla yeniden eklendi. WFC arazisi ve otomatik dalga yönüyle birlikte `origin`e push edildi (2026-10-17, `45c1bd6`).
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
