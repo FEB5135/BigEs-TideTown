@@ -47,7 +47,7 @@ Metin ve diğer kategorilerde hazır kaynak kullanılmadı.
 
 | Kategori | Kullanım | Araç | Amaç ve kullanım yeri |
 | --- | --- | --- | --- |
-| Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, kamera, tıklama, arayüz, ana menü, kamera giriş geçişi ve ayar scriptleri; sahne kurulum (editör) scriptleri; Unity paket derleme hatasının çözümü. |
+| Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, yapı yükseltme ve işçi üretme, kamera, tıklama, arayüz, ana menü, kamera giriş geçişi ve ayar scriptleri; sahne kurulum (editör) scriptleri; Unity paket derleme hatasının çözümü. |
 | Kod | Kullanıldı | Claude (Anthropic) | `Assets/Tsunami/` altındaki tsunami simülasyonu: sonlu hacim sığ su çözücüsü (`TsunamiPhysicsSolver`), batimetri, su/deniz tabanı/sprey shader'ları, su yüzeyi ve okyanus çizimi, köpük ve çarpma sıçraması efektleri, oyun içi tsunami paneli ve sahne kurulum (editör) scriptleri. Çözücü Unity dışında sayısal testlerle (durgun göl, dalga hızı √(g·h), kütle korunumu, baraj yıkılması) doğrulandı. |
 | Kod | Kullanıldı | Codex (OpenAI) | Köylülerin yürüme/odun kesme animasyonu, mevcut ekip modelinin kemik ağırlıkları, animasyonlu oduncu prefab kurulumu, SampleScene aktarımı ve Unity entegrasyon testleri. |
 | Kod ve metin | Kullanıldı | OpenCode (OpenAI) | Tsunami ile oyuncu duvarı arasındaki çözücü-yüzü çarpma örneklemesi, zaman adımlı dayanıklılık/kırılma, sınırlı sıçrama-köpük-sis ve enkaz entegrasyonu; saf C# testleri ve devir dokümantasyonu. Yeni dış kaynak veya hazır asset kullanılmadı. |

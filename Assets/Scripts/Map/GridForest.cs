@@ -95,6 +95,8 @@ public class GridForest : MonoBehaviour
 
     bool HasForestArea => forestSize.x > 0f && forestSize.y > 0f;
 
+    public Vector3 ForestCenter => forestCenter;
+
     public bool InForest(int x, int y)
     {
         var local = Quaternion.Euler(0f, -forestYaw, 0f) * (map.CellCenter(x, y) - forestCenter);

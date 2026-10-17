@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (SampleScene'deki eski kapalı Forest silindi)
+Son güncelleme: 2026-10-17 (yükseltmeler ve işçi üretme, `feature/upgrades`)
 
 ## Bağlam
 
@@ -32,6 +32,8 @@ Son güncelleme: 2026-10-17 (SampleScene'deki eski kapalı Forest silindi)
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Yükseltmeler ve işçi üretme (17 Ekim 2026, `feature/upgrades`, push edilmedi):** Kullanıcı isteği: taş ocakları ve orman 3 seviyeli (varsayılan 1), odun+taşla yükseltilir, görseller şimdilik değişmez; odun+taşla işçi üretilir, butonu geçici olarak taş butonunun yanında. Kullanıcı ocakların ayrı ayrı yükseltilmesini istedi, nasıl olacağını bize bıraktı; her yapının üstünde ekranda onu takip eden küçük buton seçildi. `UpgradeLevel` (Economy): her ocakta ayrı, ormanda tek (`forest`); seviye 2: 20 odun 10 taş, hız ×1.35, toplama süresi ×0.7; seviye 3: 45 odun 30 taş, ×1.7, ×0.45 (Inspector'dan ayarlanır). `Gatherer`: vagon kendi ocağının, işteki oduncu (`HasJob`, vagon itmiyorken) ormanın çarpanıyla yürür ve toplar; vuruş aralığı da kısalır (balta animasyonu senkron kalır). `UpgradeHUD` (HUD'da): taş butonunu kopyalayıp yapı butonlarını ("Sv 1 Yükselt / 20 odun 10 taş", son seviyede "En yüksek"; para yetmezse soluk) ve "İşçi 15 odun 10 taş" butonunu kurar. Yapı butonları ayrı canvas katmanında (`sortingOrder -2`), Tsunami panelinin ve kaynak panelinin altında; menüde ve inşa modunda gizli. İşçi `Woodcutter.prefab`'tan kuyunun yanında doğar, sahnedeki köylünün ayarlarını, boyunu ve yüksekliğini alır (`Gatherer.BecomeVillagerLike`), dolaşır; elle işe konur. `VillagerPicker` artık imleç bir butonun üstündeyken köylü tutmaz. Kurulum: `Tools/BigEs/Yukseltmeleri Kur` (`SampleSceneSetup.EnsureUpgrades`, Integrate da çağırır). Test: `Tools/BigEs/Test: Kuyuya 100 Odun 100 Tas` (yalnız Play'de). Play'de doğrulandı: orman 1→2, bir ocak 1→2→3 (doğru bedeller düştü, son seviyede tıklama bir şey harcamıyor), işçi üretimi (bedel düştü, köylülerle aynı boy/yükseklikte doğup dolaşıyor), Tsunami butonu ocak butonunun üstünde kalıyor, konsolda hata yok. Doğrulanmayan: yükseltmeden sonra vagon/oduncu hızının oyunda ölçülmesi, yeni işçinin tutulup ormana/ocağa bırakılması. Not: test sırasında ekranın sağ şeridini Claude uygulamasının görünmez bir penceresi kapladığından oradaki tıklamalar Unity'ye gitmiyordu; oyunla ilgisi yok.
 
 - **Eski Forest SampleScene'den silindi (17 Ekim 2026, `fix/remove-old-forest`; main'e fast-forward ile birleştirilip push edildi):** Kullanıcının OneDrive'daki kopyasında FinottiGames paketi yok; SampleScene açılınca `Gameplay/Forest` altındaki kapalı ağaçlar için "Missing Prefab" hataları çıkıyordu (Tree 11/12/30, üç GUID). Kullanıcı isteğiyle kapalı `Gameplay/Forest` Unity'de silinip sahne kaydedildi; SampleScene'de FinottiGames referansı kalmadı, oyundaki orman zaten `GridForest`'tan geliyor. Unity kaydederken tsunami adaptörünün yeni alanlarını ve birkaç UI anchor'ını da yazdı (değer değişikliği yok). `MergedAssetIntegrationTests`: 34 ağaçlı Forest artık yalnız ResourceTest'te beklenir, SampleScene'de olmaması beklenir. Unity Console temiz; testler bu değişiklikten sonra çalıştırılmadı. ResourceTest hâlâ FinottiGames'e bağlı (paket yoksa orada aynı hata çıkar).
 
@@ -155,6 +157,7 @@ Son güncelleme: 2026-10-17 (SampleScene'deki eski kapalı Forest silindi)
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek.
 - [ ] Ana menü: skorun tanımı belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.
+- [ ] Yükseltmeler (`feature/upgrades`): Play'de vagon/oduncu hızlanmasını gözle kontrol etmek, yeni işçiyi ormana/ocağa bırakıp denemek; bedeller ve çarpanlar dengelenecek. Seviye görselleri ve kalıcı işçi butonu yeri sonra (şimdilik geçici). Main'e birleştirmek kullanıcıya sorulacak.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (henüz kararlaştırılmadı).
 - [ ] Teslimden önce: repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak. Pixabay sesi (`RockBreak.mp3`) lisansı tek başına dağıtımı yasaklıyor, public repoda durumu değerlendirilmeli.
 - [ ] `ProjectSettings/Packages/com.unity.probuilder/Settings.json` Unity tarafından değişti, commit edilmedi (bilerek).
