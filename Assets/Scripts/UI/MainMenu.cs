@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-// Ana menü: logo, en yüksek skor, Oyna / Nasıl Oynanır / Ayarlar / Çıkış.
+// Ana menü: logo, en yüksek skor, Oyna / Ayarlar / Çıkış.
 // Arka planda harita uzaktan ve bulanık görünür (CameraIntro). Oyna deyince menü kaybolur,
 // kamera oyun duruşuna iner, kaynak paneli belirir ve GameStarted olayı çağrılır.
 public class MainMenu : MonoBehaviour
@@ -22,12 +22,10 @@ public class MainMenu : MonoBehaviour
     [Header("Sayfalar")]
     [SerializeField] CanvasGroup mainPage;
     [SerializeField] CanvasGroup settingsPage;
-    [SerializeField] CanvasGroup howToPage;
 
     [Header("Ana sayfa")]
     [SerializeField] Text highScoreText;
     [SerializeField] Button playButton;
-    [SerializeField] Button howToButton;
     [SerializeField] Button settingsButton;
     [SerializeField] Button quitButton;
     [SerializeField] Button[] backButtons;
@@ -50,7 +48,6 @@ public class MainMenu : MonoBehaviour
             SetVisible(group, false);
 
         playButton?.onClick.AddListener(Play);
-        howToButton?.onClick.AddListener(() => ShowPage(howToPage));
         settingsButton?.onClick.AddListener(() => ShowPage(settingsPage));
         quitButton?.onClick.AddListener(Quit);
         foreach (var back in backButtons)
@@ -64,7 +61,6 @@ public class MainMenu : MonoBehaviour
             highScoreText.text = HighScore.Best.ToString("N0");
 
         SetVisible(settingsPage, false);
-        SetVisible(howToPage, false);
         SetVisible(mainPage, true);
         currentPage = mainPage;
         StartCoroutine(Entrance());

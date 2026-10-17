@@ -1,4 +1,4 @@
-# Ana menü sprite'larını üretir (beyaz, Unity'de renklendirilir). Çalıştırma: python Art/UI/make_menu_sprites.py
+# Ana menünün ikon, gölge ve perde sprite'larını üretir (beyaz, Unity'de renklendirilir). Butonlar: adapt_kenney.py. Çalıştırma: python Art/UI/make_menu_sprites.py
 import math
 import os
 from PIL import Image, ImageDraw, ImageFilter
@@ -14,12 +14,6 @@ def canvas(size):
 def save(img, name, size):
     img = img.resize((size, size), Image.LANCZOS)
     img.save(os.path.join(OUT, name))
-
-
-def rounded(name, size, radius):
-    img = canvas(size)
-    ImageDraw.Draw(img).rounded_rectangle((0, 0, size * SS - 1, size * SS - 1), radius * SS, fill="white")
-    save(img, name, size)
 
 
 def shadow(name, size, radius, blur):
@@ -88,15 +82,6 @@ def icon_trophy(size=128):
     save(img, "IconTrophy.png", size)
 
 
-def icon_book(size=128):
-    img = canvas(size)
-    s = size * SS
-    d = ImageDraw.Draw(img)
-    d.polygon([(s * 0.08, s * 0.22), (s * 0.47, s * 0.3), (s * 0.47, s * 0.86), (s * 0.08, s * 0.78)], fill="white")
-    d.polygon([(s * 0.92, s * 0.22), (s * 0.53, s * 0.3), (s * 0.53, s * 0.86), (s * 0.92, s * 0.78)], fill="white")
-    save(img, "IconBook.png", size)
-
-
 def icon_exit(size=128):
     img = canvas(size)
     s = size * SS
@@ -126,14 +111,11 @@ def waves(size=256):
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    rounded("Rounded.png", 64, 18)
-    rounded("RoundedSmall.png", 32, 8)
     shadow("Shadow.png", 96, 22, 10)
     circle("Circle.png", 64)
     vignette("Vignette.png", 256)
     icon_play()
     icon_gear()
     icon_trophy()
-    icon_book()
     icon_exit()
     waves()

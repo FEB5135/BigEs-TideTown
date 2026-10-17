@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 99d6e038bb427644f84740220659e3cb
+guid: b2b7de3291bb0b149b3e9a0a7256de8d
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -6753631302674296063
-    second: Rounded_0
+      213: -3259548300371644414
+    second: SliderHandle_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -52,7 +52,7 @@ TextureImporter:
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
-  spriteBorder: {x: 20, y: 20, z: 20, w: 20}
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
@@ -102,13 +102,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Rounded_0
+      name: SliderHandle_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 64
-        height: 64
+        width: 24
+        height: 32
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -117,8 +117,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 103d32ccc184642a0800000000000000
-      internalID: -6753631302674296063
+      spriteID: 200be143712c3c2d0800000000000000
+      internalID: -3259548300371644414
       vertices: []
       indices: 
       edges: []

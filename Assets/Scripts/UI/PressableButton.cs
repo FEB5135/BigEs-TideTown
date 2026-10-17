@@ -2,65 +2,89 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// Kalın alt kenarlı (2.5B) buton görünümü: üzerine gelince yüz hafifçe kalkar ve açılır,
-// basınca alt kenara iner. Tıklama işi aynı objedeki Button'da.
+// Alt kalınlığı olan (2.5B) buton: üzerine gelince hafifçe büyür, basınca kalınlığı olmayan
+// sprite'a geçip içerik aşağı iner. Tıklama işi aynı objedeki Button'da.
 [RequireComponent(typeof(Button))]
 public class PressableButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
-    [Tooltip("Hareket eden üst yüz.")]
-    [SerializeField] RectTransform face;
-    [SerializeField] Image faceImage;
-    [Tooltip("Alt kenarın kalınlığı; basınca yüz bu kadar iner.")]
-    [SerializeField] float depth = 8f;
-    [SerializeField] float hoverLift = 3f;
-    [SerializeField] float hoverBrighten = 0.08f;
-    [SerializeField] float speed = 22f;
+    [Tooltip("Butonun görseli (kökü dolduran alt obje).")]
+    [SerializeField] Image visual;
+    [SerializeField] Sprite normalSprite;
+    [Tooltip("Basılıyken kullanılan, alt kalınlığı olmayan sprite.")]
+    [SerializeField] Sprite pressedSprite;
+    [Tooltip("İkon ve yazı; basınca aşağı iner.")]
+    [SerializeField] RectTransform content;
+    [Tooltip("Alt kalınlığın ekrandaki yüksekliği.")]
+    [SerializeField] float depth = 10f;
+    [SerializeField] float hoverScale = 1.04f;
+    [SerializeField] float speed = 20f;
+    [SerializeField] AudioClip clickSound;
 
     Button button;
-    Color baseColor;
-    Vector2 restPosition;
+    AudioSource audioSource;
     bool hovered, pressed;
-    float offset;
+    float scale = 1f;
 
     void Awake()
     {
         button = GetComponent<Button>();
-        if (face != null)
-            restPosition = face.anchoredPosition;
-        if (faceImage != null)
-            baseColor = faceImage.color;
+        audioSource = GetComponentInParent<AudioSource>();
+        button.onClick.AddListener(() =>
+        {
+            if (clickSound != null && audioSource != null)
+                audioSource.PlayOneShot(clickSound);
+        });
     }
+
+    void OnEnable() => ApplyPressed(false);
 
     void OnDisable()
     {
         hovered = pressed = false;
-        offset = 0f;
-        Refresh(1f);
+        scale = 1f;
+        transform.localScale = Vector3.one;
     }
 
-    void Update() => Refresh(1f - Mathf.Exp(-speed * Time.unscaledDeltaTime));
-
-    void Refresh(float blend)
+    void Update()
     {
-        if (face == null)
-            return;
-        bool interactable = button == null || button.IsInteractable();
-        bool lit = interactable && hovered;
-        float target = !interactable ? 0f : pressed ? -(depth - 2f) : lit ? hoverLift : 0f;
-        offset = Mathf.Lerp(offset, target, blend);
-        face.anchoredPosition = restPosition + new Vector2(0f, offset);
+        bool interactable = button.IsInteractable();
+        float target = interactable && hovered && !pressed ? hoverScale : 1f;
+        scale = Mathf.Lerp(scale, target, 1f - Mathf.Exp(-speed * Time.unscaledDeltaTime));
+        transform.localScale = new Vector3(scale, scale, 1f);
+    }
 
-        if (faceImage != null)
+    void ApplyPressed(bool down)
+    {
+        pressed = down;
+        if (visual != null)
         {
-            var color = lit ? Color.Lerp(baseColor, Color.white, hoverBrighten) : baseColor;
-            if (!interactable)
-                color = Color.Lerp(baseColor, new Color(0.5f, 0.5f, 0.5f, baseColor.a), 0.5f);
-            faceImage.color = Color.Lerp(faceImage.color, color, blend);
+            if (normalSprite != null && pressedSprite != null)
+                visual.sprite = down ? pressedSprite : normalSprite;
+            // Düz sprite, kalınlık kadar aşağıda başlayan yüzü çizer.
+            visual.rectTransform.offsetMax = new Vector2(0f, down ? -depth : 0f);
         }
+        if (content != null)
+            content.anchoredPosition = new Vector2(0f, down ? -depth * 0.5f : depth * 0.5f);
     }
 
     public void OnPointerEnter(PointerEventData eventData) => hovered = true;
-    public void OnPointerExit(PointerEventData eventData) => hovered = pressed = false;
-    public void OnPointerDown(PointerEventData eventData) => pressed = true;
-    public void OnPointerUp(PointerEventData eventData) => pressed = false;
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        hovered = false;
+        if (pressed)
+            ApplyPressed(false);
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (button.IsInteractable() && eventData.button == PointerEventData.InputButton.Left)
+            ApplyPressed(true);
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (pressed)
+            ApplyPressed(false);
+    }
 }
