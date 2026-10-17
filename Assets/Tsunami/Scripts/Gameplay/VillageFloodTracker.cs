@@ -30,6 +30,7 @@ namespace Tsunami
             [NonSerialized] public Material[] originalMaterials;
             [NonSerialized] public Vector3 originalPosition;
             [NonSerialized] public Quaternion originalRotation;
+            [NonSerialized] public float top; // world height of the building's highest point at rest
         }
 
         [SerializeField] WaterSimulation simulation;
@@ -52,6 +53,17 @@ namespace Tsunami
         float nextCheck;
 
         public int TotalCount => buildings.Length;
+
+        /// <summary>Resting position, footprint radius and roof height of building i (for splash effects).</summary>
+        public bool GetBuilding(int i, out Vector3 position, out float radius, out float top)
+        {
+            position = default; radius = 0f; top = 0f;
+            if (i < 0 || i >= buildings.Length || buildings[i].transform == null || buildings[i].renderers == null) return false;
+            position = buildings[i].originalPosition;
+            radius = buildings[i].footprintRadius;
+            top = buildings[i].top;
+            return true;
+        }
         public int SafeCount { get; private set; }
         public int FloodedCount { get; private set; }
         public int DestroyedCount { get; private set; }
@@ -67,6 +79,8 @@ namespace Tsunami
                 b.originalMaterials = new Material[b.renderers.Length];
                 for (int r = 0; r < b.renderers.Length; r++) b.originalMaterials[r] = b.renderers[r].sharedMaterial;
                 b.originalPosition = b.transform.position;
+                b.top = b.originalPosition.y;
+                foreach (Renderer r in b.renderers) b.top = Mathf.Max(b.top, r.bounds.max.y);
                 b.originalRotation = b.transform.rotation;
             }
             ResetVillage();

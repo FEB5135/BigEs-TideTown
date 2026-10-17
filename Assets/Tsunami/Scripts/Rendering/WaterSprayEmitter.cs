@@ -96,7 +96,7 @@ namespace Tsunami
         {
             TerrainGrid terrain = simulation.Terrain;
             float[] h = terrain.Heights;
-            ShallowWaterSolver solver = simulation.Solver;
+            TsunamiPhysicsSolver solver = simulation.Solver;
             float[] depth = solver.Depth;
             int count = depth.Length;
             if (previousSurface == null || previousSurface.Length != count)

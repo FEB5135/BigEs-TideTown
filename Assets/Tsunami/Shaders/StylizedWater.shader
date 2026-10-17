@@ -31,8 +31,11 @@ Shader "Tsunami/StylizedWater"
 
         [Header(Foam)]
         _FoamColor ("Foam Colour", Color) = (0.95, 0.98, 1, 1)
-        _BreakStart ("Breaking Foam Start (Froude number)", Float) = 0.8
-        _BreakFull ("Breaking Foam Full (Froude number)", Float) = 1.6
+        _BreakFroudeStart ("Breaking Foam Start (Froude number)", Float) = 1.3
+        _BreakFroudeFull ("Breaking Foam Full (Froude number)", Float) = 2.8
+        _FoamFlow ("Foam Moves With Flow (0..1)", Range(0, 1.5)) = 1
+        _FoamCycle ("Foam Flow Cycle (s)", Range(0.3, 4)) = 1.2
+        _FoamCoverage ("Foam Coverage", Range(0, 1)) = 0.55
         _ShoreFoamDepth ("Shoreline Foam Depth (m)", Float) = 0.25
         _EdgeFade ("Soft Water Edge (m of depth)", Float) = 0.15
         _FoamNoiseScale ("Foam Noise Scale", Float) = 0.4
@@ -64,6 +67,7 @@ Shader "Tsunami/StylizedWater"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "TsunamiVis.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _WaterShallow;
@@ -84,8 +88,11 @@ Shader "Tsunami/StylizedWater"
                 half _RippleStrength;
                 float _RippleSpeed;
                 half4 _FoamColor;
-                float _BreakStart;
-                float _BreakFull;
+                float _BreakFroudeStart;
+                float _BreakFroudeFull;
+                float _FoamFlow;
+                float _FoamCycle;
+                half _FoamCoverage;
                 float _ShoreFoamDepth;
                 float _EdgeFade;
                 float _FoamNoiseScale;
@@ -96,6 +103,7 @@ Shader "Tsunami/StylizedWater"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
+                float2 flow : TEXCOORD1; // depth-averaged velocity (m/s), from the simulation
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -106,6 +114,7 @@ Shader "Tsunami/StylizedWater"
                 float3 normalWS : TEXCOORD1;
                 float2 data : TEXCOORD2;
                 float fogFactor : TEXCOORD3;
+                float2 flow : TEXCOORD4;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -119,6 +128,7 @@ Shader "Tsunami/StylizedWater"
                 o.positionWS = pos.positionWS;
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 o.data = input.uv;
+                o.flow = input.flow;
                 o.fogFactor = ComputeFogFactor(pos.positionCS.z);
                 return o;
             }
@@ -142,7 +152,7 @@ Shader "Tsunami/StylizedWater"
 
             half4 frag(Varyings i) : SV_Target
             {
-                float t = _Time.y * _RippleSpeed;
+                float t = TsunamiAnimTime() * _RippleSpeed;
                 float2 p = i.positionWS.xz * _RippleScale;
                 float2 foamUV = i.positionWS.xz * _FoamNoiseScale;
                 float3 meshNormal = normalize(i.normalWS);
@@ -158,7 +168,8 @@ Shader "Tsunami/StylizedWater"
                 float depth = max(i.data.x, 0);
                 float speed = i.data.y;
                 float steep = 1.0 - saturate(meshNormal.y);                         // 0 flat .. 1 vertical
-                float rise = saturate((i.positionWS.y - _SeaLevel) / max(_CrestHeight, 0.01)); // height above sea
+                float seaY = TsunamiSeaLevel(_SeaLevel);
+                float rise = saturate((i.positionWS.y - seaY) / max(_CrestHeight, 0.01)); // height above sea
 
                 half4 col = lerp(_WaterShallow, _WaterDeep, saturate(depth / max(_DeepAt, 0.01)));
 
@@ -177,20 +188,38 @@ Shader "Tsunami/StylizedWater"
                 col.a = saturate(col.a + fresnel * 0.3);
 
                 // Foam where water breaks: flow fast relative to its depth (Froude number u / sqrt(g h)),
-                // steep wave faces and the thin shoreline edge. Broken up by scrolling noise.
-                float froude = speed / sqrt(9.81 * max(depth, 0.1));
-                float noise = ValueNoise(foamUV + float2(t * 0.35, t * 0.22)) * 0.6
-                            + ValueNoise(foamUV * 2.7 - t * 0.5) * 0.4;
-                float foamSource = smoothstep(_BreakStart, _BreakFull, froude)
+                // steep wave faces and the thin shoreline edge. The foam texture is carried along by the simulated
+                // velocity (two-phase flow map), so it streams with the water instead of sitting still and speckling.
+                float froude = speed / sqrt(9.81 * max(depth, 0.3));
+                float foamSource = smoothstep(_BreakFroudeStart, _BreakFroudeFull, froude)
                                  + saturate(1.0 - depth / max(_ShoreFoamDepth, 0.01))
                                  + smoothstep(_FaceFoamStart, _FaceFoamEnd, steep);
-                foamSource = saturate(foamSource);
-                float foam = foamSource * smoothstep(0.45, 0.7, noise + foamSource * 0.35);
+                foamSource = saturate(foamSource) * (1.0 - saturate(_TsunamiNoFoam));
+                float cycle = max(_FoamCycle, 0.05);
+                float ph0 = frac(TsunamiAnimTime() / cycle), ph1 = frac(ph0 + 0.5);
+                float2 drift = i.flow * (_FoamFlow * cycle * _FoamNoiseScale);
+                float n0 = ValueNoise(foamUV - drift * ph0) * 0.65 + ValueNoise(foamUV * 2.3 - drift * ph0 * 2.3) * 0.35;
+                float n1 = ValueNoise(foamUV - drift * ph1 + 17.3) * 0.65 + ValueNoise(foamUV * 2.3 - drift * ph1 * 2.3 + 5.1) * 0.35;
+                float noise = lerp(n0, n1, abs(ph0 - 0.5) * 2.0);
+                // Soft threshold: coverage grows with foamSource, edges stay feathered (no pin-hole speckle).
+                float cut = lerp(0.85, 0.2, foamSource * _FoamCoverage);
+                float foam = foamSource * smoothstep(cut - 0.18, cut + 0.18, noise);
                 col.rgb = lerp(col.rgb, _FoamColor.rgb * (0.7 + 0.3 * ndl), foam);
                 col.a = max(col.a, foam * 0.95);
 
                 float3 h = normalize(light.direction + v);
                 col.rgb += pow(saturate(dot(n, h)), _Gloss) * _SpecularStrength * light.color;
+
+                // Scientific colour maps replace the realistic look (shape still lit so the wave stays readable).
+                if (_TsunamiVisMode > 0.5)
+                {
+                    half3 cm;
+                    if (_TsunamiVisMode < 1.5) cm = TsunamiElevationColor((i.positionWS.y - seaY) / max(_TsunamiElevRange, 0.01));
+                    else if (_TsunamiVisMode < 2.5) cm = TsunamiDepthColor(depth / max(_TsunamiDepthRange, 0.01));
+                    else cm = TsunamiSpeedColor(speed / max(_TsunamiSpeedRange, 0.01));
+                    col.rgb = cm * (0.62 + 0.38 * ndl) + pow(saturate(dot(n, h)), _Gloss) * 0.25 * light.color;
+                    col.a = 0.94;
+                }
 
                 // Thin water fades out where it meets the ground, so the waterline is soft instead of hard-edged.
                 col.a *= saturate(depth / max(_EdgeFade, 0.001));

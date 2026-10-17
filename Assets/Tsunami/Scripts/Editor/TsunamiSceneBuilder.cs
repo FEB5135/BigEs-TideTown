@@ -32,7 +32,7 @@ namespace Tsunami.EditorTools
             new Vector2(0.0f, 0.2f)
         };
 
-        struct Materials
+        internal struct Materials
         {
             public Material terrain, flood, ocean, wall, roof, flooded, destroyed, trunk, leaves, cursor, spray;
         }
@@ -111,6 +111,10 @@ namespace Tsunami.EditorTools
             var controller = controllerGO.AddComponent<TsunamiController>();
             SetRef(controller, "simulation", sim);
             SetRef(controller, "village", tracker);
+            var demoSO = new SerializedObject(controller);
+            demoSO.FindProperty("fallbackSourcePosition").vector3Value = new Vector3(0f, 0f, -50f);
+            demoSO.FindProperty("fallbackDirection").floatValue = 0f;
+            demoSO.ApplyModifiedPropertiesWithoutUndo();
 
             var camGO = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
             camGO.tag = "MainCamera";
@@ -136,7 +140,13 @@ namespace Tsunami.EditorTools
             SetRef(brush, "cursor", line);
 
             // --- UI -----------------------------------------------------------------------------
-            BuildUI(controller, tracker, mats);
+            GameObject demoCanvas = BuildUI(controller, tracker, mats, false,
+                "WASD / Oklar: hareket    Q / E: döndür    Tekerlek: yakınlaş    Orta tuş: kaydır\n" +
+                "Sol tık basılı: araziyi yükselt (set)    Sağ tık basılı: alçalt (kanal)    [ / ]: fırça boyutu",
+                true);
+            BuildVisualization(controllerGO.transform, sim, terrainGO.GetComponent<MeshRenderer>(),
+                new Renderer[] { waterGO.GetComponent<MeshRenderer>(), oceanGO.GetComponent<MeshRenderer>() }, spray);
+            BuildImpactSplash(controllerGO.transform, sim, tracker, mats);
 
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
             AddToBuildSettings(ScenePath);
@@ -152,9 +162,50 @@ namespace Tsunami.EditorTools
             Debug.Log($"[Tsunami] Demo scene built at {ScenePath} with {houses.Count} houses. Press Play, then Start Tsunami.");
         }
 
+        /// <summary>
+        /// Adds the visualisation manager (shader globals, foam / spray / water toggles, animation clock that stops
+        /// while the simulation is paused), shared by the demo and the team map.
+        /// </summary>
+        internal static TsunamiVisualizationManager BuildVisualization(Transform parent, WaterSimulation sim, Renderer seabed,
+            Renderer[] water, WaterSprayEmitter spray)
+        {
+            var visGO = new GameObject("Visualization");
+            visGO.transform.SetParent(parent, false);
+            var vis = visGO.AddComponent<TsunamiVisualizationManager>();
+            var visSO = new SerializedObject(vis);
+            visSO.FindProperty("simulation").objectReferenceValue = sim;
+            visSO.FindProperty("seabedRenderer").objectReferenceValue = seabed;
+            visSO.FindProperty("spray").objectReferenceValue = spray;
+            SerializedProperty wr = visSO.FindProperty("waterRenderers");
+            wr.arraySize = water.Length;
+            for (int i = 0; i < water.Length; i++) wr.GetArrayElementAtIndex(i).objectReferenceValue = water[i];
+            visSO.ApplyModifiedPropertiesWithoutUndo();
+            return vis;
+        }
+
+        /// <summary>Splash and mist where the water hits mountains, walls or houses taller than itself.</summary>
+        internal static ImpactSplashEmitter BuildImpactSplash(Transform parent, WaterSimulation sim, VillageFloodTracker village,
+            Materials mats)
+        {
+            var go = new GameObject("Impact Splash", typeof(ParticleSystem));
+            go.transform.SetParent(parent, false);
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = mats.spray;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            var splash = go.AddComponent<ImpactSplashEmitter>();
+            SetRef(splash, "simulation", sim);
+            SetRef(splash, "village", village);
+            return splash;
+        }
+
         // ---------------------------------------------------------------------------------------- UI
 
-        static void BuildUI(TsunamiController controller, VillageFloodTracker tracker, Materials mats)
+        /// <param name="topRight">Put the control panel top-right instead of top-left (e.g. next to another game's UI).</param>
+        /// <param name="help">Controls help text for the bottom-left corner, or null for none.</param>
+        /// <param name="createEventSystem">False when the scene already has an EventSystem.</param>
+        internal static GameObject BuildUI(TsunamiController controller, VillageFloodTracker tracker, Materials mats,
+            bool topRight, string help, bool createEventSystem)
         {
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -166,24 +217,30 @@ namespace Tsunami.EditorTools
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            // Control panel (top-left). Its Image blocks clicks so they never reach the terrain brush.
-            var panel = CreateRect("Control Panel", canvasGO.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(20, -20), new Vector2(480, 290));
+            // Control panel. Its Image blocks clicks so they never reach the world underneath.
+            Vector2 corner = topRight ? new Vector2(1, 1) : new Vector2(0, 1);
+            var panel = CreateRect("Control Panel", canvasGO.transform, corner, corner, corner,
+                new Vector2(topRight ? -20 : 20, -20), new Vector2(480, 330));
             panel.gameObject.AddComponent<Image>().color = new Color(0.04f, 0.08f, 0.12f, 0.72f);
 
-            CreateText("Title", panel, font, "TSUNAMI", 34, FontStyle.Bold, TextAnchor.UpperLeft, Color.white,
+            CreateText("Title", panel, font, "TSUNAMİ", 34, FontStyle.Bold, TextAnchor.UpperLeft, Color.white,
                 new Vector2(20, -14), new Vector2(440, 44));
-            Text status = CreateText("Status", panel, font, "Status: Idle - calm sea", 22, FontStyle.Normal, TextAnchor.UpperLeft,
+            Text status = CreateText("Status", panel, font, "Durum: Hazır - deniz durgun", 22, FontStyle.Normal, TextAnchor.UpperLeft,
                 new Color(0.85f, 0.95f, 1f), new Vector2(20, -62), new Vector2(440, 30));
-            Text village = CreateText("Village Status", panel, font, "Village: -", 20, FontStyle.Normal, TextAnchor.UpperLeft,
+            Text village = CreateText("Village Status", panel, font, "Köy: -", 20, FontStyle.Normal, TextAnchor.UpperLeft,
                 new Color(1f, 0.92f, 0.7f), new Vector2(20, -96), new Vector2(440, 30));
 
-            Button start = CreateButton("Start Tsunami Button", panel, font, "Start Tsunami", new Color(0.18f, 0.6f, 0.3f),
-                new Vector2(20, -140), new Vector2(212, 60));
-            Button stop = CreateButton("Stop Tsunami Button", panel, font, "Stop Tsunami", new Color(0.78f, 0.22f, 0.2f),
-                new Vector2(248, -140), new Vector2(212, 60));
-            Button reset = CreateButton("Reset Simulation Button", panel, font, "Reset Simulation", new Color(0.32f, 0.36f, 0.42f),
-                new Vector2(20, -216), new Vector2(440, 50));
+            Text heightLabel = CreateText("Wave Height Label", panel, font, "Dalga yüksekliği: -", 20, FontStyle.Normal, TextAnchor.UpperLeft,
+                Color.white, new Vector2(20, -130), new Vector2(440, 28));
+            Slider heightSlider = CreateSlider("Wave Height Slider", panel, new Vector2(20, -162), new Vector2(440, 24),
+                TsunamiController.MinWaveHeight, TsunamiController.MaxWaveHeight);
+
+            Button start = CreateButton("Start Tsunami Button", panel, font, "Tsunamiyi Başlat", new Color(0.18f, 0.6f, 0.3f),
+                new Vector2(20, -196), new Vector2(212, 60));
+            Button stop = CreateButton("Pause Tsunami Button", panel, font, "Duraklat", new Color(0.78f, 0.45f, 0.15f),
+                new Vector2(248, -196), new Vector2(212, 60));
+            Button reset = CreateButton("Reset Simulation Button", panel, font, "Sıfırla", new Color(0.32f, 0.36f, 0.42f),
+                new Vector2(20, -268), new Vector2(440, 46));
 
             // Countdown (top-centre).
             var countdownRect = CreateRect("Countdown", canvasGO.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
@@ -193,19 +250,21 @@ namespace Tsunami.EditorTools
             countdownRect.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.8f);
 
             // Controls help (bottom-left).
-            var helpRect = CreateRect("Controls Help", canvasGO.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(20, 16), new Vector2(1100, 64));
-            AddText(helpRect.gameObject, font,
-                "WASD / Arrows: move    Q / E: rotate    Mouse wheel: zoom    Middle-drag: pan\n" +
-                "Hold LMB: raise terrain (barrier)    Hold RMB: lower terrain (channel)    [ / ]: brush size",
-                19, FontStyle.Normal, TextAnchor.LowerLeft, Color.white);
-            helpRect.gameObject.AddComponent<Shadow>().effectColor = new Color(0, 0, 0, 0.9f);
+            if (!string.IsNullOrEmpty(help))
+            {
+                var helpRect = CreateRect("Controls Help", canvasGO.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
+                    new Vector2(20, 16), new Vector2(1100, 64));
+                AddText(helpRect.gameObject, font, help, 19, FontStyle.Normal, TextAnchor.LowerLeft, Color.white);
+                helpRect.gameObject.AddComponent<Shadow>().effectColor = new Color(0, 0, 0, 0.9f);
+            }
 
             var ui = canvasGO.AddComponent<TsunamiUI>();
             SetRef(ui, "controller", controller);
             SetRef(ui, "startButton", start);
             SetRef(ui, "stopButton", stop);
             SetRef(ui, "resetButton", reset);
+            SetRef(ui, "waveHeightSlider", heightSlider);
+            SetRef(ui, "waveHeightText", heightLabel);
             SetRef(ui, "statusText", status);
             SetRef(ui, "countdownText", countdown);
 
@@ -215,8 +274,12 @@ namespace Tsunami.EditorTools
             so.FindProperty("destroyedMaterial").objectReferenceValue = mats.destroyed;
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            var eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            eventSystem.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
+            if (createEventSystem)
+            {
+                var eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+                eventSystem.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
+            }
+            return canvasGO;
         }
 
         static RectTransform CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
@@ -253,6 +316,28 @@ namespace Tsunami.EditorTools
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             return t;
+        }
+
+        static Slider CreateSlider(string name, Transform parent, Vector2 position, Vector2 size, float min, float max)
+        {
+            var rt = CreateRect(name, parent, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), position, size);
+            var background = CreateRect("Background", rt, new Vector2(0, 0.3f), new Vector2(1, 0.7f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            background.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.18f);
+            var fillArea = CreateRect("Fill Area", rt, new Vector2(0, 0.3f), new Vector2(1, 0.7f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(-12, 0));
+            var fill = CreateRect("Fill", fillArea, Vector2.zero, new Vector2(0, 1), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            fill.gameObject.AddComponent<Image>().color = new Color(0.25f, 0.7f, 0.95f);
+            var handleArea = CreateRect("Handle Slide Area", rt, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(-12, 0));
+            var handle = CreateRect("Handle", handleArea, Vector2.zero, new Vector2(0, 1), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(14, 0));
+            var handleImage = handle.gameObject.AddComponent<Image>();
+            handleImage.color = Color.white;
+            var slider = rt.gameObject.AddComponent<Slider>();
+            slider.fillRect = fill;
+            slider.handleRect = handle;
+            slider.targetGraphic = handleImage;
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue = min;
+            slider.maxValue = max;
+            return slider;
         }
 
         static Button CreateButton(string name, Transform parent, Font font, string label, Color color, Vector2 position, Vector2 size)
@@ -362,7 +447,7 @@ namespace Tsunami.EditorTools
             RenderSettings.sun = sun;
         }
 
-        static void ConfigureRenderer(GameObject go, Material material)
+        internal static void ConfigureRenderer(GameObject go, Material material)
         {
             var r = go.GetComponent<MeshRenderer>();
             r.sharedMaterial = material;
@@ -374,7 +459,7 @@ namespace Tsunami.EditorTools
 
         // ---------------------------------------------------------------------------- Materials
 
-        static Materials CreateMaterials()
+        internal static Materials CreateMaterials()
         {
             Shader water = Shader.Find("Tsunami/StylizedWater");
             Shader terrain = Shader.Find("Tsunami/LowPolyTerrain");
@@ -414,7 +499,7 @@ namespace Tsunami.EditorTools
 
         // -------------------------------------------------------------------------------- Utils
 
-        static void SetRef(Object target, string field, Object value)
+        internal static void SetRef(Object target, string field, Object value)
         {
             var so = new SerializedObject(target);
             SerializedProperty p = so.FindProperty(field);

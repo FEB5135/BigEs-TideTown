@@ -24,6 +24,7 @@ namespace Tsunami
         Vector3[] vertices;
         Vector3[] normals;
         Vector2[] uvs;
+        Vector2[] flows; // UV1: simulated velocity (m/s) so the shader can stream foam with the water
         float[] smoothedY;
         int lastStep = -1;
         int lastTerrainVersion = -1;
@@ -47,6 +48,7 @@ namespace Tsunami
             vertices = new Vector3[count];
             normals = new Vector3[count];
             uvs = new Vector2[count];
+            flows = new Vector2[count];
             smoothedY = new float[count];
             mesh = new Mesh { name = "Flood Water (generated)", hideFlags = HideFlags.DontSave };
             mesh.MarkDynamic();
@@ -55,6 +57,7 @@ namespace Tsunami
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
             mesh.SetUVs(0, uvs);
+            mesh.SetUVs(1, flows);
             mesh.SetTriangles(TerrainGrid.BuildGridTriangles(n), 0);
             float e = terrain.HalfExtent * 2f + terrain.CellSize;
             mesh.bounds = new Bounds(Vector3.zero, new Vector3(e, 140f, e));
@@ -96,6 +99,7 @@ namespace Tsunami
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
             mesh.SetUVs(0, uvs);
+            mesh.SetUVs(1, flows);
         }
 
         void Fill()
@@ -104,7 +108,9 @@ namespace Tsunami
             float[] h = terrain.Heights;
             float[] depth = simulation.Depth;
             float[] speed = simulation.Speed;
+            float[] velX = simulation.Solver.VelocityX, velZ = simulation.Solver.VelocityZ;
             float[] blend = simulation.EdgeBlendField;
+            byte[] walls = simulation.Solver.BarrierMask; // thin walls on cell faces (bits: 1 -x, 2 +x, 4 -z, 8 +z)
             float wet = simulation.WetThreshold;
             int n = terrain.Resolution;
             float cell = terrain.CellSize;
@@ -117,7 +123,8 @@ namespace Tsunami
                     int i = z * n + x;
                     float d = depth[i];
                     float y, u, v;
-                    if (d > wet) { y = h[i] + d; u = d; v = speed[i]; }
+                    Vector2 flow = Vector2.zero;
+                    if (d > wet) { y = h[i] + d; u = d; v = speed[i]; flow = new Vector2(velX[i], velZ[i]); }
                     else { y = h[i] - dryOffset; u = 0f; v = 0f; }
                     // Near the grid edge, fade into the open-ocean surface shared with OceanRing, so the
                     // square simulation boundary never shows (identical heights, foam values and normals).
@@ -128,29 +135,41 @@ namespace Tsunami
                         y += (oceanY - y) * b;
                         u += (WaterSimulation.OpenOceanShaderDepth - u) * b;
                         v += (oceanSpeed - v) * b;
+                        flow *= 1f - b;
                     }
                     vertices[i] = new Vector3((x - half) * cell, y, (z - half) * cell);
                     uvs[i] = new Vector2(u, v);
+                    flows[i] = flow;
                 }
             }
 
             // Smooth waterline: dry vertices next to water continue the water surface flat (but never above
             // their own ground), so the visible edge is where the surface meets the terrain, not a staircase of
             // grid cells. Their depth is 0, so the shader fades the water out softly there.
+            // Across a wall the surface must not continue: the dry vertex is mirrored below the ground instead,
+            // so the water edge lands exactly on the wall line (half-way between the two cells).
             for (int z = 1; z < n - 1; z++)
             {
                 for (int x = 1; x < n - 1; x++)
                 {
                     int i = z * n + x;
                     if (depth[i] > wet || blend[i] > 0f) continue;
-                    float sum = 0f;
+                    byte m = walls[i];
+                    float sum = 0f, walled = float.NegativeInfinity;
                     int count = 0;
-                    if (depth[i - 1] > wet) { sum += vertices[i - 1].y; count++; }
-                    if (depth[i + 1] > wet) { sum += vertices[i + 1].y; count++; }
-                    if (depth[i - n] > wet) { sum += vertices[i - n].y; count++; }
-                    if (depth[i + n] > wet) { sum += vertices[i + n].y; count++; }
-                    if (count == 0) continue;
-                    vertices[i].y = Mathf.Min(sum / count, h[i] - 0.02f);
+                    Neighbour(i - 1, 1);
+                    Neighbour(i + 1, 2);
+                    Neighbour(i - n, 4);
+                    Neighbour(i + n, 8);
+                    if (count > 0) vertices[i].y = Mathf.Min(sum / count, h[i] - 0.02f);
+                    else if (walled > h[i]) vertices[i].y = h[i] - (walled - h[i]) - 0.05f;
+
+                    void Neighbour(int j, byte face)
+                    {
+                        if (depth[j] <= wet) return;
+                        if ((m & face) != 0) { if (vertices[j].y > walled) walled = vertices[j].y; }
+                        else { sum += vertices[j].y; count++; }
+                    }
                 }
             }
 
@@ -166,6 +185,7 @@ namespace Tsunami
                         int i = z * n + x;
                         if (depth[i] <= wet || depth[i - 1] <= wet || depth[i + 1] <= wet || depth[i - n] <= wet || depth[i + n] <= wet)
                             continue;
+                        if (walls[i] != 0) continue; // never average heights across a wall
                         float avg = 0.25f * (vertices[i - 1].y + vertices[i + 1].y + vertices[i - n].y + vertices[i + n].y);
                         float y = Mathf.Lerp(vertices[i].y, avg, surfaceSmoothing);
                         smoothedY[i] = Mathf.Max(y, h[i] + 0.02f); // never sink below the ground
@@ -183,8 +203,11 @@ namespace Tsunami
                 {
                     int i = z * n + x;
                     if (!IsWet(i)) { normals[i] = Vector3.up; continue; }
-                    float yl = Surface(x - 1, z, i), yr = Surface(x + 1, z, i);
-                    float yd = Surface(x, z - 1, i), yu = Surface(x, z + 1, i);
+                    byte m = walls[i];
+                    float yl = (m & 1) != 0 ? vertices[i].y : Surface(x - 1, z, i);
+                    float yr = (m & 2) != 0 ? vertices[i].y : Surface(x + 1, z, i);
+                    float yd = (m & 4) != 0 ? vertices[i].y : Surface(x, z - 1, i);
+                    float yu = (m & 8) != 0 ? vertices[i].y : Surface(x, z + 1, i);
                     normals[i] = new Vector3(yl - yr, twoCell, yd - yu).normalized;
                 }
             }

@@ -23,6 +23,8 @@ Shader "Tsunami/LowPolyTerrain"
             half _WrapLighting;
         CBUFFER_END
 
+        #include "TsunamiVis.hlsl"
+
         float3 FlatNormal(float3 positionWS)
         {
             float3 n = normalize(cross(ddy(positionWS), ddx(positionWS)));
@@ -78,7 +80,11 @@ Shader "Tsunami/LowPolyTerrain"
                 Light light = GetMainLight();
                 half ndl = saturate((dot(n, light.direction) + _WrapLighting) / (1.0 + _WrapLighting));
                 half3 ambient = SampleSH(n) * _AmbientStrength;
-                half3 col = i.color.rgb * (light.color * ndl + ambient);
+                half3 albedo = i.color.rgb;
+                // Bathymetry view: sea floor coloured by depth below the still sea (same map as the water depth view).
+                if (_TsunamiBathyVis > 0.5 && i.positionWS.y < _TsunamiSeaLevel)
+                    albedo = TsunamiDepthColor((_TsunamiSeaLevel - i.positionWS.y) / max(_TsunamiDepthRange, 0.01));
+                half3 col = albedo * (light.color * ndl + ambient);
                 col = MixFog(col, i.fogFactor);
                 return half4(col, 1);
             }

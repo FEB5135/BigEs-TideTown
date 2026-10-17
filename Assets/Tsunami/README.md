@@ -1,109 +1,118 @@
-# Tsunami prototype: setup & testing guide
+# Tsunami Simülasyonu
 
-## Project inventory (as found)
-- Unity **6000.6.6f1**, **URP 17.6** (PC_RPAsset/PC_Renderer: Forward+, SSAO, depth + opaque textures; Mobile_RPAsset also present).
-- Input: **new Input System only** (`activeInputHandler: 1`), uGUI 2.6.
-- Assets: the empty URP template (`SampleScene`, `Settings/`, `TutorialInfo/`). **No water/ocean shaders, terrain, UI or gameplay scripts existed**, so nothing could be reused. `SampleScene` and all `Settings/` assets are untouched.
+Ekibin oyun haritasında (`Assets/Scenes/SampleScene.unity`) çalışan, fizik tabanlı, etkileşimli tsunami simülasyonu.
+Unity 6000.6.6f1, URP 17.6, yalnız yeni Input System. Ek paket gerekmez.
 
-Because no water shader existed, two small URP HLSL shaders were added (no textures, one pass, no refraction/reflections/screen-space reads):
-- `Shaders/StylizedWater.shader`: used by **both** the ocean (`Water_Ocean.mat`) and the flood surface (`Water_Flood.mat`), so the colours match at the seam. Depth tint, backlit crest glow on tall wave faces, wave-face and shoreline foam, ripples, fresnel and specular are all visual only.
-- `Shaders/Spray.shader`: soft round particle (no texture) for the spray.
-- `Shaders/LowPolyTerrain.shader`: vertex-coloured, flat-shaded island. Includes DepthOnly/DepthNormals passes so SSAO doesn't break.
+## Kurulum
 
-## One-time setup
-1. Focus the Unity editor so it imports `Assets/Tsunami` (check the Console for errors).
-2. Menu **Tsunami > Build Demo Scene**. This creates `Assets/Tsunami/Scenes/TsunamiDemo.unity`, the materials in `Assets/Tsunami/Materials` (existing ones are reused, never overwritten), and adds the scene to Build Settings.
-3. Press **Play**. Nothing happens until you click **Start Tsunami**.
+1. `Assets/Scenes/SampleScene.unity`'yi aç.
+2. **Tsunami > Add Tsunami To Open Scene (Team Map)** menüsünü çalıştır ve **Continue**'ya tıkla. Sahneye tek bir `Tsunami` nesnesi eklenir ve sahne kaydedilir; sahnedeki başka hiçbir şey değişmez. Yeniden çalıştırmak nesneyi baştan kurar. Kaldırmak için `Tsunami` nesnesini sil.
+3. Play. Ana menüden oyuna geç. Sağ üstteki panelde:
+   - **Dalga yüksekliği** kaydırıcısı: 1–25 m. Açık denizdeki ilk kabarmanın yüksekliği; bir sonraki başlatmada ya da yeniden başlatmada uygulanır.
+   - **Tsunamiyi Başlat** (ilerlerken **Yeniden Başlat**), **Duraklat/Devam**, **Sıfırla**.
+   - Varsayılan yükseklik: `Tsunami > Tsunami Controller > Scenarios > Element 0 > Amplitude` (10 m).
 
-> After pulling an update that changes the island or grid size, run **Tsunami > Build Demo Scene** again: the scene stores the old resolution and terrain settings.
+Ayrı test adası: **Tsunami > Build Demo Scene** (`Assets/Tsunami/Scenes/TsunamiDemo.unity`). Asıl kullanım ekip haritasıdır.
 
-## Controls
-| Input | Action |
+## Mimari
+
+| Bileşen | Görev |
 |---|---|
-| WASD / arrows | Move camera |
-| Q / E | Rotate |
-| Mouse wheel | Zoom |
-| Middle-drag | Pan |
-| Hold LMB | Raise terrain (barrier) |
-| Hold RMB | Lower terrain (channel) |
-| `[` / `]` | Brush size |
+| `TsunamiPhysicsSolver` | Saf C# sığ su çözücüsü (Unity bağımlılığı yok, Unity dışında test edilir). Çok çekirdekli. |
+| `WaterSimulation` | Çözücüyü sürer: CFL'li adımlar, oynatma hızı, duraklatma, kare başına zaman bütçesi, kaynak ekleme, duvarlar. |
+| `BathymetryProfile` | Deniz tabanı profili: kıyı eğimi → kıta sahanlığı → kıta yamacı → derin deniz (+ isteğe bağlı sualtı sırtı). |
+| `TeamMapTsunamiAdapter` | Simülasyon ızgarasını ekibin `World`'üne hizalar (2 m hücre). Vadinin açıldığı kuzeydoğuya okyanus ekler, dağları araziye çizer, oyuncunun duvarlarını ince engellere çevirir, deniz tabanını gösterir. |
+| `TsunamiController` | Simülasyon yöneticisi: oynat, duraklat, devam, sıfırla, yeniden başlat, hız, dalga yüksekliği, senaryolar (Inspector), kaynak yerleşimi. |
+| `TsunamiScenario` | Senaryo tanımı (kaynak + deniz tabanı). |
+| `WaterMeshRenderer`, `OceanRing` | Su yüzeyini simülasyon yüksekliğinden çizer; ızgara kenarı çevredeki okyanusla dikişsiz birleşir. |
+| `ImpactSplashEmitter`, `ImpactDetection` | Çarpma ve sıçrama: su kendinden yüksek bir şeye (dağ yamacı, dik kıyı, duvar, ev) çarptığında damlacık ve sis fırlar. Fırlama hızı çarpma hızıyla büyür. Tespit çözücünün hız, derinlik ve engel yüksekliği verisiyle yapılır. |
+| `TsunamiVisualizationManager` | Inspector'dan: renk haritaları, köpük, sprey, su yüzeyi ve batimetri görünümü; duraklatınca süs animasyonları da durur. |
+| `TsunamiUI` | Oyun içi panel: dalga yüksekliği, başlat/duraklat/sıfırla, durum, geri sayım. |
+| `VillageFloodTracker` | 40 köy evinin su basma / yıkılma durumu. |
 
-## Architecture
-| Component | Responsibility |
+## Fizik modeli
+
+Derinlik ortalamalı, doğrusal olmayan sığ su (Saint-Venant) denklemleri:
+
+- ∂h/∂t + ∇·(h**u**) = 0
+- ∂(h**u**)/∂t + ∇·(h**u**⊗**u** + ½ g h² **I**) = −g h ∇z_b − sürtünme
+
+**Ayrıklaştırma:**
+
+- Hücre merkezli sonlu hacim.
+- 2. dereceden MUSCL yeniden yapılandırma (minmod sınırlayıcı). Kuru hücrelerin ve duvarların yanında 1. dereceye düşer.
+- HLL yaklaşık Riemann çözücüsü.
+- Audusse vd. hidrostatik yeniden yapılandırma. Göl durgunken durgun kalır, kıyıda negatif derinlik oluşmaz, ıslanma/kuruma kararlı.
+- Heun (SSP-RK2) zaman adımı. Adım CFL koşulundan seçilir (Courant 0.3).
+- Yarı-örtük Manning sürtünmesi (deniz n = 0.025, kara n = 0.06).
+
+**Duvarlar:** Oyuncunun duvarları hücre kenarlarında ince engellerdir. Hidrostatik yeniden yapılandırmaya yükseltilmiş bir eşik olarak girer: su, duvarın tepesini aşınca savaktan taşar gibi geçer.
+
+**Sınırlar:**
+
+- Açık denizde bir sönümleme bandı dalgaları dışarı atar.
+- Izgaranın kare kenarı çizimde durgun okyanusa karışır, görünmez.
+
+**Kaynak:** Açık denizde Gauss ya da N-dalgası yüzey bozulması.
+
+- **Işınsal:** su durgun başlar, bozulma her yöne yayılır.
+- **Yönlü:** u = η·√(g/h) uzun dalga bağıntısıyla akış verilir; dalga tek bir ana yönde ilerler.
+- **N-dalgası:** önde çukur vardır, kıyıda deniz önce çekilir.
+
+**Varsayımlar ve sınırlar:**
+
+- Bu bir **tahmin modeli değildir**, eğitim amaçlı bir yaklaşımdır.
+- Dispersiyon, dalga kırılması fiziği ve dikey akış yoktur.
+- Sürtünme basitleştirilmiştir.
+- 2 m çözünürlük, alan yaklaşık 416 × 416 m.
+- Açık sınır yaklaşıktır.
+- Evler ve ağaçlar suya engel değildir; evlerin yalnız su basma ya da yıkılma durumu izlenir.
+
+**Fizik ile görsel ayrımı:**
+
+- Su yüzeyinin büyük ölçekli şekli doğrudan çözücüden gelir.
+- Dalgacıklar, köpük, sprey, çarpma sıçramaları, ışık ve yüzey yumuşatması yalnız görseldir, fiziği değiştirmez.
+- Köpük nereden çıkar: kırılan akış (Froude > 1.3, tamamı 2.8'de), kıyı kenarı ve dik dalga yüzü.
+- Köpük dokusu, simülasyonun hız alanıyla akar (iki fazlı flow-map). Bu yüzden yerinde durup beneklenmez.
+
+## Ayarlar
+
+- **Oyun içinde:** yalnız dalga yüksekliği (sağ üst panel).
+- **Inspector'da, `Tsunami` nesnesi altında:**
+  - `Tsunami Controller`: senaryolar (kaynak genliği, boyutu, kıyıdan uzaklığı, yönü, Gauss / N-dalgası, ışınsal / yönlü, deniz tabanı profili), seçili senaryo, uyarı geri sayımı.
+  - `Water Simulation`: oynatma hızı, Manning pürüzlülükleri, Courant sayısı, kare bütçesi.
+  - `Visualization`: renk haritası modu ve aralıkları, köpük, sprey, batimetri görünümü.
+- **Dalga hızı ayarı bilerek yok:** hız denklemlerden gelir (c ≈ √(g·h)).
+
+Senaryolar (örnektir, tahmin değildir):
+
+1. **Vadi Tsunamisi (Oyun):** varsayılan, 10 m kabarma, vadiden köye.
+2. **Küçük Açık Deniz Bozulması.**
+3. **Büyük Açık Deniz Tsunamisi.**
+4. **Sığ Kıyıya Yaklaşma.**
+5. **Kıyı Taşkını.**
+6. **Özel.**
+
+Seçili senaryo `Tsunami Controller > Scenario Index` ile değişir.
+
+## Doğrulama (Unity dışında, saf C# çözücüyle)
+
+| Test | Sonuç |
 |---|---|
-| `TerrainGrid` | Heightfield (procedural island, or baked from colliders), world/grid conversion, ray-march picking, brush edits, island mesh |
-| `ShallowWaterSolver` | Pure C# staggered-grid shallow-water solver (no Unity dependency, so it can be tested headless) |
-| `WaterSimulation` | Fixed-timestep driver, Inspector parameters, depth sampling |
-| `WaterMeshRenderer` | One dynamic mesh, one vertex per cell; UV0 = (depth, speed) for the shader. Its outer 8 cells fade into the shared open-ocean surface, so the square grid is never visible |
-| `WaterSprayEmitter` | One pooled particle system; throws spray off fast, rising wave fronts using the simulated velocity |
-| `OceanRing` | Ocean around the grid, morphing into a circle further out. Heights, normals and foam come from `WaterSimulation.OpenOceanHeight`, the same function the flood mesh fades into, so the seam is exact |
-| `TsunamiController` | Owns the `Idle/Warning/Running/Stopped` state; `StartTsunami()`, `StopTsunami()`, `ResetSimulation()` |
-| `TsunamiUI` | Buttons, status, and countdown; refreshes only on state change |
-| `VillageFloodTracker` | Samples depth around each house every 0.25 s; Safe, Flooded or Destroyed (latched) |
-| `TerrainBrush` / `GodCameraController` | Player input; both ignore input that starts over UI |
+| Durgun göl, 60 sn (engebeli taban, kuru ada, duvarlar) | En büyük hız 1.5·10⁻⁵ m/s, yüzey sapması 4·10⁻⁶ m |
+| Dalga hızı (5 / 10 / 40 m derinlik) | √(g·h)'den sapma +%3.5 / +%1.0 / +%0.9 |
+| Kapalı havzada kütle (kıyıya tırmanma dahil) | Sapma 10⁻⁷, hiç negatif derinlik yok |
+| Kuru yatağa baraj yıkılması | Cephe 10.9 m/s, Ritter çözümü 12.5 m/s (ince uç sayısal yayılmayla yavaşlıyor) |
+| Zaman adımı yarıya | Tepe 1.005 → 1.006 m (aynı) |
+| Izgara inceltme (2 → 1 m) | Tepe 1.005 → 1.129 m, varış zamanı aynı (2 m'nin sayısal yayılması) |
+| Ekip haritası düzeninde, açık deniz kaynağı | 4 m: 9 ev sular altında. 8 m: 38 sular altında, 2 yıkık. 12 m: vadide 9 m su, 40 ev yıkık. Kararlı, negatif derinlik yok. |
+| Çarpma tespiti ve köpük (oyun senaryosu, 60 sn) | Çarpmalar yalnız dalga gelirken (10–30 sn): dağ yamacında en çok 22 hücre, duvar halkasında 4; düz taşkında hiç yok. Islak karada köpük: dalga cephesinde %29–63 (eski eşikle %85–100), su yatışınca %0. |
+| Hız (.NET 10, çok çekirdek) | 208×208: adım başına yaklaşık 1.3–1.9 ms, CFL adımı ~0.03 sn |
 
-### How the water works
-- Each cell stores terrain height and water depth; each face between two cells carries one signed flux. The flux accelerates with the **water-surface** difference across the face, and its cross-section is the water column above the higher bed. So waves travel at about √(g·depth), and raised terrain blocks water until the water tops it.
-- A cell's outgoing fluxes are scaled so it never sends more water than it holds: no negative depths, and no water is created inside the grid.
-- **Tsunami sequence** (matches the classic diagram): the sea draws back during the warning. Then a train of waves (each smaller than the last) rides on a slow rise in sea level. Over the shallow coast the solver slows the waves, bunches them up and makes them taller (shoaling), they run up onto land, and after the event the water drains back out (backwash) or stays in hollows.
-- The incoming signal is replayed along the edges with a travel delay, so the waves sweep in from the source side instead of the whole border rising at once.
-- Grid edges are **open ocean**. A 5-cell absorbing band stops waves from bouncing back off the borders.
-- Bed friction scales with 1/depth², so waves cross deep water almost loss-free while thin floods on land settle quickly.
-- Terrain edits keep the water depth in each cell, so water is displaced rather than created.
-- The flood is entirely the solver's response to the terrain; no animated wall is moved. The heightfield can't curl or break like the diagram; foam on fast, steep crests stands in for breaking.
-- This is a gameplay approximation, **not** a physically validated tsunami model.
+**Unity'de henüz test edilmedi:** shader derlemesi, sahne kurulumu, panel yerleşimi, FPS. Unity'nin Mono'su .NET'ten yavaştır; `Water Simulation` bileşeninde sağ tık > Log Water Volume çözücü süresini yazdırır.
 
-### Key Inspector parameters
-- **WaterSimulation**: `edgeFadeCells` (8: width of the band where the rendered water fades into the open ocean; the simulation still runs there), `waveVisibleDistance`, `timestep` (1/60), `maxStepsPerFrame` (4), `waveSpeed` (1 = physical √(g·h)), `bedFriction` (0.3), `landDrag` (0.25), `baseDrag` (0.04), `edgeAbsorption` (3), `seaLevel`. `StabilityNumber` (Courant number) should stay below ~0.5 (default ≈ 0.1).
-- **TerrainGrid**: `resolution` (96), `cellSize` (1.33 m, so the island is ~127 m across), `seaFloor` (-12 m), island shape/hills (26 m mountain, ~16 m ridges), `bakeFromColliders` to use a teammate's island mesh instead.
-- **TsunamiController**
-  - Source: `sourceSide`, `sourceStart/End`, `edgeTaper` (0.2: the wave fades toward both ends of the edge so the grid corners stay calm), `sourceRows`, `sideReach` (only matters when `edgeTaper` is 0), `approachDistance` (how far out at sea the waves are visible before entering).
-  - Waves: `numberOfWaves` (1; 0 means until Stop), `waveHeight` (12 m out at sea, the "strength"; it rears up to ~15 m at the shore), `wavePeriod` (9 s), `waveDecay`, `wavePeriod`, `waveInterval`.
-  - Surge: `floodLevel` (1 m), `floodRampTime`, `floodHoldTime`, `floodFadeTime`, `sourceFadeTime` (Start/Stop fade, 1 s). `sideReach` 0.35 keeps the waves coming mainly from the source side.
-  - Warning and reset: `useWarning`, `warningDuration`, `drawback`, `resetTerrainOnReset`.
-- **VillageFloodTracker**: `checkInterval`, `floodDepth` (0.25 m), `destroyDepth` (1.2 m).
+## Performans ayarları
 
-## What has been verified (headless, outside Unity)
-The solver was compiled and run with `dotnet` (scratch harness, not in the repo):
-- **Shoaling:** a 1 m wave on a sea floor rising from 8 m depth grows to 1.6 m at 1.2 m depth (Green's law predicts about 1.6×), reaches about 2 m in the surf zone, and runs up 2.3 m onto the beach.
-- Closed-box dam-break for 60 s: volume drift < 0.0001 %, no negative depths, water passes a wall only through its gap. Ocean at rest: zero motion.
-- **Mountain waves** (96×96, 12 m waves): about 13–15 m surfaces at the shore, up to 19 m where they hit a wall. Depths stay valid and nothing blows up.
-- Village with no wall: all 10 houses destroyed (12–15 m of water). With a 20 m ring wall around the village: 9 safe; the one house outside the ring is destroyed. A straight 22 m beach wall alone only saves 2, because water wraps around its ends.
-- With `edgeTaper` 0.2, the south corners peak at 5 m instead of 17 m (the corner pile-up that caused visual spikes). A single wave still destroys 9 of 10 houses with no wall; a ring wall saves 9.
-- Grid/ocean seam: replaying the renderer's maths over a full tsunami, heights and normals on both sides of the grid edge match to about 2e-7 (float rounding).
-- After the event, currents fall below 2 m/s within 30 s; only thin films keep draining downhill.
-- Cost: ~0.12 ms per solver step at 96² (desktop CPU; at most 4 steps per frame). Mesh and spray updates are not measured yet.
-- All scripts compile against the project's Unity 6.6 assemblies with `dotnet build`.
-
-**Not yet verified in the Unity editor:** shader compilation, the scene builder, visuals, UI and frame rate on target laptops. Run the checklist below.
-
-## Acceptance checklist (run in Play mode)
-1. Scene starts Idle; sea calm; Stop is disabled.
-2. Start: the countdown appears, the sea draws back, and Start becomes disabled.
-3. After the countdown "THE WAVE IS COMING" appears. Expect a single wall of water well over the height of the houses, with spray flying off its breaking front. No folds or spikes at the ocean corners. A crest approaches from the south across the open ocean, steepens over the shallow beach and floods inland. Waves 2 and 3 follow and are smaller. There is no gap between the ocean and the simulated water.
-4. Start, then Stop during the countdown: no water comes in; status reads Stopped.
-5. Stop during flooding: the inflow stops at once and the inland water stays and keeps moving.
-6. Water drains back to sea; the hollow east of the village stays wet.
-7. Spam Start/Stop: only one event at a time (timer-based, no coroutines).
-8. Start again after Stop works. Reset clears water and restores houses (terrain only if `resetTerrainOnReset`).
-9. Clicking buttons never sculpts terrain or zooms the camera.
-10. Raise a ~20 m ring wall around the village (hold LMB; `[`/`]` resize the brush) before the wave: most houses survive.
-
-## Performance (target: 75+ FPS on low-end PCs)
-**Graphics:** **Tsunami > Build Demo Scene** offers to switch the active quality level to *fast settings*. **Tsunami > Graphics > Use Fast Settings** does the same at any time. It creates copies of the project's URP asset and renderer in `Assets/Tsunami/Settings` with SSAO, HDR, MSAA, shadows, depth/opaque texture copies and Forward+ turned off, plus VSync off. The original `Assets/Settings` assets are not modified. **Tsunami > Graphics > Use Original Settings** switches back.
-
-**CPU work per frame:**
-- Calm water costs almost nothing: the flood mesh, ocean ring and spray skip their updates when no cell's depth changed and no wave is active.
-- The open-ocean surface (incoming wave / drawback) is cached once per step, only for the 8-cell edge band, and only while it changes. The ocean ring evaluates it once per vertex instead of five times.
-- The terrain brush only ray-marches between the highest and lowest possible terrain.
-- Solver: ~0.12 ms per step at 96² on a desktop CPU, with at most 4 steps per frame (fewer at high FPS).
-
-**Measuring in the editor:**
-- Turn off the Game view's **VSync** toggle (it caps you at the monitor's refresh rate).
-- Set the Game view to **1920×1080**: QHD (2560×1440) is ~1.8x the pixels of the low-end target.
-- Read **Stats** or the **Profiler** (CPU: `WaterSimulation.Update`, `WaterMeshRenderer.LateUpdate`).
-
-**If FPS is still below target:**
-- `TerrainGrid.resolution` 64 + `cellSize` 2 (same island, ~2.25x fewer cells), or `WaterSimulation.maxStepsPerFrame` 2.
-- Spray: lower `maxParticles` (600) / `maxPerFrame` (25).
-- Water material: set `_RippleStrength` to 0 for slightly cheaper pixels.
+- **`WaterSimulation`:** `timeScale`, `maxStepsPerFrame` (8), `frameBudgetMs` (10 ms; aşılırsa simülasyon yavaşlar ama kararsızlaşmaz), `secondOrder`, `multithreaded`.
+- **`TeamMapTsunamiAdapter.oceanCells`:** (72) okyanus genişliği; ızgara boyutunu ve maliyeti belirler.
+- **Grafik:** Tsunami > Graphics > Use Fast Settings (SSAO, HDR, gölge kapalı kopya ayarlar; orijinaller değişmez).

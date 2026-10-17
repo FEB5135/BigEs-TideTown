@@ -5,105 +5,90 @@ namespace Tsunami
 {
     public enum TsunamiState
     {
+        /// <summary>Initial conditions not applied yet; the sea is at rest.</summary>
         Idle,
+        /// <summary>Optional gameplay countdown before the tsunami is released.</summary>
         Warning,
+        /// <summary>The solver is advancing.</summary>
         Running,
-        Stopped
-    }
-
-    public enum TsunamiStopReason
-    {
-        None,
-        Player,
-        WaveEnded
+        /// <summary>Simulation time is frozen; Resume continues from exactly this state.</summary>
+        Paused
     }
 
     /// <summary>
-    /// Single authority for the tsunami event. Uses a timer in Update (no coroutines), so repeated
-    /// Start/Stop calls can never create duplicate timers or sources. Stopping only switches the
-    /// source off; the water solver keeps running and existing water stays in the scene.
+    /// Tsunami simulation manager: owns the lifecycle (play, pause, resume, reset, restart), simulation speed and
+    /// scenario selection, and turns the current scenario into the solver's initial conditions and sea floor.
     ///
-    /// The event follows the classic tsunami sequence:
-    ///   Warning - the sea draws back from the shore.
-    ///   Running - a train of long waves (each smaller than the last) rides on a slow rise of sea level.
-    ///             The solver makes them slow down, bunch up and grow taller over the shallow coast.
-    ///   Stopped - no more water comes in; the flood drains back out (backwash) or pools in hollows.
+    /// Initial-condition parameters (source and sea floor) only take effect when the simulation is (re)started:
+    /// editing them while a tsunami is running never silently recreates it; HasPendingChanges tells the UI to ask
+    /// for a reset. Speed and friction are live parameters.
     /// </summary>
     public class TsunamiController : MonoBehaviour
     {
         [SerializeField] WaterSimulation simulation;
         [Tooltip("Optional; reset together with the simulation.")]
         [SerializeField] VillageFloodTracker village;
+        [Tooltip("Optional: the team map adapter (sea floor, approach axis). Without it the source uses the fallback placement.")]
+        [SerializeField] TeamMapTsunamiAdapter mapAdapter;
 
-        [Header("Source")]
-        [Tooltip("Grid edge the tsunami arrives from (South = -Z).")]
-        [SerializeField] BoundarySide sourceSide = BoundarySide.South;
-        [Tooltip("Portion of that edge that carries the waves (0..1 along the edge).")]
-        [SerializeField, Range(0f, 1f)] float sourceStart = 0f;
-        [SerializeField, Range(0f, 1f)] float sourceEnd = 1f;
-        [Tooltip("Extra rows inward from the edge that receive water (0 = edge only, best for travelling waves).")]
-        [SerializeField, Range(0, 16)] int sourceRows = 0;
-        [Tooltip("Fraction of the source edge, at each end, over which the wave fades out (keeps the corners calm).")]
-        [SerializeField, Range(0f, 0.5f)] float edgeTaper = 0.2f;
-        [Tooltip("How far the waves run along the side edges (fraction of the grid width). Only matters when edgeTaper is 0.")]
-        [SerializeField, Range(0f, 1f)] float sideReach = 0.35f;
-        [Tooltip("Open-ocean distance (m) the waves travel, visibly, before entering the grid.")]
-        [SerializeField, Range(0f, 150f)] float approachDistance = 60f;
+        [Header("Scenarios")]
+        [SerializeField] TsunamiScenario[] scenarios = TsunamiScenario.CreateDefaults();
+        [SerializeField] int scenarioIndex;
 
-        [Header("Wave train")]
-        [Tooltip("Number of waves. 0 = keep coming until Stop is pressed.")]
-        [SerializeField, Range(0, 10)] int numberOfWaves = 1;
-        [Tooltip("Tsunami strength: height of the first wave out at sea (m). It rears up over the shallow coast.")]
-        [SerializeField, Range(0.5f, 30f)] float waveHeight = 12f;
-        [Tooltip("Each following wave is this fraction of the previous one.")]
-        [SerializeField, Range(0.3f, 1.5f)] float waveDecay = 0.7f;
-        [Tooltip("Duration of one wave passing a point (s). Longer = longer wavelength.")]
-        [SerializeField, Range(2f, 20f)] float wavePeriod = 9f;
-        [Tooltip("Time between wave crests (s).")]
-        [SerializeField, Range(3f, 40f)] float waveInterval = 16f;
-
-        [Header("Sea-level surge")]
-        [Tooltip("Slow rise of sea level under the waves during the event (m). Drives the inland flooding.")]
-        [SerializeField, Range(0f, 5f)] float floodLevel = 1f;
-        [SerializeField, Min(0f)] float floodRampTime = 8f;
-        [Tooltip("Seconds the surge holds after the last wave before fading.")]
-        [SerializeField, Min(0f)] float floodHoldTime = 10f;
-        [SerializeField, Min(0f)] float floodFadeTime = 4f;
-        [Tooltip("Seconds for the incoming wave to fade in on Start and out on Stop (avoids a sudden jump at the edge).")]
-        [SerializeField, Range(0.1f, 5f)] float sourceFadeTime = 1f;
-
-        [Header("Warning")]
+        [Header("Gameplay")]
+        [Tooltip("Show a countdown before the tsunami is released (gameplay). Restart skips it.")]
         [SerializeField] bool useWarning = true;
-        [SerializeField, Min(0f)] float warningDuration = 5f;
-        [Tooltip("How far the sea draws back during the warning (m). 0 disables.")]
-        [SerializeField, Range(0f, 4f)] float drawback = 1.2f;
+        [SerializeField, Range(0f, 15f)] float warningDuration = 4f;
 
-        [Header("Reset")]
-        [Tooltip("Also restore the original terrain when ResetSimulation is called.")]
-        [SerializeField] bool resetTerrainOnReset;
+        [Header("Fallback placement (scenes without a map adapter)")]
+        [SerializeField] Vector3 fallbackSourcePosition = new Vector3(0f, 0f, -90f);
+        [Tooltip("Travel direction in degrees: 0 = towards +Z (north), 90 = towards +X (east).")]
+        [SerializeField] float fallbackDirection = 0f;
 
+        TsunamiScenario current;            // live copy of the selected scenario (edited by the UI)
+        bool hasCustomPosition;
+        Vector3 customPosition;
         float timer;
+        BathymetryProfile appliedBathymetry;
+        bool appliedBathymetryValid;
 
         public TsunamiState State { get; private set; } = TsunamiState.Idle;
-        public TsunamiStopReason StopReason { get; private set; }
-        /// <summary>Seconds left in the warning countdown (0 outside Warning).</summary>
         public float WarningRemaining => State == TsunamiState.Warning ? Mathf.Max(0f, timer) : 0f;
-        /// <summary>Seconds since the waves started (0 outside Running).</summary>
-        public float RunningTime => State == TsunamiState.Running ? timer : 0f;
-        /// <summary>0 = unlimited.</summary>
-        public int WaveCount => numberOfWaves;
-        /// <summary>1-based index of the latest wave sent out (0 before the first).</summary>
-        public int CurrentWave
+        public WaterSimulation Simulation => simulation;
+        public TeamMapTsunamiAdapter MapAdapter => mapAdapter;
+        public TsunamiScenario[] Scenarios => scenarios;
+        public int ScenarioIndex => scenarioIndex;
+        /// <summary>The editable copy of the selected scenario.</summary>
+        public TsunamiScenario Current => current ?? (current = scenarios[Mathf.Clamp(scenarioIndex, 0, scenarios.Length - 1)].Clone());
+        /// <summary>Initial-condition settings changed since the last (re)start: a reset is needed to apply them.</summary>
+        public bool HasPendingChanges { get; private set; }
+        public bool UseWarning { get => useWarning; set => useWarning = value; }
+        public float TimeScale { get => simulation != null ? simulation.TimeScale : 1f; set { if (simulation != null) simulation.TimeScale = value; } }
+        /// <summary>
+        /// Height of the initial sea-surface bulge out at sea (m) for the current scenario. Takes effect on the next
+        /// start / restart; a tsunami already in progress is not changed.
+        /// </summary>
+        public float WaveHeight
         {
-            get
+            get => Current.amplitude;
+            set
             {
-                if (State != TsunamiState.Running) return 0;
-                int k = Mathf.FloorToInt(timer / waveInterval) + 1;
-                return numberOfWaves > 0 ? Mathf.Min(k, numberOfWaves) : k;
+                Current.amplitude = Mathf.Clamp(value, MinWaveHeight, MaxWaveHeight);
+                NotifyParametersEdited();
             }
         }
 
+        public const float MinWaveHeight = 1f;
+        public const float MaxWaveHeight = 25f;
+
+        /// <summary>Volume added by the last source (m^3).</summary>
+        public double LastSourceVolume { get; private set; }
+
         public event Action<TsunamiState> StateChanged;
+        /// <summary>Raised after the water was reset to rest (new initial state): trackers clear their maxima.</summary>
+        public event Action SimulationReset;
+        public event Action ScenarioChanged;
+        public event Action ParametersChanged;
 
         void Start()
         {
@@ -113,124 +98,202 @@ namespace Tsunami
                 enabled = false;
                 return;
             }
-            ApplySource(false, 0f);
+            if (scenarios == null || scenarios.Length == 0) scenarios = TsunamiScenario.CreateDefaults();
+            current = null;
+            ApplyBathymetryIfNeeded(true);
+            simulation.Paused = true;
+            SimulationReset?.Invoke();
         }
 
-        /// <summary>Starts the warning countdown (or the waves directly). Ignored while Warning/Running.</summary>
-        public void StartTsunami()
+        void Update()
         {
-            if (!enabled || State == TsunamiState.Warning || State == TsunamiState.Running) return;
-            StopReason = TsunamiStopReason.None;
+            if (State != TsunamiState.Warning) return;
+            timer -= Time.deltaTime;
+            if (timer <= 0f) BeginRun();
+        }
+
+        // ------------------------------------------------------------------ playback
+
+        /// <summary>Starts the tsunami from the current initial conditions, or resumes when paused.</summary>
+        public void Play()
+        {
+            if (!enabled) return;
+            switch (State)
+            {
+                case TsunamiState.Paused: Resume(); return;
+                case TsunamiState.Running:
+                case TsunamiState.Warning: return;
+            }
             if (useWarning && warningDuration > 0f)
             {
                 timer = warningDuration;
                 SetState(TsunamiState.Warning);
             }
-            else
+            else BeginRun();
+        }
+
+        public void Pause()
+        {
+            if (State == TsunamiState.Running)
             {
-                BeginRunning();
+                simulation.Paused = true;
+                SetState(TsunamiState.Paused);
+            }
+            else if (State == TsunamiState.Warning)
+            {
+                SetState(TsunamiState.Idle); // cancel the pending release
             }
         }
 
-        /// <summary>Cancels a pending countdown or stops incoming water. Existing water is kept.</summary>
-        public void StopTsunami()
+        public void Resume()
         {
-            if (State != TsunamiState.Warning && State != TsunamiState.Running) return;
-            EndEvent(TsunamiStopReason.Player);
-        }
-
-        /// <summary>Stops the event, removes all simulated water and returns to Idle.</summary>
-        public void ResetSimulation()
-        {
-            if (simulation == null) return;
-            ApplySource(false, 0f);
-            if (resetTerrainOnReset) simulation.Terrain.ResetTerrain();
-            simulation.ResetWater();
-            if (village != null) village.ResetVillage();
-            StopReason = TsunamiStopReason.None;
-            timer = 0f;
-            SetState(TsunamiState.Idle);
-        }
-
-        void Update()
-        {
-            switch (State)
-            {
-                case TsunamiState.Warning:
-                    timer -= Time.deltaTime;
-                    float progress = 1f - Mathf.Clamp01(timer / warningDuration);
-                    simulation.Solver.BoundaryLevelOffset = -drawback * Mathf.SmoothStep(0f, 1f, progress);
-                    if (timer <= 0f) BeginRunning();
-                    break;
-
-                case TsunamiState.Running:
-                    timer += Time.deltaTime;
-                    float height = WaveSignal(timer, out bool finished);
-                    if (finished) EndEvent(TsunamiStopReason.WaveEnded);
-                    else ApplySource(true, height);
-                    break;
-            }
-        }
-
-        /// <summary>Height of the incoming signal out at sea, t seconds after the waves started.</summary>
-        float WaveSignal(float t, out bool finished)
-        {
-            finished = false;
-            float fade = 1f;
-            if (numberOfWaves > 0)
-            {
-                float end = (numberOfWaves - 1) * waveInterval + wavePeriod + floodHoldTime;
-                if (t >= end + floodFadeTime) { finished = true; return 0f; }
-                if (t > end) fade = floodFadeTime > 0f ? 1f - (t - end) / floodFadeTime : 0f;
-            }
-
-            float surge = floodLevel * (floodRampTime > 0f ? Mathf.SmoothStep(0f, 1f, t / floodRampTime) : 1f) * fade;
-
-            // Each wave is a smooth sin^2 hump; only the one or two overlapping the current time matter.
-            float waves = 0f;
-            int last = Mathf.FloorToInt(t / waveInterval);
-            int first = Mathf.Max(0, last - Mathf.CeilToInt(wavePeriod / waveInterval));
-            for (int k = first; k <= last; k++)
-            {
-                if (numberOfWaves > 0 && k >= numberOfWaves) break;
-                float x = (t - k * waveInterval) / wavePeriod;
-                if (x <= 0f || x >= 1f) continue;
-                float s = Mathf.Sin(Mathf.PI * x);
-                waves += waveHeight * Mathf.Pow(waveDecay, k) * s * s;
-            }
-            return surge + waves;
-        }
-
-        void BeginRunning()
-        {
-            timer = 0f;
-            simulation.Solver.BoundaryLevelOffset = 0f;
-            ApplySource(true, 0f);
+            if (State != TsunamiState.Paused) return;
+            simulation.Paused = false;
             SetState(TsunamiState.Running);
         }
 
-        void EndEvent(TsunamiStopReason reason)
+        public void TogglePause()
         {
-            ApplySource(false, 0f);
-            simulation.Solver.BoundaryLevelOffset = 0f;
-            timer = 0f;
-            StopReason = reason;
-            SetState(TsunamiState.Stopped);
+            if (State == TsunamiState.Paused) Resume();
+            else Pause();
         }
 
-        void ApplySource(bool active, float height)
+        /// <summary>Restores the initial state: sea at rest, current scenario's sea floor, village repaired.</summary>
+        public void ResetSimulation()
         {
-            ShallowWaterSolver s = simulation.Solver;
-            s.SourceActive = active;
-            s.SurgeHeight = height;
-            s.SourceSide = sourceSide;
-            s.SourceStart01 = Mathf.Min(sourceStart, sourceEnd);
-            s.SourceEnd01 = Mathf.Max(sourceStart, sourceEnd);
-            s.SourceBandCells = sourceRows;
-            s.SideSurgeReach = sideReach;
-            s.SourceEdgeTaper = edgeTaper;
-            s.ApproachDistance = approachDistance;
-            s.SourceFadeRate = 1f / sourceFadeTime;
+            if (simulation == null) return;
+            simulation.Paused = true;
+            ApplyBathymetryIfNeeded(false);
+            simulation.ResetWater();
+            if (village != null) village.ResetVillage();
+            HasPendingChanges = false;
+            timer = 0f;
+            SetState(TsunamiState.Idle);
+            SimulationReset?.Invoke();
+        }
+
+        /// <summary>Reset and immediately release the tsunami (no countdown).</summary>
+        public void Restart()
+        {
+            ResetSimulation();
+            BeginRun();
+        }
+
+        // Kept for older UI / scripts.
+        public void StartTsunami() => Play();
+        public void StopTsunami() => Pause();
+
+        void BeginRun()
+        {
+            if (State != TsunamiState.Idle && State != TsunamiState.Warning) ResetSimulation();
+            if (HasPendingChanges) ResetSimulation();
+            ApplyBathymetryIfNeeded(false);
+            // Fresh initial state: sea at rest + the scenario's disturbance.
+            simulation.ResetWater();
+            SimulationReset?.Invoke();
+            TsunamiScenario s = Current;
+            LastSourceVolume = simulation.AddSource(SourcePosition, TravelDirection, s.amplitude, s.lengthRadius,
+                s.widthRadius, s.profile, s.motion);
+            HasPendingChanges = false;
+            simulation.Paused = false;
+            SetState(TsunamiState.Running);
+        }
+
+        // ------------------------------------------------------------------ scenarios and parameters
+
+        public void SelectScenario(int index)
+        {
+            if (scenarios == null || scenarios.Length == 0) return;
+            index = Mathf.Clamp(index, 0, scenarios.Length - 1);
+            scenarioIndex = index;
+            current = scenarios[index].Clone();
+            hasCustomPosition = false;
+            ScenarioChanged?.Invoke();
+            ResetSimulation();
+        }
+
+        /// <summary>Call after editing <see cref="Current"/>: marks a reset as needed if a tsunami is in progress.</summary>
+        public void NotifyParametersEdited()
+        {
+            // A new sea floor is rebuilt once on Reset / Play (not on every slider tick); a running tsunami is
+            // never recreated silently.
+            if (State != TsunamiState.Idle || !BathymetryEquals(Current.bathymetry.Validated(), appliedBathymetry))
+                HasPendingChanges = true;
+            ParametersChanged?.Invoke();
+        }
+
+        /// <summary>Places the source at a world position (custom placement, e.g. a click on the ocean).</summary>
+        public void SetSourcePosition(Vector3 world)
+        {
+            hasCustomPosition = true;
+            customPosition = mapAdapter != null ? mapAdapter.ClampToOcean(world) : world;
+            NotifyParametersEdited();
+        }
+
+        public bool HasCustomSourcePosition => hasCustomPosition;
+
+        /// <summary>Back to the scenario's placement (offshore on the approach axis).</summary>
+        public void ClearSourcePosition()
+        {
+            if (!hasCustomPosition) return;
+            hasCustomPosition = false;
+            NotifyParametersEdited();
+        }
+
+        /// <summary>World position of the source centre for the current settings.</summary>
+        public Vector3 SourcePosition
+        {
+            get
+            {
+                if (hasCustomPosition) return customPosition;
+                if (mapAdapter != null) return mapAdapter.OffshorePoint(Current.offshoreDistance);
+                return fallbackSourcePosition;
+            }
+        }
+
+        /// <summary>Travel direction of the disturbance (unit XZ).</summary>
+        public Vector2 TravelDirection
+        {
+            get
+            {
+                Vector2 axis;
+                if (mapAdapter != null) axis = mapAdapter.ApproachDirection;
+                else
+                {
+                    float a = fallbackDirection * Mathf.Deg2Rad;
+                    axis = new Vector2(Mathf.Sin(a), Mathf.Cos(a));
+                }
+                if (hasCustomPosition && mapAdapter != null)
+                {
+                    // A placed source aims at the approach target unless rotated.
+                    Vector3 d = mapAdapter.ApproachTarget - customPosition;
+                    if (new Vector2(d.x, d.z).sqrMagnitude > 1f) axis = new Vector2(d.x, d.z).normalized;
+                }
+                float off = -Current.directionOffset * Mathf.Deg2Rad;
+                float c = Mathf.Cos(off), s = Mathf.Sin(off);
+                return new Vector2(axis.x * c - axis.y * s, axis.x * s + axis.y * c);
+            }
+        }
+
+        /// <summary>Travel direction as a compass angle (0 = +Z/north, 90 = +X/east).</summary>
+        public float TravelHeading => Mathf.Repeat(Mathf.Atan2(TravelDirection.x, TravelDirection.y) * Mathf.Rad2Deg, 360f);
+
+        void ApplyBathymetryIfNeeded(bool force)
+        {
+            if (mapAdapter == null) return;
+            BathymetryProfile wanted = Current.bathymetry.Validated();
+            if (!force && appliedBathymetryValid && BathymetryEquals(wanted, appliedBathymetry)) return;
+            mapAdapter.SetBathymetry(wanted);
+            appliedBathymetry = wanted;
+            appliedBathymetryValid = true;
+        }
+
+        static bool BathymetryEquals(BathymetryProfile a, BathymetryProfile b)
+        {
+            return Mathf.Approximately(a.seaBelowGround, b.seaBelowGround) && Mathf.Approximately(a.coastSlopeWidth, b.coastSlopeWidth) &&
+                   Mathf.Approximately(a.shelfDepth, b.shelfDepth) && Mathf.Approximately(a.shelfWidth, b.shelfWidth) &&
+                   Mathf.Approximately(a.slopeWidth, b.slopeWidth) && Mathf.Approximately(a.deepDepth, b.deepDepth) &&
+                   Mathf.Approximately(a.ridgeHeight, b.ridgeHeight) && Mathf.Approximately(a.ridgeDistance, b.ridgeDistance);
         }
 
         void SetState(TsunamiState next)

@@ -3,79 +3,90 @@ using UnityEngine;
 namespace Tsunami
 {
     /// <summary>
-    /// Runs the ShallowWaterSolver on the TerrainGrid with a fixed timestep, independent of framerate.
-    /// The solver keeps running whether or not a tsunami source is active.
+    /// Drives the TsunamiPhysicsSolver on the TerrainGrid. Simulation time is separate from rendering time:
+    /// every frame the solver advances (frame time x TimeScale) in CFL-limited steps, capped by a per-frame
+    /// step/time budget (if the budget runs out the simulation runs slower instead of becoming unstable).
     /// </summary>
     [DefaultExecutionOrder(-50)]
     public class WaterSimulation : MonoBehaviour
     {
         [SerializeField] TerrainGrid terrain;
 
-        [Header("Timestep")]
-        [Tooltip("Fixed solver timestep (s). Must stay well below cellSize / waveSpeed; see StabilityNumber.")]
-        [SerializeField, Range(0.005f, 0.05f)] float timestep = 1f / 60f;
-        [Tooltip("Upper bound on solver steps per rendered frame. Prevents a spiral of death on slow machines " +
-                 "(the simulation slows down instead).")]
-        [SerializeField, Range(1, 16)] int maxStepsPerFrame = 4;
+        [Header("Time")]
+        [Tooltip("Simulation seconds per real second (playback speed). Does not change the physics.")]
+        [SerializeField, Range(0.1f, 8f)] float timeScale = 1f;
+        [Tooltip("Upper bound for one solver step (s). The CFL condition usually picks a smaller one.")]
+        [SerializeField, Range(0.005f, 0.1f)] float maxTimestep = 0.05f;
+        [Tooltip("Courant number of the solver (stability). 0.3 is safe; above 0.4 the shoreline may misbehave.")]
+        [SerializeField, Range(0.05f, 0.45f)] float courantNumber = 0.3f;
+        [Tooltip("At most this many solver steps per rendered frame.")]
+        [SerializeField, Range(1, 32)] int maxStepsPerFrame = 8;
+        [Tooltip("At most this much CPU time per frame for the solver (ms); the simulation slows down instead.")]
+        [SerializeField, Range(2f, 40f)] float frameBudgetMs = 10f;
         [SerializeField] bool paused;
 
-        [Header("Flow")]
-        [SerializeField] float gravity = 9.81f;
-        // Field names differ from the first prototype on purpose, so scenes built with the old (plateau)
-        // tuning pick up these defaults instead of the old serialized values.
-        [Tooltip("Wave-speed multiplier: waves travel at about sqrt(g * depth * waveSpeed). 1 = physical.")]
-        [SerializeField, Range(0.25f, 4f)] float waveSpeed = 1f;
-        [Tooltip("Bed friction (1/s at 1 m depth, scaled by 1/depth^2). Higher = floods settle faster, waves lose more height.")]
-        [SerializeField, Range(0f, 3f)] float bedFriction = 0.3f;
-        [Tooltip("Extra drag (1/s) on water flowing over land, so floods settle instead of sloshing.")]
-        [SerializeField, Range(0f, 2f)] float landDrag = 0.25f;
-        [Tooltip("Small drag (1/s) everywhere so leftover ocean currents die out.")]
-        [SerializeField, Range(0f, 0.5f)] float baseDrag = 0.04f;
-        [Tooltip("Depth (m) below which a cell is treated as dry for rendering and speed estimates.")]
+        [Header("Physics")]
+        [SerializeField, Range(1f, 20f)] float gravity = 9.81f;
+        [Tooltip("Manning roughness of the sea floor (s/m^1/3). 0.02-0.03 for sand/mud.")]
+        [SerializeField, Range(0f, 0.1f)] float seaManning = 0.025f;
+        [Tooltip("Manning roughness of land (s/m^1/3). Grass/streets 0.03-0.06, towns/forest up to 0.1.")]
+        [SerializeField, Range(0f, 0.2f)] float landManning = 0.06f;
+        [Tooltip("Second-order (MUSCL) reconstruction: sharper waves. Off = first order (more diffusive, cheaper).")]
+        [SerializeField] bool secondOrder = true;
+        [Tooltip("Spread the solver over all CPU cores.")]
+        [SerializeField] bool multithreaded = true;
+        [Tooltip("Depth (m) below which a cell counts as dry for rendering, foam and measurements.")]
         [SerializeField, Range(0.001f, 0.1f)] float wetThreshold = 0.01f;
 
-        [Header("Ocean")]
+        [Header("Sea and boundaries")]
         [SerializeField] float seaLevel = 0f;
-        [Tooltip("Grid edge cells act as open ocean held at sea level: water can drain out and the surge can flow in.")]
-        [SerializeField] bool openOceanBoundaries = true;
-        [Tooltip("Damping (1/s) in a 5-cell band along the edges so waves leave the grid instead of reflecting.")]
-        [SerializeField, Range(0f, 10f)] float edgeAbsorption = 3f;
+        [Tooltip("Open sea at the domain edge (waves leave through an absorbing band). Off = solid walls (waves reflect).")]
+        [SerializeField] bool openBoundaries = true;
+        [Tooltip("Relaxation rate (1/s) of the absorbing band at the domain edge.")]
+        [SerializeField, Range(0f, 10f)] float spongeStrength = 1.5f;
+        [SerializeField, Range(0, 24)] int spongeCells = 6;
 
         [Header("Open-ocean blending (visual only)")]
-        [Tooltip("Cells from the grid edge over which the rendered water fades into the open-ocean surface. " +
-                 "The simulation boundary (absorbing band, fixed sea level) lives inside this band, so the square " +
-                 "outline of the grid is never visible.")]
+        [Tooltip("Cells from the grid edge over which the rendered water fades into the still open ocean, hiding the " +
+                 "square outline of the domain and its absorbing band.")]
         [SerializeField, Range(3, 24)] int edgeFadeCells = 8;
-        [Tooltip("The incoming wave out at sea fades between this distance and twice this distance beyond the source edge (m).")]
-        [SerializeField, Min(10f)] float waveVisibleDistance = 60f;
 
         /// <summary>Depth value the shader receives for open ocean (deep colour, no shoreline foam).</summary>
         public const float OpenOceanShaderDepth = 50f;
 
-        ShallowWaterSolver solver;
-        float accumulator;
-
-        // Cached open-ocean surface for grid coords -1..n (one ring beyond the grid), edge band only.
-        float[] oceanHeight;
-        float[] oceanSpeed;
+        TsunamiPhysicsSolver solver;
+        double pendingSimTime;
         float[] edgeBlend;
-        int oceanFieldVersion = int.MinValue;
+        readonly System.Diagnostics.Stopwatch budget = new System.Diagnostics.Stopwatch();
 
         public TerrainGrid Terrain => terrain;
-        public float SeaLevel => seaLevel;
-        public float WetThreshold => wetThreshold;
-        public bool Paused { get => paused; set => paused = value; }
-        /// <summary>Incremented after every solver step; renderers use it to skip redundant updates.</summary>
-        public int StepCount { get; private set; }
-        public ShallowWaterSolver Solver { get { EnsureInitialized(); return solver; } }
+        public TsunamiPhysicsSolver Solver { get { EnsureInitialized(); return solver; } }
         public float[] Depth => Solver.Depth;
         public float[] Speed => Solver.Speed;
+        public float WetThreshold => wetThreshold;
+        public float Gravity => gravity;
+        public bool Paused { get => paused; set => paused = value; }
+        public float TimeScale { get => timeScale; set => timeScale = Mathf.Clamp(value, 0.1f, 8f); }
+        public float SeaManning { get => seaManning; set { seaManning = Mathf.Clamp(value, 0f, 0.1f); if (solver != null) PushSettings(); } }
+        public float LandManning { get => landManning; set { landManning = Mathf.Clamp(value, 0f, 0.2f); if (solver != null) PushSettings(); } }
+        /// <summary>Simulated time since the last reset (s).</summary>
+        public double SimTime => solver != null ? solver.Time : 0.0;
+        /// <summary>True when the last frame could not keep up with TimeScale (budget exhausted).</summary>
+        public bool RunningSlow { get; private set; }
+        public int StepsLastFrame { get; private set; }
+        public float SolverMsLastFrame { get; private set; }
+        /// <summary>Incremented after every frame in which the solver advanced (renderers use it to skip work).</summary>
+        public int StepCount { get; private set; }
 
-        /// <summary>
-        /// Courant number for a 15 m deep wave: dt * sqrt(g * 15 * waveSpeed) / cellSize. Keep below ~0.5
-        /// (defaults give ~0.1).
-        /// </summary>
-        public float StabilityNumber => terrain == null ? 0f : timestep * Mathf.Sqrt(gravity * 15f * waveSpeed) / terrain.CellSize;
+        /// <summary>Still-water level relative to the terrain transform. Takes effect on the next ResetWater.</summary>
+        public float SeaLevel
+        {
+            get => seaLevel;
+            set { seaLevel = value; if (solver != null) PushSettings(); }
+        }
+
+        /// <summary>World-space height of the still sea.</summary>
+        public float SeaLevelWorld => (terrain != null ? terrain.transform.position.y : 0f) + seaLevel;
 
         void Awake()
         {
@@ -84,13 +95,9 @@ namespace Tsunami
 
         void OnValidate()
         {
-            if (terrain != null && StabilityNumber > 0.5f)
-                Debug.LogWarning($"[WaterSimulation] Stability number {StabilityNumber:F2} is high; lower timestep or waveSpeed.", this);
-            if (solver != null)
-            {
-                PushSettings();
-                BuildEdgeBlend();
-            }
+            if (solver == null) return;
+            PushSettings();
+            BuildEdgeBlend();
         }
 
         public void EnsureInitialized()
@@ -105,7 +112,7 @@ namespace Tsunami
             terrain.EnsureInitialized();
             if (solver != null && solver.Size == terrain.Resolution && Mathf.Approximately(solver.CellSize, terrain.CellSize)) return;
 
-            solver = new ShallowWaterSolver(terrain.Resolution, terrain.CellSize);
+            solver = new TsunamiPhysicsSolver(terrain.Resolution, terrain.CellSize) { SpongeCells = spongeCells };
             PushSettings();
             solver.ResetToSeaLevel(terrain.Heights);
             BuildEdgeBlend();
@@ -115,74 +122,90 @@ namespace Tsunami
         void PushSettings()
         {
             solver.Gravity = gravity;
-            solver.FlowSpeed = waveSpeed;
-            solver.Friction = bedFriction;
-            solver.SpongeStrength = edgeAbsorption;
-            solver.LandDrag = landDrag;
-            solver.BaseDrag = baseDrag;
-            solver.WetThreshold = wetThreshold;
+            solver.SeaManning = seaManning;
+            solver.LandManning = landManning;
+            solver.Cfl = courantNumber;
+            solver.SecondOrder = secondOrder;
+            solver.UseThreads = multithreaded;
             solver.SeaLevel = seaLevel;
-            solver.OpenOceanBoundaries = openOceanBoundaries;
+            solver.OpenBoundaries = openBoundaries;
+            solver.SpongeStrength = spongeStrength;
         }
 
         void Update()
         {
+            StepsLastFrame = 0;
+            SolverMsLastFrame = 0f;
+            RunningSlow = false;
             if (solver == null || paused) return;
-            accumulator += Time.deltaTime;
-            int steps = 0;
+
+            pendingSimTime += Time.deltaTime * timeScale;
             float[] h = terrain.Heights;
-            while (accumulator >= timestep && steps < maxStepsPerFrame)
+            budget.Restart();
+            int steps = 0;
+            while (pendingSimTime > 1e-5 && steps < maxStepsPerFrame && budget.Elapsed.TotalMilliseconds < frameBudgetMs)
             {
-                solver.Step(h, timestep);
-                accumulator -= timestep;
+                float dt = solver.Step(h, Mathf.Min(maxTimestep, (float)pendingSimTime));
+                if (dt <= 0f) break;
+                pendingSimTime -= dt;
                 steps++;
             }
-            if (steps == maxStepsPerFrame && accumulator > timestep) accumulator = 0f; // drop backlog
+            if (pendingSimTime > maxTimestep)
+            {
+                // Could not keep up: drop the backlog (the simulation runs slower than requested, never unstable).
+                RunningSlow = true;
+                pendingSimTime = 0;
+            }
+            StepsLastFrame = steps;
+            SolverMsLastFrame = (float)budget.Elapsed.TotalMilliseconds;
             if (steps > 0) StepCount++;
-            RefreshOceanField();
         }
 
-        /// <summary>Clears all simulated water and refills the surrounding ocean to sea level.</summary>
+        /// <summary>Removes all motion and refills the sea to the still-water level. Walls are kept.</summary>
         public void ResetWater()
         {
             EnsureInitialized();
+            PushSettings();
             solver.ResetToSeaLevel(terrain.Heights);
-            RefreshOceanField();
-            accumulator = 0f;
+            pendingSimTime = 0;
             StepCount++;
         }
 
-        /// <summary>
-        /// Open-ocean water surface (local Y, relative to the terrain transform) at continuous grid coordinates,
-        /// which may lie outside the grid. Used by both the flood mesh edge band and the surrounding ocean, so the
-        /// two always match exactly at the grid edge. <paramref name="speed"/> is the long-wave particle speed.
-        /// </summary>
-        public float OpenOceanHeight(float gx, float gz, out float speed)
+        /// <summary>Adds an initial sea-surface disturbance centred on a world position.</summary>
+        public double AddSource(Vector3 worldCentre, Vector2 travelDirection, float amplitude, float lengthRadius,
+            float widthRadius, SourceProfile profile, SourceMotion motion)
         {
-            ShallowWaterSolver s = solver ?? Solver;
-            s.SourceFrame(gx, gz, out float distance, out float along);
-            float eta = s.IncomingWaveAt(distance, Mathf.Clamp01(along));
-            if (distance < -waveVisibleDistance) eta *= Mathf.Clamp01(2f + distance / waveVisibleDistance);
-            speed = Mathf.Max(0f, eta) * Mathf.Sqrt(s.Gravity / Mathf.Max(1f, s.ReferenceDepth));
-            return s.SeaLevel + s.CurrentBoundaryOffset + eta;
+            EnsureInitialized();
+            Vector3 local = worldCentre - terrain.transform.position;
+            Vector2 d = travelDirection.sqrMagnitude > 1e-6f ? travelDirection.normalized : Vector2.right;
+            double added = solver.AddSource(new TsunamiSource
+            {
+                centerX = local.x, centerZ = local.z, dirX = d.x, dirZ = d.y,
+                amplitude = amplitude, lengthRadius = lengthRadius, widthRadius = widthRadius,
+                profile = profile, motion = motion
+            });
+            StepCount++;
+            return added;
         }
 
         /// <summary>True when any cell's depth changed noticeably in the last step (water not at rest).</summary>
         public bool WaterMoving => solver != null && solver.MaxDepthChange > 1e-5f;
 
-        /// <summary>Changes whenever the cached open-ocean surface changes.</summary>
+        /// <summary>Changes whenever the still open ocean around the domain changes (reset, sea level).</summary>
         public int OpenOceanVersion => solver != null ? solver.OpenOceanVersion : 0;
 
-        /// <summary>
-        /// Cached OpenOceanHeight at integer grid coords -1..Resolution. Valid for the edge band and the ring
-        /// just outside the grid (elsewhere it returns sea level).
-        /// </summary>
+        /// <summary>Still open-ocean surface (local Y) at any grid coordinate, including outside the domain.</summary>
+        public float OpenOceanHeight(float gx, float gz, out float speed)
+        {
+            speed = 0f;
+            return seaLevel;
+        }
+
+        /// <summary>Open-ocean surface at integer grid coords (-1..Resolution), shared by the flood mesh edge and OceanRing.</summary>
         public float OceanAt(int x, int z, out float speed)
         {
-            RefreshOceanField();
-            int i = (z + 1) * (terrain.Resolution + 2) + (x + 1);
-            speed = oceanSpeed[i];
-            return oceanHeight[i];
+            speed = 0f;
+            return seaLevel;
         }
 
         /// <summary>
@@ -209,28 +232,45 @@ namespace Tsunami
                     edgeBlend[z * n + x] = w;
                 }
             }
-            int m = (n + 2) * (n + 2);
-            oceanHeight = new float[m];
-            oceanSpeed = new float[m];
-            oceanFieldVersion = int.MinValue;
         }
 
-        void RefreshOceanField()
+        /// <summary>
+        /// Adds a thin wall between two cell corners (world positions, e.g. the ends of a player-built wall segment
+        /// on a grid aligned with this simulation). Diagonal segments become a two-face staircase.
+        /// <paramref name="topWorldY"/> is the world height of the wall top; water above it spills over.
+        /// </summary>
+        public void AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY)
         {
-            if (solver == null || oceanFieldVersion == solver.OpenOceanVersion) return;
-            oceanFieldVersion = solver.OpenOceanVersion;
-            int n = terrain.Resolution;
-            int w = n + 2;
-            for (int z = -1; z <= n; z++)
-            {
-                for (int x = -1; x <= n; x++)
-                {
-                    bool outside = x < 0 || z < 0 || x >= n || z >= n;
-                    if (!outside && edgeBlend[z * n + x] <= 0f) continue; // interior: not needed
-                    int i = (z + 1) * w + (x + 1);
-                    oceanHeight[i] = OpenOceanHeight(x, z, out oceanSpeed[i]);
-                }
-            }
+            EnsureInitialized();
+            float top = topWorldY - terrain.transform.position.y;
+            // Cell corners sit half a cell from the samples: corner (u,v) is the lower-left corner of cell (u,v).
+            Vector2 ga = terrain.WorldToGrid(worldA), gb = terrain.WorldToGrid(worldB);
+            var a = new Vector2Int(Mathf.RoundToInt(ga.x + 0.5f), Mathf.RoundToInt(ga.y + 0.5f));
+            var b = new Vector2Int(Mathf.RoundToInt(gb.x + 0.5f), Mathf.RoundToInt(gb.y + 0.5f));
+            var corner = new Vector2Int(b.x, a.y);
+            WallAlongX(a.y, a.x, corner.x, top);      // horizontal leg a -> corner
+            WallAlongZ(corner.x, corner.y, b.y, top); // vertical leg corner -> b
+        }
+
+        // Horizontal edge on corner row v between corner columns u0..u1: separates cells (u, v-1) and (u, v).
+        void WallAlongX(int v, int u0, int u1, float top)
+        {
+            if (u0 > u1) { int t = u0; u0 = u1; u1 = t; }
+            for (int u = u0; u < u1; u++) solver.SetBarrier(u, v - 1, false, top);
+        }
+
+        // Vertical edge on corner column u between corner rows v0..v1: separates cells (u-1, v) and (u, v).
+        void WallAlongZ(int u, int v0, int v1, float top)
+        {
+            if (v0 > v1) { int t = v0; v0 = v1; v1 = t; }
+            for (int v = v0; v < v1; v++) solver.SetBarrier(u - 1, v, true, top);
+        }
+
+        /// <summary>Removes all thin walls.</summary>
+        public void ClearWalls()
+        {
+            EnsureInitialized();
+            solver.ClearBarriers();
         }
 
         /// <summary>Water depth (m) at a world position, bilinearly interpolated.</summary>
@@ -242,7 +282,8 @@ namespace Tsunami
         [ContextMenu("Log Water Volume")]
         void LogVolume()
         {
-            Debug.Log($"[WaterSimulation] volume={TotalVolume():F1} m^3, boundary exchange={Solver.BoundaryVolumeExchange:F1} m^3, stability={StabilityNumber:F3}", this);
+            Debug.Log($"[WaterSimulation] t={SimTime:F1} s, volume={TotalVolume():F1} m^3, last dt={Solver.LastTimestep:F4} s, " +
+                      $"steps/frame={StepsLastFrame}, solver {SolverMsLastFrame:F2} ms", this);
         }
     }
 }

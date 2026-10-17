@@ -89,6 +89,10 @@ namespace Tsunami
         Color[] colors;
         bool meshDirty;
         bool regenerateRequested;
+        bool externalHeights;
+        bool[] renderCover;      // cells drawn by another system's ground (e.g. the team's map)
+        float coverSink = 0.08f;
+        bool trianglesDirty = true;
 
         public int Resolution => resolution;
         public float CellSize => cellSize;
@@ -117,6 +121,7 @@ namespace Tsunami
 
         void OnValidate()
         {
+            if (externalHeights) return; // heights come from another system (e.g. TeamMapTsunamiAdapter)
             regenerateRequested = true;
         }
 
@@ -154,6 +159,41 @@ namespace Tsunami
         }
 
         /// <summary>Restores the heights produced by the last Generate() call.</summary>
+        /// <summary>True when heights were supplied by UseExternalHeights instead of the procedural island.</summary>
+        public bool HasExternalHeights => externalHeights;
+
+        /// <summary>
+        /// Replaces the procedural island with heights from another system (e.g. the team's map).
+        /// Heights are relative to this transform's Y, row-major, one per cell (length = newResolution^2).
+        /// </summary>
+        public void UseExternalHeights(int newResolution, float newCellSize, float[] newHeights)
+        {
+            if (newHeights == null || newHeights.Length != newResolution * newResolution)
+                throw new ArgumentException("Height array must have resolution * resolution entries.", nameof(newHeights));
+            externalHeights = true;
+            regenerateRequested = false;
+            resolution = newResolution;
+            cellSize = newCellSize;
+            heights = (float[])newHeights.Clone();
+            initialHeights = (float[])newHeights.Clone();
+            vertices = null;
+            Version++;
+            RebuildMesh();
+        }
+
+        /// <summary>
+        /// Marks cells whose ground is drawn by something else (e.g. the team's map tiles). Quads entirely inside
+        /// are not drawn; covered vertices next to visible ones are tucked <paramref name="sink"/> below the surface,
+        /// so the seabed meets the other ground without z-fighting. Null draws everything.
+        /// </summary>
+        public void SetRenderCover(bool[] covered, float sink = 0.08f)
+        {
+            renderCover = covered != null && covered.Length == resolution * resolution ? covered : null;
+            coverSink = sink;
+            trianglesDirty = true;
+            RebuildMesh();
+        }
+
         public void ResetTerrain()
         {
             if (initialHeights == null) return;
@@ -342,7 +382,13 @@ namespace Tsunami
                 mesh.indexFormat = count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
                 FillPositions();
                 mesh.SetVertices(vertices);
-                mesh.SetTriangles(BuildGridTriangles(n), 0);
+                trianglesDirty = true;
+            }
+            if (renderCover != null && renderCover.Length != count) renderCover = null;
+            if (trianglesDirty)
+            {
+                mesh.SetTriangles(BuildGridTriangles(n, renderCover), 0);
+                trianglesDirty = false;
             }
             FillPositions();
             mesh.SetVertices(vertices);
@@ -363,7 +409,8 @@ namespace Tsunami
                 {
                     int i = z * n + x;
                     float h = heights[i];
-                    vertices[i] = new Vector3((x - half) * cellSize, h, (z - half) * cellSize);
+                    float y = renderCover != null && renderCover[i] ? h - coverSink : h;
+                    vertices[i] = new Vector3((x - half) * cellSize, y, (z - half) * cellSize);
                     float hl = heights[x > 0 ? i - 1 : i], hr = heights[x < n - 1 ? i + 1 : i];
                     float hd = heights[z > 0 ? i - n : i], hu = heights[z < n - 1 ? i + n : i];
                     normals[i] = new Vector3(hl - hr, 2f * cellSize, hd - hu).normalized;
@@ -385,14 +432,22 @@ namespace Tsunami
         }
 
         /// <summary>Triangle list for an n x n vertex grid with alternating diagonals (low-poly look).</summary>
-        public static int[] BuildGridTriangles(int n)
+        public static int[] BuildGridTriangles(int n) => BuildGridTriangles(n, null);
+
+        /// <summary>Grid triangles, skipping quads whose four corners are all covered (when a mask is given).</summary>
+        public static int[] BuildGridTriangles(int n, bool[] skipCovered)
         {
-            var tris = new int[(n - 1) * (n - 1) * 6];
+            int quads = 0;
+            for (int z = 0; z < n - 1; z++)
+                for (int x = 0; x < n - 1; x++)
+                    if (!AllCovered(skipCovered, n, x, z)) quads++;
+            var tris = new int[quads * 6];
             int t = 0;
             for (int z = 0; z < n - 1; z++)
             {
                 for (int x = 0; x < n - 1; x++)
                 {
+                    if (AllCovered(skipCovered, n, x, z)) continue;
                     int a = z * n + x, b = a + 1, c = a + n, d = c + 1;
                     if (((x + z) & 1) == 0)
                     {
@@ -407,6 +462,13 @@ namespace Tsunami
                 }
             }
             return tris;
+        }
+
+        static bool AllCovered(bool[] m, int n, int x, int z)
+        {
+            if (m == null) return false;
+            int a = z * n + x;
+            return m[a] && m[a + 1] && m[a + n] && m[a + n + 1];
         }
     }
 }

@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (14:45)
+Son güncelleme: 2026-10-17 (tsunami simülasyonu)
 
 ## Bağlam
 
@@ -33,6 +33,16 @@ Son güncelleme: 2026-10-17 (14:45)
 - Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
+
+- **Tsunami simülasyonu (2026-10-17, `Terrain-1` dalı, `Assets/Tsunami/`):**
+  - **Çözücü:** Eski "sanal boru" çözücüsü kaldırıldı. Yerine fizik tabanlı `TsunamiPhysicsSolver` geldi: sığ su denklemleri, 2. dereceden sonlu hacim (MUSCL + HLL), Audusse hidrostatik yeniden yapılandırma (kıyıda dengeli ıslanma/kuruma, negatif derinlik yok), RK2, CFL'li adım, Manning sürtünmesi, çok çekirdek.
+  - **Harita uyumu:** Izgara SampleScene'in World'üne hizalı (2 m). Vadinin açıldığı kuzeydoğuya derin deniz, kıta yamacı, sahanlık ve kıyı eğimi eklendi (`BathymetryProfile`). Dağlar araziye çizildi. Duvarlar `WallBuilt` olayıyla ince engellere dönüşüyor (su tepeyi aşınca taşar).
+  - **Kaynak:** Açık denizde Gauss ya da N-dalgası; ışınsal ya da yönlü.
+  - **Senaryolar:** 6 senaryo (Vadi Tsunamisi (Oyun), Küçük Açık Deniz, Büyük Açık Deniz, Sığ Kıyıya Yaklaşma, Kıyı Taşkını, Özel).
+  - **Arayüz:** Oyun paneli sağ üstte: dalga yüksekliği kaydırıcısı (1–25 m, bir sonraki başlatmada uygulanır), Başlat/Yeniden Başlat, Duraklat/Devam, Sıfırla. Bilim paneli kullanıcı isteğiyle kaldırıldı; diğer ayarlar Inspector'da.
+  - **Efektler:** Köpük artık simülasyonun hız alanıyla akıyor (flow-map), eşikleri yükseltildi (Froude 1.3–2.8), benekli görünüm gitti. Su dağ yamacına, duvara ya da eve çarpınca çarpma hızıyla orantılı sıçrama ve sis çıkıyor (`ImpactSplashEmitter`).
+  - **Kurulum:** Tsunami > Add Tsunami To Open Scene (Team Map). Sahneye yalnız bir `Tsunami` nesnesi eklenir.
+  - **Doğrulama:** Unity dışında sayısal testler yapıldı (durgun göl, √(g·h) dalga hızı, kütle korunumu, baraj yıkılması, zaman adımı ve ızgara yakınsaması, ekip haritası düzeni). Ayrıntılar `Assets/Tsunami/README.md`'de. Derleme `dotnet build` ile 0 hata. **Unity'de Play testi ve FPS ölçümü henüz yapılmadı.**
 
 - **WFC ağaçları ve zemin main'e (2026-10-17, `feature/wfc-forest`'tan yalnız ağaç/zemin görünümü):** Kullanıcı isteği: main'in SampleScene'i ve World'ü (128×128, 2 m) kullanılacak; ResourceTest ve inşa değişikliklerimiz alınmadı. `SampleSceneSetup.EnsureGridForest` (SampleScene kurulum menüsü de çağırır): MapView malzemesi TerrainGround yerine `Flat.mat` (çimenli karolar görünür), World'e `GridForest` eklenir, eski tek tek ağaçlı `Gameplay/Forest` kapatılır (silinmez), WFC'nin köy için ayırdığı başlangıç hücrelerinden orman alanına düşenler silinir, inşa grid'ine `ConstructionGridToggle` eklenir (çizgiler yalnız inşa modunda). `GridForest`: orman alanı (45° dönük, merkez kasabanın 6 m dışında solda, 30×55 m) dışını WFC'de zemine sabitler; alan içinde yalnız ağaç ve düz zemin kalır (yokuş/tepe karoları zemine çevrilir). Ağaçlar toplanabilir; kesilince zemin plakası olmadan, her ağaç ayrı, 8 yönden rastgele devrilir, 2 sn sonra `FlatFade.mat` ile saydamlaşıp kaybolur; tıklanınca ve oduncu vurunca (`Gatherer.hitInterval` 0.5 sn, yalnız odun) sallanır. `ResourceNode`'a `VisibilityChanged` ve `Hit` olayları eklendi. Play'de doğrulandı: orman köyün solunda, zemin çimenli ve grid'siz, oduncular odun getiriyor, konsol temiz. Ağaçlar ResourceTest'teki boyda: kurulum ekibin ağaç karolarından zemin plakasız, karo merkezi etrafında 2.5 kat büyütülmüş kopyalar üretir (`Assets/Prefabs/Map/tree_0_*_big.prefab` + `.asset` mesh; ekibin modeline dokunulmaz) ve MapView'daki id 5 modüllerini bunlarla değiştirir. Büyük ağaçlar üst üste binmesin diye GridForest ormanı seyreltir (`treeKeep` 0.45, ağaçlar arası en az 1 boş hücre); tıklama alanı `treeScale` ile büyür. Play'de doğrulandı: boy ve yoğunluk ResourceTest'e benziyor, devrilme çalışıyor.
 
@@ -93,6 +103,10 @@ Son güncelleme: 2026-10-17 (14:45)
 - **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
 ## Sıradaki işler / açık konular
+
+- [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
+- [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.
+- [ ] Tsunami, main'e birleştirmeden önce: `Terrain-1`'de PC kalite seviyesi hızlı grafik ayarlarına çevrili (`Assets/Tsunami/Settings`), build sahne listesinde ilk sırada `TsunamiDemo` var. İkisi de ekiple konuşulmalı.
 
 - [x] Köylü animasyonlarını ve SampleScene düzenini main'e birleştir.
 - [ ] Yerel main değişikliklerini paylaşmak için push (henüz yapılmadı).

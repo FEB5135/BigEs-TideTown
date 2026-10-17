@@ -4,21 +4,34 @@ using UnityEngine.UI;
 namespace Tsunami
 {
     /// <summary>
-    /// Wires the Start / Stop / Reset buttons to the TsunamiController and shows its state.
-    /// Interactability is refreshed only when the controller's state changes.
+    /// In-game tsunami panel: wave height slider, Start / Pause-Resume / Reset, status and countdown.
+    /// The wave height is an initial condition: it is used the next time the tsunami is started or restarted.
+    /// Labels and interactability refresh only when something changes.
     /// </summary>
     public class TsunamiUI : MonoBehaviour
     {
         [SerializeField] TsunamiController controller;
+        [Tooltip("Play; becomes 'Restart' while a tsunami is in progress.")]
         [SerializeField] Button startButton;
+        [Tooltip("Pause / Resume.")]
         [SerializeField] Button stopButton;
-        [Tooltip("Optional.")]
         [SerializeField] Button resetButton;
+        [Tooltip("Height (m) of the initial sea-surface bulge out at sea.")]
+        [SerializeField] Slider waveHeightSlider;
+        [SerializeField] Text waveHeightText;
         [SerializeField] Text statusText;
         [Tooltip("Large countdown / alert label. Optional.")]
         [SerializeField] Text countdownText;
 
-        int shownSeconds = -1;
+        int shownKey = int.MinValue;
+        bool shownPending;
+        Text startLabel, stopLabel;
+
+        void Awake()
+        {
+            if (startButton != null) startLabel = startButton.GetComponentInChildren<Text>();
+            if (stopButton != null) stopLabel = stopButton.GetComponentInChildren<Text>();
+        }
 
         void OnEnable()
         {
@@ -27,64 +40,85 @@ namespace Tsunami
                 Debug.LogError("[TsunamiUI] No TsunamiController assigned.", this);
                 return;
             }
-            if (startButton != null) startButton.onClick.AddListener(controller.StartTsunami);
-            if (stopButton != null) stopButton.onClick.AddListener(controller.StopTsunami);
+            if (startButton != null) startButton.onClick.AddListener(OnStart);
+            if (stopButton != null) stopButton.onClick.AddListener(controller.TogglePause);
             if (resetButton != null) resetButton.onClick.AddListener(controller.ResetSimulation);
+            if (waveHeightSlider != null)
+            {
+                waveHeightSlider.minValue = TsunamiController.MinWaveHeight;
+                waveHeightSlider.maxValue = TsunamiController.MaxWaveHeight;
+                waveHeightSlider.SetValueWithoutNotify(controller.WaveHeight);
+                waveHeightSlider.onValueChanged.AddListener(OnWaveHeight);
+            }
             controller.StateChanged += OnStateChanged;
             OnStateChanged(controller.State);
+            RefreshWaveHeight();
         }
 
         void OnDisable()
         {
             if (controller == null) return;
-            if (startButton != null) startButton.onClick.RemoveListener(controller.StartTsunami);
-            if (stopButton != null) stopButton.onClick.RemoveListener(controller.StopTsunami);
+            if (startButton != null) startButton.onClick.RemoveListener(OnStart);
+            if (stopButton != null) stopButton.onClick.RemoveListener(controller.TogglePause);
             if (resetButton != null) resetButton.onClick.RemoveListener(controller.ResetSimulation);
+            if (waveHeightSlider != null) waveHeightSlider.onValueChanged.RemoveListener(OnWaveHeight);
             controller.StateChanged -= OnStateChanged;
+        }
+
+        void OnStart()
+        {
+            if (controller.State == TsunamiState.Idle) controller.Play();
+            else controller.Restart();
+        }
+
+        void OnWaveHeight(float value)
+        {
+            controller.WaveHeight = value;
+            RefreshWaveHeight();
+        }
+
+        void RefreshWaveHeight()
+        {
+            shownPending = controller.HasPendingChanges;
+            if (waveHeightText == null) return;
+            string note = shownPending ? "  (yeniden başlatınca)" : string.Empty;
+            waveHeightText.text = $"Dalga yüksekliği: {controller.WaveHeight:0.0} m{note}";
         }
 
         void Update()
         {
-            if (controller == null || countdownText == null) return;
-            // Key encodes what the label shows, so the string is rebuilt only when it changes.
+            if (controller == null) return;
+            if (controller.HasPendingChanges != shownPending) RefreshWaveHeight();
+            if (countdownText == null) return;
             int key = -1;
             if (controller.State == TsunamiState.Warning) key = Mathf.CeilToInt(controller.WarningRemaining);
-            else if (controller.State == TsunamiState.Running) key = 1000 + controller.CurrentWave;
-            if (key == shownSeconds) return;
-            shownSeconds = key;
-            if (key >= 1000)
-            {
-                int wave = key - 1000;
-                countdownText.text = controller.WaveCount == 1 ? "THE WAVE IS COMING"
-                    : controller.WaveCount > 0 ? $"WAVE {wave} OF {controller.WaveCount} INCOMING"
-                    : $"WAVE {wave} INCOMING";
-            }
-            else if (key >= 0) countdownText.text = $"TSUNAMI WARNING\nThe sea is pulling back... {key}";
+            else if (controller.State == TsunamiState.Running && controller.Simulation != null && controller.Simulation.SimTime < 6.0) key = 1000;
+            if (key == shownKey) return;
+            shownKey = key;
+            if (key == 1000) countdownText.text = "TSUNAMİ GELİYOR";
+            else if (key >= 0) countdownText.text = $"TSUNAMİ UYARISI\n{key}";
             else countdownText.text = string.Empty;
         }
 
         void OnStateChanged(TsunamiState state)
         {
-            bool active = state == TsunamiState.Warning || state == TsunamiState.Running;
-            if (startButton != null) startButton.interactable = !active;
-            if (stopButton != null) stopButton.interactable = active;
-            if (statusText != null) statusText.text = "Status: " + Describe(state);
-            shownSeconds = int.MinValue; // force countdown label refresh
-            if (countdownText != null && state != TsunamiState.Warning && state != TsunamiState.Running)
-                countdownText.text = string.Empty;
+            bool started = state != TsunamiState.Idle;
+            if (startLabel != null) startLabel.text = started ? "Yeniden Başlat" : "Tsunamiyi Başlat";
+            if (stopButton != null) stopButton.interactable = state == TsunamiState.Running || state == TsunamiState.Paused || state == TsunamiState.Warning;
+            if (stopLabel != null) stopLabel.text = state == TsunamiState.Paused ? "Devam" : "Duraklat";
+            if (statusText != null) statusText.text = "Durum: " + Describe(state);
+            shownKey = int.MinValue;
+            RefreshWaveHeight();
         }
 
-        string Describe(TsunamiState state)
+        public static string Describe(TsunamiState state)
         {
             switch (state)
             {
-                case TsunamiState.Warning: return "WARNING - sea is drawing back";
-                case TsunamiState.Running: return "TSUNAMI ACTIVE - water incoming";
-                case TsunamiState.Stopped:
-                    return controller.StopReason == TsunamiStopReason.WaveEnded
-                        ? "Wave passed - water settling"
-                        : "Stopped - no more water incoming";
-                default: return "Idle - calm sea";
+                case TsunamiState.Warning: return "Uyarı - dalga birazdan bırakılacak";
+                case TsunamiState.Running: return "Tsunami ilerliyor";
+                case TsunamiState.Paused: return "Duraklatıldı";
+                default: return "Hazır - deniz durgun";
             }
         }
     }
