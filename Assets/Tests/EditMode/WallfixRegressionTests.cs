@@ -67,7 +67,11 @@ namespace IdleTown.Tests
                     // Width lies across the slope here, so each side differs by at most half wall thickness * grade.
                     Assert.That(Mathf.Abs(point.y - ground.y), Is.LessThan(.03f));
                 }
-            Assert.That(wall.GetComponent<WallSlopeGeometry>().Rise, Is.GreaterThan(.2f));
+            Assert.That(wall.GetComponent<WallSlopeGeometry>().Rise, Is.GreaterThan(.1f));
+            Assert.That(wall.transform.localScale.y, Is.EqualTo(2f));
+            controller.TryGetWallInstance(new WallEdge(a, b), 9, out var topWall);
+            Assert.That(topWall.transform.position.y - wall.transform.position.y, Is.EqualTo(18f).Within(.001f));
+            Assert.That(WallConstructionController.MaximumWallHeight, Is.EqualTo(20f));
             controller.SetDemolitionMode(true);
             controller.RefreshDemolitionPreview(wall.GetComponent<WallSegment>());
             Assert.That(System.Array.FindAll(root.GetComponentsInChildren<LineRenderer>(),

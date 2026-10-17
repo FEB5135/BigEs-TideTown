@@ -360,7 +360,7 @@ MonoBehaviour:
   obstaclePadding: 0.04
   woodCost: 1
   stoneCost: 1
-  wallHeight: 1.25
+  wallHeight: 2
   wallThickness: 0.18
 --- !u!4 &234408073
 Transform:

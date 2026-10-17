@@ -44,7 +44,9 @@ namespace IdleTown.Construction
         [SerializeField] bool constructionModeActive = true;
 
         [Header("Generated wall geometry")]
-        [SerializeField, Min(0.01f)] float wallHeight = 1.25f;
+        public const float StoreyHeight = 2f;
+        public const float MaximumWallHeight = 20f;
+        [SerializeField, Min(0.01f)] float wallHeight = StoreyHeight;
         [SerializeField, Min(0.01f)] float wallThickness = 0.18f;
 
         readonly WallConstructionModel model = new();
@@ -149,7 +151,8 @@ namespace IdleTown.Construction
             stoneTierStoneCost = Mathf.Max(stoneCost, stoneTierStoneCost);
             reinforcedWoodCost = Mathf.Max(stoneTierWoodCost, reinforcedWoodCost);
             reinforcedStoneCost = Mathf.Max(stoneTierStoneCost, reinforcedStoneCost);
-            maxFloors = Mathf.Max(1, maxFloors);
+            wallHeight = StoreyHeight;
+            maxFloors = Mathf.Clamp(maxFloors, 1, Mathf.FloorToInt(MaximumWallHeight / StoreyHeight));
             selectedFloor = Mathf.Clamp(selectedFloor, 0, maxFloors - 1);
             wallHeight = Mathf.Max(0.01f, wallHeight);
             wallThickness = Mathf.Max(0.01f, wallThickness);

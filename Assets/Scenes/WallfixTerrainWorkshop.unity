@@ -686,7 +686,7 @@ MonoBehaviour:
   floorZeroBaseHeight: 0
   maxFloors: 10
   constructionModeActive: 1
-  wallHeight: 1.25
+  wallHeight: 2
   wallThickness: 0.18
 --- !u!4 &1045255022
 Transform:

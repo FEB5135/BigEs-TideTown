@@ -493,8 +493,8 @@ namespace IdleTown.Tests
                 var walls = GetBuiltWalls(root.transform);
                 Assert.That(walls, Has.Count.EqualTo(2));
                 walls.Sort((left, right) => left.GetComponent<WallSegment>().Floor.CompareTo(right.GetComponent<WallSegment>().Floor));
-                Assert.That(walls[0].transform.position.y, Is.EqualTo(0.625f).Within(0.001f));
-                Assert.That(walls[1].transform.position.y, Is.EqualTo(1.875f).Within(0.001f));
+                Assert.That(walls[0].transform.position.y, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(walls[1].transform.position.y, Is.EqualTo(3f).Within(0.001f));
                 Assert.That(walls[1].GetComponent<WallSegment>().Floor, Is.EqualTo(1));
             }
             finally
@@ -520,7 +520,7 @@ namespace IdleTown.Tests
                 serializedController.ApplyModifiedPropertiesWithoutUndo();
 
                 Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out var reason), Is.True, reason);
-                Assert.That(GetBuiltWalls(root.transform)[0].transform.position.y, Is.EqualTo(2.625f).Within(0.001f));
+                Assert.That(GetBuiltWalls(root.transform)[0].transform.position.y, Is.EqualTo(3f).Within(0.001f));
                 Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 2, WallTier.Timber, out _), Is.False);
             }
             finally
@@ -543,7 +543,7 @@ namespace IdleTown.Tests
                 controller.SetResourceStore(resources);
                 controller.ObstacleLayers = 1 << 8;
                 obstacle.layer = 8;
-                obstacle.transform.position = new Vector3(0.5f, 1.875f, 0f);
+                obstacle.transform.position = new Vector3(0.5f, 3f, 0f);
                 obstacle.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
                 Physics.SyncTransforms();
 
@@ -610,8 +610,8 @@ namespace IdleTown.Tests
 
                 var preview = root.GetComponentInChildren<LineRenderer>();
                 Assert.That(preview, Is.Not.Null);
-                Assert.That(preview.GetPosition(0).y, Is.EqualTo(2.55f).Within(0.001f));
-                Assert.That(preview.GetPosition(1).y, Is.EqualTo(2.55f).Within(0.001f));
+                Assert.That(preview.GetPosition(0).y, Is.EqualTo(4.05f).Within(0.001f));
+                Assert.That(preview.GetPosition(1).y, Is.EqualTo(4.05f).Within(0.001f));
 
                 Assert.That(controller.TryBuild(new Vector2Int(0, 1), new Vector2Int(1, 1), 0, WallTier.Timber, out var timberReason), Is.True, timberReason);
                 Assert.That(controller.TryBuild(new Vector2Int(0, 2), new Vector2Int(1, 2), 0, WallTier.Stone, out var stoneReason), Is.True, stoneReason);

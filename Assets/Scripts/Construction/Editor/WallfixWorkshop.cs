@@ -49,7 +49,7 @@ namespace IdleTown.Editor
                     var root = new GameObject(tier + " Wall", typeof(MeshFilter), typeof(MeshRenderer), typeof(BoxCollider));
                     root.GetComponent<MeshFilter>().sharedMesh = mesh;
                     root.GetComponent<MeshRenderer>().sharedMaterials = materials;
-                    root.transform.localScale = new Vector3(.18f, 1.25f, 1f);
+                    root.transform.localScale = new Vector3(.18f, WallConstructionController.StoreyHeight, 1f);
                     PrefabUtility.SaveAsPrefabAsset(root, prefix + ".prefab");
                     Object.DestroyImmediate(root);
                 }
