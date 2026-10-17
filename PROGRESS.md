@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (main, collision-main-merge dalına birleştirildi)
+Son güncelleme: 2026-10-17 (collision-main-merge: tsunami WFC arazisi ve otomatik dalga yönü)
 
 ## Bağlam
 
@@ -32,6 +32,8 @@ Son güncelleme: 2026-10-17 (main, collision-main-merge dalına birleştirildi)
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Tsunami WFC arazisi + otomatik dalga yönü (17 Ekim 2026, `collision-main-merge`):** Oyun başlayınca WFC haritası kurulduktan 2 kare sonra `TeamMapTsunamiAdapter`, `MapView` parçalarını (eğim, düzlük, tepe, dağ: karo 1–4 ve 6–9) su arazisine çiziyor; ağaç karoları (5) atlanıyor, su aralarından akıyor. Sonra köyden harita kenarına 16 yöndeki koridorları tepe yüksekliğine göre puanlayıp dalgayı en açık koridordan getiriyor, okyanusu o tarafa taşıyor. Editörde arazi düz kalır (WFC yalnız oyunda çalışır). Unity'de geçici Play Mode testiyle doğrulandı: 1907 tepe karosunun hepsi araziye girdi (en yüksek 8.9 m), yön 270° (batı), 25 sn'de köyde 1.26 m su, geçersiz derinlik yok. EditMode 1696 geçti, 13 başarısız (önceki gibi: 3'ü eksik FinottiGames paketi, 10'u URP paket testleri).
 
 - **Collision + katlı inşa (17 Ekim 2026):** `origin/ContructionMechanics` birleştirildi. Ahşap/taş/güçlendirilmiş ve üç kat, `(edge,floor)` hasar/su kayıtlarıyla bağlandı. %15/%40/%70 hasarda çatlaklı parça görünümü, en az 3 simülasyon saniyesine yayılan yüksek yük hasarı, kırılmada 12 fiziksel parça (küresel limit 20, ömür 8 s) eklendi. Üst kata ulaşmayan su üst katı etkilemez; alt kat kırılınca desteksiz üst katlar çöker; komşu korunur. Unity EditMode 52/52, çarpışma saf testleri 10/10, tier saf testleri 5/5 ve gerçek haritada kontrollü Play Mode geçti. Güncel kurulum, reset ve sınırlar `COLLISION_HANDOFF.md` içinde.
 
@@ -143,11 +145,11 @@ Son güncelleme: 2026-10-17 (main, collision-main-merge dalına birleştirildi)
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.
 - [ ] Tsunami, main'e birleştirmeden önce: `Terrain-1`'de PC kalite seviyesi hızlı grafik ayarlarına çevrili (`Assets/Tsunami/Settings`), build sahne listesinde ilk sırada `TsunamiDemo` var. İkisi de ekiple konuşulmalı.
 - [ ] Unity'de yeni duvar EditMode regresyonlarını ve Play modunda kat/seviye paneli, yükseltilmiş ön izleme ile materyal ayrımını doğrulamak.
-- [ ] Tsunami: main'de elle konmuş dağlar kapatıldı, dağ/tepeler artık WFC ile rastgele; tsunami adaptörü yalnız `Mountains` grubunu araziye çiziyordu ve vadi hedefi o dağlardan hesaplanıyordu. WFC dağ/tepe karoları simülasyon arazisine eklenmeli, dalga yönü yeni düzene göre seçilmeli.
+- [ ] Tsunami: WFC arazisi ve otomatik dalga yönü grafik açık Play'de gözle kontrol edilmeli (deniz tarafı haritaya göre değiştiği için kamera/okyanus görünümü, ilk karelerdeki düz arazi geçişi).
 
 - [ ] Vagon yuvarlanma sesi: sentez beğenilmedi; kullanıcı gerçek bir tekerlek kaydı seçecek, döngülü yapılıp `GameAudio.cartRoll`'a bağlanacak.
 - [ ] Odun kesme animasyonu hâlâ garip (kullanıcı ertelendi dedi); istenirse elde balta modeli ve daha belirgin vuruş.
-- [ ] Dağ/tepe düzeni değişecek (kullanıcı ayrıntı verecek). Eski elle konmuş dağlar kapalı; tsunaminin geleceği vadi artık yok, dalga tasarımı bunu dikkate almalı.
+- [ ] Dağ/tepe düzeni değişecek (kullanıcı ayrıntı verecek). Eski elle konmuş dağlar kapalı; tsunami artık her haritada köye en açık koridoru kendisi seçiyor (`TeamMapTsunamiAdapter > Auto Approach`).
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek.
 - [ ] Ana menü: skorun tanımı belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.

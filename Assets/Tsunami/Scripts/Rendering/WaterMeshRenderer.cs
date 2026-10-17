@@ -93,6 +93,8 @@ namespace Tsunami
             if (!terrainChanged && !oceanChanged && !simulation.WaterMoving) return;
             // In edit mode the island can be regenerated from the Inspector: refill the calm sea to match.
             if (!Application.isPlaying && terrainChanged) simulation.ResetWater();
+            // The map adapter can move the grid at runtime (new ocean side after the WFC map is built).
+            if (terrainChanged) transform.SetPositionAndRotation(terrain.transform.position, Quaternion.identity);
             lastTerrainVersion = terrain.Version;
             lastOceanVersion = simulation.OpenOceanVersion;
             Fill();

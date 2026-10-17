@@ -44,6 +44,17 @@ namespace Tsunami
         [Tooltip("World point the wave heads for, e.g. the village centre.")]
         [SerializeField] Vector3 approachTarget = Vector3.zero;
 
+        [Header("Runtime map (WFC hills and mountains)")]
+        [Tooltip("After the WFC map is built at runtime, draw its hill / mountain / slope tiles into the water terrain.")]
+        [SerializeField] bool rasterizeWfcTiles = true;
+        [Tooltip("World tile ids that are not obstacles for water (trees: water flows between them).")]
+        [SerializeField] int[] ignoredTileIds = { 5 };
+        [Tooltip("Pick the wave's approach automatically: the most open corridor from the map edge to the village.")]
+        [SerializeField] bool autoApproach = true;
+        [Tooltip("Half-width (m) of the corridor checked for hills on each candidate approach.")]
+        [SerializeField, Range(2f, 40f)] float corridorHalfWidth = 12f;
+        [SerializeField, Range(4, 64)] int corridorHeadings = 16;
+
         [Header("Walls")]
         [Tooltip("Wall top above the ground (m) when it can't be read from the wall's renderers.")]
         [SerializeField, Min(0.1f)] float fallbackWallHeight = 1.25f;
@@ -93,6 +104,7 @@ namespace Tsunami
         public BathymetryProfile Bathymetry => bathymetry;
         public Vector3 ApproachThrough => approachThrough;
         public Vector3 ApproachTarget => approachTarget;
+        public Vector2Int OceanSide => oceanSide;
         public World World => world;
         /// <summary>The World's rectangle in world space (x, z, width, depth).</summary>
         public Rect MapRectWorld => world == null ? default :
@@ -107,6 +119,78 @@ namespace Tsunami
         void Start()
         {
             BindRuntime();
+            if (Application.isPlaying) StartCoroutine(RebuildAfterMapGenerated());
+        }
+
+        /// <summary>Approach heading chosen at runtime (compass degrees, 0 = +Z / north), or NaN.</summary>
+        public float ChosenHeading { get; private set; } = float.NaN;
+
+        // WfcSolver and MapView build the map in their Start; wait until the chunks exist, then rebuild the water
+        // terrain from them and aim the wave through the most open corridor of this (random) map.
+        System.Collections.IEnumerator RebuildAfterMapGenerated()
+        {
+            yield return null;
+            yield return null;
+            if (world == null || terrain == null || simulation == null) yield break;
+            Apply();
+            if (autoApproach && ChooseApproach()) Apply();
+        }
+
+        /// <summary>
+        /// Scores straight corridors from the village (approach target) to the map edge in corridorHeadings
+        /// directions by the hills they cross, aims the wave down the most open one and puts the open ocean on that
+        /// side. Returns true when the ocean side changed (the domain must be rebuilt).
+        /// </summary>
+        bool ChooseApproach()
+        {
+            Rect r = MapRectWorld;
+            Vector3 target = approachTarget;
+            float groundY = world.transform.position.y;
+            float step = world.CellSize;
+            float bestScore = float.MaxValue, bestExit = 0f;
+            Vector2 bestDir = Vector2.zero;
+            for (int k = 0; k < corridorHeadings; k++)
+            {
+                float a = k * Mathf.PI * 2f / corridorHeadings;
+                var d = new Vector2(Mathf.Sin(a), Mathf.Cos(a));
+                float tExit = ExitDistance(r, target, d);
+                if (tExit < 30f) continue;
+                var perp = new Vector2(-d.y, d.x);
+                float sum = 0f, peak = 0f;
+                int samples = 0;
+                for (float t = 20f; t < tExit; t += step)
+                {
+                    for (int s = -1; s <= 1; s++)
+                    {
+                        Vector2 p = new Vector2(target.x, target.z) + d * t + perp * (s * corridorHalfWidth);
+                        float h = terrain.SampleHeight(new Vector3(p.x, 0f, p.y)) - groundY;
+                        if (h > 0.4f) sum += h;
+                        if (h > peak) peak = h;
+                        samples++;
+                    }
+                }
+                float score = samples > 0 ? sum / samples + 0.25f * peak : float.MaxValue;
+                if (score < bestScore) { bestScore = score; bestDir = d; bestExit = tExit; }
+            }
+            if (bestDir == Vector2.zero) return false;
+            approachThrough = new Vector3(target.x + bestDir.x * bestExit * 0.75f, target.y, target.z + bestDir.y * bestExit * 0.75f);
+            ChosenHeading = Mathf.Repeat(Mathf.Atan2(bestDir.x, bestDir.y) * Mathf.Rad2Deg, 360f);
+            var side = new Vector2Int(Mathf.Abs(bestDir.x) > 0.38f ? (int)Mathf.Sign(bestDir.x) : 0,
+                                      Mathf.Abs(bestDir.y) > 0.38f ? (int)Mathf.Sign(bestDir.y) : 0);
+            Debug.Log($"[TeamMapTsunamiAdapter] Wave approach: {ChosenHeading:0}° (most open corridor, mean hill {bestScore:0.00}); ocean side {side}.", this);
+            if (side == oceanSide) return false;
+            oceanSide = side;
+            return true;
+        }
+
+        static float ExitDistance(Rect r, Vector3 from, Vector2 d)
+        {
+            float t = float.MaxValue;
+            if (d.x > 1e-4f) t = Mathf.Min(t, (r.xMax - from.x) / d.x);
+            if (d.x < -1e-4f) t = Mathf.Min(t, (r.xMin - from.x) / d.x);
+            if (d.y > 1e-4f) t = Mathf.Min(t, (r.yMax - from.z) / d.y);
+            if (d.y < -1e-4f) t = Mathf.Min(t, (r.yMin - from.z) / d.y);
+            return t == float.MaxValue ? 0f : Mathf.Max(0f, t);
         }
 
         void BindRuntime()
@@ -255,7 +339,8 @@ namespace Tsunami
             // Apply once so WorldToGrid uses the new grid, then rasterise the mountains and apply again.
             terrain.UseExternalHeights(n, cell, heights);
             foreach (Transform root in terrainMeshRoots)
-                if (root != null) RasterizeMeshes(root, heights, n, groundY);
+                if (root != null && root.gameObject.activeInHierarchy) RasterizeMeshes(root, heights, n, groundY, null);
+            if (Application.isPlaying && rasterizeWfcTiles) RasterizeWfcChunks(heights, n, groundY, offX, offZ);
             terrain.UseExternalHeights(n, cell, heights);
             terrain.SetRenderCover(covered);
             var seabed = terrain.GetComponent<MeshRenderer>();
@@ -500,8 +585,32 @@ namespace Tsunami
             return world.transform.TransformPoint(new Vector3(node.x * world.CellSize, 0f, node.y * world.CellSize));
         }
 
+        /// <summary>
+        /// Draws the WFC map's chunk meshes (built by MapView at runtime) into the heights, except cells whose tile
+        /// is listed in ignoredTileIds (trees) - so hills, mountains and slopes block and steer the water.
+        /// </summary>
+        void RasterizeWfcChunks(float[] heights, int n, float groundY, int offX, int offZ)
+        {
+            Func<int, int, bool> skip = (x, z) =>
+            {
+                int wx = x - offX, wz = z - offZ;
+                if (!world.InBounds(wx, wz)) return true;
+                world.Get(wx, wz, out int id, out _);
+                for (int k = 0; k < ignoredTileIds.Length; k++) if (ignoredTileIds[k] == id) return true;
+                return false;
+            };
+            foreach (MapView view in FindObjectsByType<MapView>())
+            {
+                foreach (Transform child in view.transform)
+                {
+                    if (!child.name.StartsWith("Chunk ") || !child.gameObject.activeInHierarchy) continue;
+                    RasterizeMeshes(child, heights, n, groundY, skip);
+                }
+            }
+        }
+
         /// <summary>Raises grid heights to the top surface of every mesh under <paramref name="root"/>.</summary>
-        void RasterizeMeshes(Transform root, float[] heights, int n, float groundY)
+        void RasterizeMeshes(Transform root, float[] heights, int n, float groundY, Func<int, int, bool> skipCell)
         {
             foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>())
             {
@@ -517,11 +626,11 @@ namespace Tsunami
                 for (int v = 0; v < verts.Length; v++) verts[v] = toWorld.MultiplyPoint3x4(verts[v]);
                 int[] tris = mesh.triangles;
                 for (int t = 0; t < tris.Length; t += 3)
-                    RasterizeTriangle(verts[tris[t]], verts[tris[t + 1]], verts[tris[t + 2]], heights, n, groundY);
+                    RasterizeTriangle(verts[tris[t]], verts[tris[t + 1]], verts[tris[t + 2]], heights, n, groundY, skipCell);
             }
         }
 
-        void RasterizeTriangle(Vector3 a, Vector3 b, Vector3 c, float[] heights, int n, float groundY)
+        void RasterizeTriangle(Vector3 a, Vector3 b, Vector3 c, float[] heights, int n, float groundY, Func<int, int, bool> skipCell)
         {
             Vector2 ga = terrain.WorldToGrid(a), gb = terrain.WorldToGrid(b), gc = terrain.WorldToGrid(c);
             int x0 = Mathf.Max(0, Mathf.CeilToInt(Mathf.Min(ga.x, Mathf.Min(gb.x, gc.x))));
@@ -541,6 +650,8 @@ namespace Tsunami
                     if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f) continue;
                     float y = w0 * a.y + w1 * b.y + w2 * c.y - groundY;
                     int i = z * n + x;
+                    if (y <= heights[i]) continue;
+                    if (skipCell != null && skipCell(x, z)) continue;
                     if (y > heights[i]) heights[i] = y;
                 }
             }

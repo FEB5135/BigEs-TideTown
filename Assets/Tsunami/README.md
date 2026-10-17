@@ -21,7 +21,7 @@ Ayrı test adası: **Tsunami > Build Demo Scene** (`Assets/Tsunami/Scenes/Tsunam
 | `TsunamiPhysicsSolver` | Saf C# sığ su çözücüsü (Unity bağımlılığı yok, Unity dışında test edilir). Çok çekirdekli. |
 | `WaterSimulation` | Çözücüyü sürer: CFL'li adımlar, oynatma hızı, duraklatma, kare başına zaman bütçesi, kaynak ekleme, duvarlar. |
 | `BathymetryProfile` | Deniz tabanı profili: kıyı eğimi → kıta sahanlığı → kıta yamacı → derin deniz (+ isteğe bağlı sualtı sırtı). |
-| `TeamMapTsunamiAdapter` | Simülasyon ızgarasını ekibin `World`'üne hizalar (2 m hücre). Vadinin açıldığı kuzeydoğuya okyanus ekler, dağları araziye çizer, oyuncunun duvarlarını ince engellere çevirir, deniz tabanını gösterir. |
+| `TeamMapTsunamiAdapter` | Simülasyon ızgarasını ekibin `World`'üne hizalar (2 m hücre). Oyunda WFC haritası kurulunca eğim/tepe/dağ karolarını araziye çizer (ağaçları atlar), köye en açık koridoru bulup dalgayı oradan getirir ve okyanusu o tarafa ekler, oyuncunun duvarlarını ince engellere çevirir, deniz tabanını gösterir. |
 | `TsunamiController` | Simülasyon yöneticisi: oynat, duraklat, devam, sıfırla, yeniden başlat, hız, dalga yüksekliği, senaryolar (Inspector), kaynak yerleşimi. |
 | `TsunamiScenario` | Senaryo tanımı (kaynak + deniz tabanı). |
 | `WaterMeshRenderer`, `OceanRing` | Su yüzeyini simülasyon yüksekliğinden çizer; ızgara kenarı çevredeki okyanusla dikişsiz birleşir. |
@@ -87,14 +87,14 @@ Kırılan tek kenar inşa modelinden ve sahipli sayısal bariyerden çıkar; gö
 - **Inspector'da, `Tsunami` nesnesi altında:**
   - `Tsunami Controller`: senaryolar (kaynak genliği, boyutu, kıyıdan uzaklığı, yönü, Gauss / N-dalgası, ışınsal / yönlü, deniz tabanı profili), seçili senaryo, uyarı geri sayımı.
   - `Water Simulation`: oynatma hızı, Manning pürüzlülükleri, Courant sayısı, kare bütçesi.
-  - `Team Map Adapter`: duvar yüksekliği fallback'i; dayanıklılık, darbe/sürekli yük eşikleri ve hasar oranları; enkaz sınırı/ömrü/itkisi.
+  - `Team Map Adapter`: WFC karolarını araziye çizme ve atlanacak karo numaraları (ağaç = 5), otomatik dalga yönü, koridor genişliği ve denenecek yön sayısı; duvar yüksekliği fallback'i; dayanıklılık, darbe/sürekli yük eşikleri ve hasar oranları; enkaz sınırı/ömrü/itkisi.
   - `Impact Splash`: darbe ve derinlik eşikleri, kare başı çarpma sınırı, damla/köpük/sis kapasiteleri ve görünüm.
   - `Visualization`: renk haritası modu ve aralıkları, köpük, sprey, batimetri görünümü.
 - **Dalga hızı ayarı bilerek yok:** hız denklemlerden gelir (c ≈ √(g·h)).
 
 Senaryolar (örnektir, tahmin değildir):
 
-1. **Vadi Tsunamisi (Oyun):** varsayılan, 10 m kabarma, vadiden köye.
+1. **Vadi Tsunamisi (Oyun):** varsayılan, 10 m kabarma, rastgele haritada köye en açık koridordan.
 2. **Küçük Açık Deniz Bozulması.**
 3. **Büyük Açık Deniz Tsunamisi.**
 4. **Sığ Kıyıya Yaklaşma.**
