@@ -52,6 +52,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!/Tests/PureLogic/WallTierRules.Tests.csproj
 *.unityproj
 *.sln
 *.slnx
