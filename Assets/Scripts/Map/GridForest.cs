@@ -117,7 +117,8 @@ public class GridForest : MonoBehaviour
     {
         map.Get(x, y, out var id, out var rotation);
         // Orman alanında yalnız ağaç ve düz zemin olur; WFC'nin koyduğu yokuş/tepe karoları zemine çevrilir.
-        if (id != treeId && id != groundId && HasForestArea && InForest(x, y))
+        // Sabitlemeler elle boyanmış haritaya uymadıysa WFC onlarsız çözer; o zaman alandaki dağlar da kalır.
+        if (id != treeId && id != groundId && HasForestArea && (solver == null || solver.PinsKept) && InForest(x, y))
         {
             map.Set(x, y, groundId, rotation);
             return;
