@@ -34,6 +34,8 @@ Son güncelleme: 2026-10-17 (14:45)
 
 ## Son durum (yapılanlar)
 
+- **WFC influence boyama (2026-10-17):** Stickiness kalktı. WfcSolver kuralında Area (Any / Low / Middle / High / Houses) var. Sahnede Brush = Influence ile kaba alan boyanır; bu bir yasak değil, ağırlık çarpanıdır (varsayılan 8). Aynı alanın içi ova olur, yokuşlar yalnız iki zemin türünün sınırında artar. Ev boyası yokuş çekmez. Boyanmamış yer `patchSize` (16) bloklarla ova olur ve arada orta kat, dağ ve ev lekesi ekler. Kenar kuralları hâlâ zorunlu karoyu koyabilir.
+
 - **Ana menü yeniden tasarımı (2026-10-17, `feature/menu-redesign`, main'den; push edilmedi):** Kullanıcıyla konuşulan UI rehberine göre (Crossy Road tarzı). Yalnız `MainMenuSetup` ve sprite'lar değişti, `MainMenu`/`PressableButton` davranışı aynı. SampleScene'de menü yeniden kuruldu.
   - Renkler: Oyna mercan `#F2542D` (alt `#B83A1B`), ikincil (Ayarlar, Geri, ayar okları) okyanus `#1F5F8B` (alt `#154566`), Çıkış hayalet (yarı saydam beyaz, çerçeveli), panel lacivert `#0B2A3D`, vurgu su `#2EC4D6`, skor altın `#FFD23F`. Kahverengi/krem kalktı.
   - Butonlar: düz yüz, 8 px sert alt kalınlık, kesik (pah kırılmış) köşeler; `Art/UI/make_menu_sprites.py` çiziyor (`Button{Coral,Ocean,Ghost}`, `Square*`, `Panel`, `Bar`, `Handle`, `Scrim`). Kenney menü sprite'ları SampleScene'de artık kullanılmıyor.
