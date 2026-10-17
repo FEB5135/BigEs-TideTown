@@ -5,8 +5,8 @@ using UnityEngine.AI;
 using UnityEngine.UI;
 
 // Geçici yükseltme arayüzü (HUD'da):
-// - her yükseltilebilir yapının (her taş ocağı ayrı, orman) üstünde ekranda onu takip eden küçük buton: seviyeyi ve
-//   bir sonraki seviyenin bedelini gösterir, tıklayınca kuyudaki odun ve taşla yükseltir;
+// - her yükseltilebilir yapının (her taş ocağı ayrı, orman) üstünde ekranda onu takip eden küçük buton; yalnız
+//   kuyudaki odun ve taş bir sonraki seviyeye yetince belirir, tıklayınca o bedelle yükseltir;
 // - taş butonunun yanında odun ve taşla yeni işçi (köylü) üreten buton; işçi kuyunun yanında doğar ve dolaşır.
 // Butonlar sahnedeki taş butonundan kopyalanır, böylece görünüm aynı kalır.
 [RequireComponent(typeof(Canvas))]
@@ -35,6 +35,7 @@ public class UpgradeHUD : MonoBehaviour
         public Button button;
         public Text text;
         public CanvasGroup group;
+        public bool affordable;
     }
 
     readonly List<Entry> entries = new();
@@ -179,14 +180,11 @@ public class UpgradeHUD : MonoBehaviour
         foreach (var entry in entries)
         {
             var upgrade = entry.upgrade;
-            bool canUpgrade = upgrade.CanUpgrade(well);
-            entry.button.interactable = canUpgrade;
-            entry.group.alpha = canUpgrade || upgrade.IsMax ? 1f : 0.7f;
-            if (entry.text == null)
-                continue;
-            entry.text.text = upgrade.TryGetNextCost(out int wood, out int stone)
-                ? $"Sv {upgrade.Level} Yükselt\n<size=22>{wood} odun {stone} taş</size>"
-                : $"Sv {upgrade.Level}\n<size=22>En yüksek</size>";
+            // Bedel küçük butonda okunmuyordu: buton yalnız kuyudaki kaynak yetince görünür, hedef seviyeyi yazar.
+            entry.affordable = upgrade.CanUpgrade(well);
+            entry.button.interactable = entry.affordable;
+            if (entry.text != null)
+                entry.text.text = $"Yükselt\n<size=26>Sv {upgrade.Level + 1}</size>";
         }
 
         bool canHire = workerPrefab != null && well.CanAfford(workerWood, workerStone);
@@ -198,7 +196,8 @@ public class UpgradeHUD : MonoBehaviour
             workerText.text = $"İşçi\n<size=22>{workerWood} odun {workerStone} taş</size>";
     }
 
-    // Yapı butonları yapının ekrandaki yerini takip eder; menüde, inşa modunda ve yapı kamera arkasındayken gizlenir.
+    // Yapı butonları yapının ekrandaki yerini takip eder; para yetmezken, son seviyede, menüde, inşa modunda ve yapı
+    // kamera arkasındayken gizlenir.
     void LateUpdate()
     {
         if (cam == null)
@@ -212,7 +211,7 @@ public class UpgradeHUD : MonoBehaviour
         bool hidden = MainMenu.IsOpen || (construction != null && construction.isActiveAndEnabled && construction.ConstructionModeActive);
         foreach (var entry in entries)
         {
-            bool visible = !hidden && entry.upgrade != null && entry.upgrade.isActiveAndEnabled;
+            bool visible = !hidden && entry.affordable && entry.upgrade != null && entry.upgrade.isActiveAndEnabled;
             Vector3 screen = default;
             if (visible)
             {
