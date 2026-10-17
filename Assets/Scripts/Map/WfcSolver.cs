@@ -22,6 +22,8 @@ public class WfcSolver : MonoBehaviour
 
     [SerializeField] World world;
     [SerializeField] int seed;
+    [SerializeField, Tooltip("Each placed tile only constrains and searches cells within this distance. The solved area grows outward. 0 searches the whole map on every placement, which is slow on large maps.")]
+    int maxDistance = 16;
     [SerializeField] Rule[] rules;
     [SerializeField] FixedCell[] initialCells;
 
@@ -32,12 +34,22 @@ public class WfcSolver : MonoBehaviour
     bool[] possible;
     int[] counts;
     bool[] queued;
+    bool[] expanded;
+    int[] coverage;
+    bool[] compatible;
+    int[] activeIndex;
+    bool[] inWave;
+    readonly List<int> active = new();
+    readonly List<Edit> edits = new();
+    readonly Queue<int> wave = new();
     System.Random random;
     int width;
     int height;
     int tileCount;
     int attempts;
+    int attemptLimit;
     int usedSeed;
+    int propagateOrigin = -1;
 
     void Start()
     {
@@ -67,9 +79,18 @@ public class WfcSolver : MonoBehaviour
         possible = new bool[cellCount * tileCount];
         counts = new int[cellCount];
         queued = new bool[cellCount];
+        expanded = maxDistance > 0 ? new bool[cellCount] : null;
+        coverage = maxDistance > 0 ? new int[cellCount] : null;
+        activeIndex = new int[cellCount];
+        inWave = new bool[cellCount];
+        compatible = new bool[tileCount * tileCount * 4];
+        active.Clear();
+        edits.Clear();
+        BuildCompatibility();
         for (var i = 0; i < cellCount; i++)
         {
             counts[i] = tileCount;
+            activeIndex[i] = -1;
             for (var tile = 0; tile < tileCount; tile++)
                 possible[i * tileCount + tile] = true;
         }
@@ -80,12 +101,18 @@ public class WfcSolver : MonoBehaviour
         usedSeed = seed != 0 ? seed : Environment.TickCount;
         random = new System.Random(usedSeed);
         attempts = 0;
+        attemptLimit = Math.Max(MaxAttempts, cellCount * 32);
         dirty.Clear();
+        wave.Clear();
 
+        var origins = new List<int>();
         for (var i = 0; i < cellCount; i++)
-            Enqueue(i);
+        {
+            if (counts[i] < tileCount)
+                origins.Add(i);
+        }
 
-        if (!Propagate() || !Search())
+        if (!PropagateInitial(origins) || !Search(origins))
         {
             Debug.LogError($"WFC failed to fill the map (seed {usedSeed}).", this);
             return;
@@ -197,73 +224,195 @@ public class WfcSolver : MonoBehaviour
         return true;
     }
 
-    bool Search()
+    void BuildCompatibility()
     {
-        var cell = PickCell();
-        if (cell == -1)
-            return true;
-        if (cell < -1)
+        for (var a = 0; a < tileCount; a++)
+        {
+            for (var b = 0; b < tileCount; b++)
+            {
+                for (var dir = 0; dir < 4; dir++)
+                {
+                    var opposite = Opposite[dir];
+                    compatible[(a * tileCount + b) * 4 + dir] =
+                        Allows(tiles[a].Edges[dir], tiles[b].Id)
+                        && Allows(tiles[b].Edges[opposite], tiles[a].Id);
+                }
+            }
+        }
+    }
+
+    bool Search(List<int> origins)
+    {
+        if (!OpenInitialWindows(origins))
             return false;
 
-        var choiceCount = counts[cell];
-        var choices = new int[choiceCount];
-        var choice = 0;
-        var cellBase = cell * tileCount;
-        for (var tile = 0; tile < tileCount; tile++)
-        {
-            if (possible[cellBase + tile])
-                choices[choice++] = tile;
-        }
+        var steps = new List<SearchStep>();
 
-        for (var i = choiceCount - 1; i > 0; i--)
+        while (true)
         {
-            var swap = random.Next(i + 1);
-            (choices[i], choices[swap]) = (choices[swap], choices[i]);
-        }
-
-        var savedPossible = (bool[])possible.Clone();
-        var savedCounts = (int[])counts.Clone();
-
-        foreach (var tile in choices)
-        {
-            if (++attempts > MaxAttempts)
+            if (attempts > attemptLimit)
                 return false;
 
-            Array.Copy(savedPossible, possible, possible.Length);
-            Array.Copy(savedCounts, counts, counts.Length);
-            dirty.Clear();
-            Array.Clear(queued, 0, queued.Length);
+            var cell = PickCell();
+            if (cell == -2)
+            {
+                if (!Backtrack(steps))
+                    return false;
+                continue;
+            }
 
-            if (Collapse(cell, tile) && Search())
+            if (cell < 0)
                 return true;
+
+            steps.Add(new SearchStep
+            {
+                Cell = cell,
+                Choices = ShuffledChoices(cell),
+                Index = 0,
+                Mark = edits.Count
+            });
+
+            if (!TryCurrent(steps))
+                return false;
+        }
+    }
+
+    bool TryCurrent(List<SearchStep> steps)
+    {
+        while (steps.Count > 0)
+        {
+            var step = steps[steps.Count - 1];
+            if (step.Index >= step.Choices.Length)
+            {
+                steps.RemoveAt(steps.Count - 1);
+                if (steps.Count == 0)
+                    return false;
+
+                step = steps[steps.Count - 1];
+                Undo(step.Mark);
+                step.Index++;
+                steps[steps.Count - 1] = step;
+                continue;
+            }
+
+            if (++attempts > attemptLimit)
+                return false;
+
+            if (Collapse(step.Cell, step.Choices[step.Index]))
+                return true;
+
+            step.Index++;
+            steps[steps.Count - 1] = step;
         }
 
         return false;
     }
 
+    bool Backtrack(List<SearchStep> steps)
+    {
+        if (steps.Count == 0)
+            return false;
+
+        var step = steps[steps.Count - 1];
+        Undo(step.Mark);
+        step.Index++;
+        steps[steps.Count - 1] = step;
+        return TryCurrent(steps);
+    }
+
+    void Undo(int mark)
+    {
+        for (var i = edits.Count - 1; i >= mark; i--)
+        {
+            var edit = edits[i];
+            if (edit.Kind == EditRemove)
+                UndoRemove(edit);
+            else
+                UndoExpand(edit.Cell);
+        }
+
+        if (edits.Count > mark)
+            edits.RemoveRange(mark, edits.Count - mark);
+    }
+
+    int[] ShuffledChoices(int cell)
+    {
+        var count = 0;
+        var cellBase = cell * tileCount;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile])
+                count++;
+        }
+
+        var choices = new int[count];
+        var index = 0;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile])
+                choices[index++] = tile;
+        }
+
+        for (var i = count - 1; i > 0; i--)
+        {
+            var swap = random.Next(i + 1);
+            (choices[i], choices[swap]) = (choices[swap], choices[i]);
+        }
+
+        return choices;
+    }
+
+    const byte EditRemove = 0;
+    const byte EditExpand = 1;
+
+    struct SearchStep
+    {
+        public int Cell;
+        public int[] Choices;
+        public int Index;
+        public int Mark;
+    }
+
+    struct Edit
+    {
+        public byte Kind;
+        public int Cell;
+        public int Tile;
+    }
+
     int PickCell()
     {
         var min = int.MaxValue;
+        var bestCover = -1;
         var chosen = -1;
         var ties = 0;
-        for (var i = 0; i < counts.Length; i++)
+        var i = 0;
+        while (i < active.Count)
         {
-            var count = counts[i];
+            var cell = active[i];
+            var count = counts[cell];
             if (count == 0)
                 return -2;
             if (count <= 1)
+            {
+                Deactivate(cell);
                 continue;
+            }
 
-            if (count < min)
+            var cover = coverage == null ? 0 : coverage[cell];
+            if (count < min || (count == min && cover > bestCover))
             {
                 min = count;
-                chosen = i;
+                bestCover = cover;
+                chosen = cell;
                 ties = 1;
             }
-            else if (count == min && random.Next(++ties) == 0)
+            else if (count == min && cover == bestCover && random.Next(++ties) == 0)
             {
-                chosen = i;
+                chosen = cell;
             }
+
+            i++;
         }
 
         return chosen;
@@ -271,18 +420,239 @@ public class WfcSolver : MonoBehaviour
 
     bool Collapse(int cell, int tile)
     {
+        var mark = edits.Count;
         var cellBase = cell * tileCount;
         for (var other = 0; other < tileCount; other++)
         {
-            if (other == tile || !possible[cellBase + other])
-                continue;
-
-            possible[cellBase + other] = false;
-            counts[cell]--;
+            if (other != tile && possible[cellBase + other])
+                RemovePossibility(cell, other);
         }
 
-        Enqueue(cell);
-        return Propagate();
+        if (!Spread(cell))
+        {
+            ClearQueue();
+            DrainWave();
+            Undo(mark);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Spread(int origin)
+    {
+        if (maxDistance <= 0)
+        {
+            propagateOrigin = -1;
+            Enqueue(origin);
+            return Propagate();
+        }
+
+        Consider(origin);
+        while (wave.Count > 0)
+        {
+            var cell = wave.Dequeue();
+            inWave[cell] = false;
+            if (counts[cell] != 1 || expanded[cell])
+                continue;
+
+            propagateOrigin = cell;
+            Enqueue(cell);
+            if (!Propagate())
+            {
+                propagateOrigin = -1;
+                return false;
+            }
+
+            propagateOrigin = -1;
+            Expand(cell);
+            ConsiderSquare(cell);
+        }
+
+        return true;
+    }
+
+    void Consider(int cell)
+    {
+        if (inWave[cell] || expanded[cell] || counts[cell] != 1)
+            return;
+
+        inWave[cell] = true;
+        wave.Enqueue(cell);
+    }
+
+    void ConsiderSquare(int cell)
+    {
+        var x = cell % width;
+        var y = cell / width;
+        var y0 = Math.Max(0, y - maxDistance);
+        var y1 = Math.Min(height - 1, y + maxDistance);
+        var x0 = Math.Max(0, x - maxDistance);
+        var x1 = Math.Min(width - 1, x + maxDistance);
+        for (var ny = y0; ny <= y1; ny++)
+        {
+            for (var nx = x0; nx <= x1; nx++)
+                Consider(ny * width + nx);
+        }
+    }
+
+    void DrainWave()
+    {
+        while (wave.Count > 0)
+            inWave[wave.Dequeue()] = false;
+    }
+
+    bool PropagateInitial(List<int> origins)
+    {
+        if (maxDistance <= 0)
+        {
+            for (var i = 0; i < counts.Length; i++)
+                Enqueue(i);
+            return Propagate();
+        }
+
+        for (var i = 0; i < origins.Count; i++)
+        {
+            propagateOrigin = origins[i];
+            Enqueue(origins[i]);
+            if (!Propagate())
+            {
+                propagateOrigin = -1;
+                ClearQueue();
+                return false;
+            }
+        }
+
+        propagateOrigin = -1;
+        return true;
+    }
+
+    bool OpenInitialWindows(List<int> origins)
+    {
+        if (maxDistance <= 0)
+        {
+            for (var i = 0; i < counts.Length; i++)
+            {
+                if (counts[i] > 1)
+                    Activate(i);
+            }
+
+            return true;
+        }
+
+        var opened = false;
+        for (var i = 0; i < origins.Count; i++)
+        {
+            var cell = origins[i];
+            opened = true;
+            if (counts[cell] == 1)
+            {
+                if (!Spread(cell))
+                {
+                    ClearQueue();
+                    DrainWave();
+                    return false;
+                }
+            }
+            else if (coverage[cell] == 0)
+            {
+                coverage[cell] = 1;
+            }
+
+            if (counts[cell] > 1)
+                Activate(cell);
+        }
+
+        if (opened)
+            return true;
+
+        var center = (height / 2) * width + width / 2;
+        coverage[center] = 1;
+        if (counts[center] > 1)
+            Activate(center);
+        return true;
+    }
+
+    void Expand(int cell)
+    {
+        if (maxDistance <= 0 || expanded[cell] || counts[cell] != 1)
+            return;
+
+        expanded[cell] = true;
+        edits.Add(new Edit { Kind = EditExpand, Cell = cell });
+        VisitSquare(cell, true);
+    }
+
+    void UndoExpand(int cell)
+    {
+        expanded[cell] = false;
+        VisitSquare(cell, false);
+    }
+
+    void VisitSquare(int cell, bool add)
+    {
+        var x = cell % width;
+        var y = cell / width;
+        var y0 = Math.Max(0, y - maxDistance);
+        var y1 = Math.Min(height - 1, y + maxDistance);
+        var x0 = Math.Max(0, x - maxDistance);
+        var x1 = Math.Min(width - 1, x + maxDistance);
+        for (var ny = y0; ny <= y1; ny++)
+        {
+            for (var nx = x0; nx <= x1; nx++)
+            {
+                var index = ny * width + nx;
+                if (add)
+                {
+                    coverage[index]++;
+                    if (counts[index] > 1)
+                        Activate(index);
+                }
+                else if (--coverage[index] == 0)
+                {
+                    Deactivate(index);
+                }
+            }
+        }
+    }
+
+    void RemovePossibility(int cell, int tile)
+    {
+        possible[cell * tileCount + tile] = false;
+        counts[cell]--;
+        edits.Add(new Edit { Kind = EditRemove, Cell = cell, Tile = tile });
+        if (counts[cell] <= 1)
+            Deactivate(cell);
+    }
+
+    void UndoRemove(Edit edit)
+    {
+        possible[edit.Cell * tileCount + edit.Tile] = true;
+        counts[edit.Cell]++;
+        if (counts[edit.Cell] > 1 && (maxDistance <= 0 || coverage[edit.Cell] > 0))
+            Activate(edit.Cell);
+    }
+
+    void Activate(int cell)
+    {
+        if (activeIndex[cell] >= 0)
+            return;
+
+        activeIndex[cell] = active.Count;
+        active.Add(cell);
+    }
+
+    void Deactivate(int cell)
+    {
+        var index = activeIndex[cell];
+        if (index < 0)
+            return;
+
+        var last = active[active.Count - 1];
+        active[index] = last;
+        activeIndex[last] = index;
+        active.RemoveAt(active.Count - 1);
+        activeIndex[cell] = -1;
     }
 
     bool Propagate()
@@ -302,6 +672,9 @@ public class WfcSolver : MonoBehaviour
                     continue;
 
                 var neighbor = ny * width + nx;
+                if (maxDistance > 0 && propagateOrigin >= 0 && Distance(propagateOrigin, neighbor) > maxDistance)
+                    continue;
+
                 if (!Prune(neighbor, cell, Opposite[dir]))
                     continue;
 
@@ -320,7 +693,19 @@ public class WfcSolver : MonoBehaviour
         var changed = false;
         var cellBase = cell * tileCount;
         var otherBase = other * tileCount;
-        var opposite = Opposite[dirFromCellToOther];
+        var otherCount = counts[other];
+        var single = -1;
+        if (otherCount == 1)
+        {
+            for (var b = 0; b < tileCount; b++)
+            {
+                if (!possible[otherBase + b])
+                    continue;
+
+                single = b;
+                break;
+            }
+        }
 
         for (var a = 0; a < tileCount; a++)
         {
@@ -328,30 +713,32 @@ public class WfcSolver : MonoBehaviour
                 continue;
 
             var fits = false;
-            for (var b = 0; b < tileCount; b++)
+            if (single >= 0)
             {
-                if (possible[otherBase + b] && Compatible(a, b, dirFromCellToOther, opposite))
+                fits = compatible[(a * tileCount + single) * 4 + dirFromCellToOther];
+            }
+            else
+            {
+                for (var b = 0; b < tileCount; b++)
                 {
-                    fits = true;
-                    break;
+                    if (possible[otherBase + b] && compatible[(a * tileCount + b) * 4 + dirFromCellToOther])
+                    {
+                        fits = true;
+                        break;
+                    }
                 }
             }
 
             if (fits)
                 continue;
 
-            possible[cellBase + a] = false;
-            counts[cell]--;
+            RemovePossibility(cell, a);
             changed = true;
+            if (counts[cell] == 0)
+                return true;
         }
 
         return changed;
-    }
-
-    bool Compatible(int tileA, int tileB, int dirFromAToB, int opposite)
-    {
-        return Allows(tiles[tileA].Edges[dirFromAToB], tiles[tileB].Id)
-            && Allows(tiles[tileB].Edges[opposite], tiles[tileA].Id);
     }
 
     static bool Allows(int[] ids, int id)
@@ -377,6 +764,12 @@ public class WfcSolver : MonoBehaviour
         dirty.Enqueue(cell);
     }
 
+    void ClearQueue()
+    {
+        while (dirty.Count > 0)
+            queued[dirty.Dequeue()] = false;
+    }
+
     int ChosenTile(int cell)
     {
         var cellBase = cell * tileCount;
@@ -387,6 +780,17 @@ public class WfcSolver : MonoBehaviour
         }
 
         return 0;
+    }
+
+    int Distance(int a, int b)
+    {
+        var dx = a % width - b % width;
+        var dy = a / width - b / width;
+        if (dx < 0)
+            dx = -dx;
+        if (dy < 0)
+            dy = -dy;
+        return dx > dy ? dx : dy;
     }
 
     static int Normalize(int rotation)
