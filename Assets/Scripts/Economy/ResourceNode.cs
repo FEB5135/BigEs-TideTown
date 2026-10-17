@@ -17,6 +17,8 @@ public class ResourceNode : MonoBehaviour
     [SerializeField] int maxGatherers = 1;
     [Tooltip("Tükenince yalnız bu gizlenir (örn. ocaktaki taş yığını). Boşsa tüm model gizlenir.")]
     [SerializeField] GameObject depletedHide;
+    [Tooltip("Toplayıcı kaynağa bu noktalardan sırayla geçerek girer, toplayınca aynı yoldan geri çıkar (örn. ray başı, tünel içi). Boşsa doğrudan gider.")]
+    [SerializeField] Transform[] approachPath;
 
     [Header("Tıklama Geri Bildirimi")]
     [SerializeField] float hitShakeDuration = 0.2f;
@@ -30,6 +32,7 @@ public class ResourceNode : MonoBehaviour
     public ResourceType Type => type;
     public int Remaining => remaining;
     public bool IsAvailable => remaining > 0 && claimants.Count < maxGatherers;
+    public Transform[] ApproachPath => approachPath;
 
     void Awake()
     {

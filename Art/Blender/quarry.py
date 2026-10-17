@@ -1,105 +1,11 @@
 # Maden ocagi modeli. Blender 4.2: blender -b --python quarry.py
 # QUARRY_FBX ortam degiskeni verilirse Unity icin FBX de cikarir. Giris -Y'ye bakar (Unity'de +Z).
-import bpy, bmesh, math, random, sys, os
+import bpy, bmesh, math, sys, os
 from mathutils import Vector, Matrix, Euler
 S = os.path.dirname(os.path.abspath(__file__)); sys.path.append(S)
-from common import *
-bpy.ops.wm.read_factory_settings(use_empty=True)
-MAT = palette_mat()
-rng = random.Random(11)
-OUT = {}  # grup adi -> nesneler
-
-# Palet sutunlari: 0 tas grisi (v: alt koyu -> ust acik), 1 gri->siyah, 2 ahsap, 3 sari, 4 kirmizi, 5 beyaz
-STONE, DARK, WOOD, YELLOW, RED, WHITE = range(6)
-
-def obj_from_bm(bm, name, group):
-    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
-    o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
-    me.materials.append(MAT); OUT.setdefault(group, []).append(o)
-    return o
-
-def paint(o, col, lo, hi, vlo, vhi, axis=2):
-    me = o.data
-    uv = me.uv_layers.get("UV") or me.uv_layers.new(name="UV")
-    u = (col + 0.5) / 64
-    for loop in me.loops:
-        c = me.vertices[loop.vertex_index].co[axis]
-        t = 0 if hi == lo else min(1, max(0, (c - lo) / (hi - lo)))
-        uv.data[loop.index].uv = (u, vlo + t * (vhi - vlo))
-
-def xform(bm, loc, rot):
-    m = Matrix.Translation(loc) @ Euler([math.radians(a) for a in rot]).to_matrix().to_4x4()
-    bmesh.ops.transform(bm, matrix=m, verts=bm.verts)
-
-def box(name, group, size, loc, rot=(0, 0, 0), bevel=0.06, seg=2):
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1)
-    bmesh.ops.scale(bm, vec=Vector(size), verts=bm.verts)
-    if bevel: bmesh.ops.bevel(bm, geom=bm.edges[:], offset=bevel, segments=seg, profile=0.5, affect='EDGES')
-    xform(bm, loc, rot)
-    return obj_from_bm(bm, name, group)
-
-def cyl(name, group, r, h, loc, rot=(0, 0, 0), n=8, bevel=0.04, r2=None):
-    bm = bmesh.new()
-    bmesh.ops.create_cone(bm, cap_ends=True, segments=n, radius1=r, radius2=r if r2 is None else r2, depth=h)
-    if bevel: bmesh.ops.bevel(bm, geom=bm.edges[:], offset=bevel, segments=1, affect='EDGES')
-    xform(bm, loc, rot)
-    return obj_from_bm(bm, name, group)
-
-def hull(name, group, pts):
-    bm = bmesh.new()
-    for p in pts: bm.verts.new(p)
-    res = bmesh.ops.convex_hull(bm, input=bm.verts[:])
-    junk = list({v for v in res["geom_interior"] + res["geom_unused"] if isinstance(v, bmesh.types.BMVert)})
-    if junk: bmesh.ops.delete(bm, geom=junk, context='VERTS')
-    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(3), verts=bm.verts[:], edges=bm.edges[:])
-    bmesh.ops.triangulate(bm, faces=bm.faces[:])
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-    return obj_from_bm(bm, name, group)
-
-def rock(name, group, r, loc, scl=(1, 1, 1), jitter=0.22, pts=18, flat=0.6, floor=-0.3):
-    # rastgele noktalarin dis kabugu: koseli kaya; ust kismi duzlenir, alti zemine gomulur
-    golden = math.pi * (3 - math.sqrt(5))
-    rot = Matrix.Rotation(rng.uniform(0, 6.28), 3, 'Z')
-    P = []
-    for i in range(pts):
-        zz = 1 - 2 * (i + 0.5) / pts
-        rr = math.sqrt(1 - zz * zz); th = golden * i + rng.uniform(-0.35, 0.35)
-        p = Vector((math.cos(th) * rr, math.sin(th) * rr, zz)) * r * (1 + rng.uniform(-jitter, jitter) * 1.6)
-        p.z = min(p.z, r * flat * rng.uniform(0.9, 1.05))
-        p = rot @ Vector((p.x * scl[0], p.y * scl[1], p.z * scl[2])) + Vector(loc)
-        p.z = max(p.z, floor)
-        P.append(p)
-    return hull(name, group, P)
-
-def prism(name, group, profile, y0, y1, cap_front=True, cap_back=True):
-    # profile: (x, z) listesi, y0..y1 boyunca uzatilir
-    bm = bmesh.new()
-    a = [bm.verts.new((x, y0, z)) for x, z in profile]
-    b = [bm.verts.new((x, y1, z)) for x, z in profile]
-    n = len(profile)
-    for i in range(n):
-        j = (i + 1) % n
-        bm.faces.new((a[i], a[j], b[j], b[i]))
-    if cap_front: bm.faces.new(list(reversed(a)))
-    if cap_back: bm.faces.new(b)
-    bm.normal_update()
-    if cap_front and cap_back: bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-    return obj_from_bm(bm, name, group)
-
-def boolean(o, cutter, op='DIFFERENCE'):
-    mod = o.modifiers.new("b", 'BOOLEAN'); mod.operation = op; mod.object = cutter; mod.solver = 'EXACT'
-    with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o]):
-        bpy.ops.object.modifier_apply(modifier="b")
-
-def arch_profile(hw, h, n=12, grow=0.0):
-    hw += grow
-    pts = [(hw, -grow - 0.4), (hw, h)]
-    for i in range(1, n):
-        t = math.pi * i / n
-        pts.append((hw * math.cos(t), h + hw * math.sin(t)))
-    pts += [(-hw, h), (-hw, -grow - 0.4)]
-    return pts
+import shapes
+from shapes import *
+start(11)
 
 # ================= Olculer =================
 HW, AH = 1.7, 2.5        # tunel yari genisligi, kemerin basladigi yukseklik (tepe = AH + HW)
@@ -283,7 +189,7 @@ box("PickHead", "Props", (0.85, 0.11, 0.11), (SX + 1.57, SY - 1.4, 1.32), rot=(-
 box("ShovelHandle", "Props", (0.07, 0.07, 1.3), (SX - 1.4, SY - 1.25, 0.8), rot=(-12, -8, 0), bevel=0.02, seg=1)
 box("ShovelHead", "Props", (0.32, 0.06, 0.4), (SX - 1.48, SY - 1.4, 0.2), rot=(-12, -8, 0), bevel=0.03, seg=1)
 bpy.ops.mesh.primitive_torus_add(major_radius=0.3, minor_radius=0.08, major_segments=12, minor_segments=6, location=(SX + 1.7, SY + 0.6, 0.08))
-tor = bpy.context.active_object; tor.name = "Rope"; tor.data.materials.append(MAT); OUT.setdefault("Props", []).append(tor)
+tor = bpy.context.active_object; tor.name = "Rope"; tor.data.materials.append(shapes.MAT); OUT.setdefault("Props", []).append(tor)
 
 # ================= El arabasi =================
 WX, WY, WR = 1.9, FRONT - 2.6, -30
@@ -389,29 +295,8 @@ for o in OUT["Props"]:
     elif is_(o, "Rope"): paint(o, WOOD, 0, 1, 0.98, 0.98)
     else: paint(o, WOOD, 0, 1.5, 0.2, 0.95)
 
-# ================= Gruplari birlestir =================
+# ================= Gruplari birlestir, kaydet, FBX =================
 PIVOTS = {"Lantern": LANTERN_HOOK, "Bucket": BUCKET_HOOK}
 PIVOTS.update({f"PostLantern{i}": h for i, h in enumerate(POST_HOOKS)})
-FLAT = {"Rocks", "Tunnel", "Crystals", "StonePile", "Rails"}
-root = bpy.data.objects.new("Quarry", None); bpy.context.scene.collection.objects.link(root)
-for g, objs in OUT.items():
-    with bpy.context.temp_override(active_object=objs[0], selected_editable_objects=objs, selected_objects=objs):
-        bpy.ops.object.join()
-    o = objs[0]; o.name = g; o.data.name = g
-    with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o], selected_editable_objects=[o]):
-        if g in FLAT: bpy.ops.object.shade_flat()
-        else: bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
-    if g in PIVOTS:  # sallanabilsin diye pivot kancada
-        o.data.transform(Matrix.Translation(-PIVOTS[g])); o.location = PIVOTS[g]
-    o.parent = root
-
-bpy.ops.wm.save_as_mainfile(filepath=os.path.join(S, "quarry.blend"))
-print("TRIS", sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in bpy.data.objects if o.type == 'MESH'))
-
-# ================= Unity icin FBX (giris Unity'de +Z'ye bakar) =================
-FBX = os.environ.get("QUARRY_FBX")
-if FBX:
-    bpy.ops.export_scene.fbx(filepath=FBX, object_types={'EMPTY', 'MESH'}, use_mesh_modifiers=True,
-        mesh_smooth_type='FACE', apply_scale_options='FBX_SCALE_UNITS', axis_forward='-Z', axis_up='Y',
-        bake_space_transform=True, use_custom_props=False, add_leaf_bones=False, path_mode='STRIP')
-    print("FBX", FBX)
+finish("Quarry", os.path.join(S, "quarry.blend"), os.environ.get("QUARRY_FBX"), PIVOTS,
+       {"Rocks", "Tunnel", "Crystals", "StonePile", "Rails"})
