@@ -117,6 +117,9 @@ public class ResourceNode : MonoBehaviour
         if (!isActiveAndEnabled || remaining <= 0)
             return;
         Hit?.Invoke();
+        // Ağaçta balta, ocakta tok taş sesi.
+        if (GameAudio.Instance != null)
+            GameAudio.Play(type == ResourceType.Wood ? GameAudio.Instance.treeHit : GameAudio.Instance.stoneHit, transform.position);
         if (shake != null)
             StopCoroutine(shake);
         shake = StartCoroutine(ShakeRoutine());

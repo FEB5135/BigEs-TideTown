@@ -70,10 +70,128 @@ namespace IdleTown.Tests
 
             Assert.That(model.Validate(edge, 4, 4, out _), Is.True);
         }
+
+        [Test]
+        public void Remove_OnlyRemovesRequestedEdge_AndAllowsRebuild()
+        {
+            var model = new WallConstructionModel();
+            var first = new WallEdge(Vector2Int.zero, Vector2Int.right);
+            var neighbour = new WallEdge(Vector2Int.right, new Vector2Int(2, 0));
+            model.Add(new List<WallEdge> { first, neighbour });
+
+            Assert.That(model.Remove(first), Is.True);
+            Assert.That(model.Edges, Has.Count.EqualTo(1));
+            Assert.That(model.Edges, Does.Contain(neighbour));
+            Assert.That(model.Validate(new List<WallEdge> { first }, 4, 4, out _), Is.True);
+        }
+
+        [Test]
+        public void Validate_TracksOccupancyAndCrossingsPerFloor()
+        {
+            var model = new WallConstructionModel();
+            var diagonal = new List<WallEdge>
+            {
+                new(Vector2Int.zero, Vector2Int.one)
+            };
+            var crossing = new List<WallEdge>
+            {
+                new(new Vector2Int(0, 1), new Vector2Int(1, 0))
+            };
+            model.Set(diagonal, 0, WallTier.Timber);
+
+            Assert.That(model.Validate(crossing, 4, 4, 0, WallTier.Timber, 3, out _), Is.False);
+            // Crossing is floor-local, but an upper edge still needs support on that same edge.
+            model.Set(crossing, 0, WallTier.Timber);
+            Assert.That(model.Validate(crossing, 4, 4, 1, WallTier.Timber, 3, out _), Is.True);
+        }
+
+        [Test]
+        public void Validate_UpperFloorRequiresSameEdgeAndEqualOrStrongerSupport()
+        {
+            var model = new WallConstructionModel();
+            var edge = new List<WallEdge>
+            {
+                new(Vector2Int.zero, Vector2Int.right)
+            };
+
+            Assert.That(model.Validate(edge, 4, 4, 1, WallTier.Timber, 3, out _), Is.False);
+
+            model.Set(edge, 0, WallTier.Timber);
+            Assert.That(model.Validate(edge, 4, 4, 1, WallTier.Stone, 3, out _), Is.False);
+            Assert.That(model.Validate(edge, 4, 4, 1, WallTier.Timber, 3, out _), Is.True);
+
+            model.Set(edge, 0, WallTier.Reinforced);
+            Assert.That(model.Validate(edge, 4, 4, 1, WallTier.Stone, 3, out _), Is.True);
+        }
+
+        [Test]
+        public void Validate_AllowsOnlyStrictTierUpgrades()
+        {
+            var model = new WallConstructionModel();
+            var edge = new List<WallEdge>
+            {
+                new(Vector2Int.zero, Vector2Int.right)
+            };
+            model.Set(edge, 0, WallTier.Stone);
+
+            Assert.That(model.Validate(edge, 4, 4, 0, WallTier.Timber, 3, out _), Is.False);
+            Assert.That(model.Validate(edge, 4, 4, 0, WallTier.Stone, 3, out _), Is.False);
+            Assert.That(model.Validate(edge, 4, 4, 0, WallTier.Reinforced, 3, out _), Is.True);
+        }
     }
 
     public sealed class WallConstructionControllerTests
     {
+        [Test]
+        public void DestroyingAnUpperFloor_PreservesBaseAndNeighbour_AndCollapsesUnsupportedFloors()
+        {
+            var root = new GameObject("Stack Collapse Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(new FakeResourceStore(1000, 1000));
+                var a = Vector2Int.zero;
+                var b = Vector2Int.right;
+                var c = new Vector2Int(2, 0);
+                Assert.That(controller.TryBuild(a, c, 0, WallTier.Reinforced, out var reason), Is.True, reason);
+                Assert.That(controller.TryBuild(a, b, 1, WallTier.Stone, out reason), Is.True, reason);
+                Assert.That(controller.TryBuild(a, b, 2, WallTier.Timber, out reason), Is.True, reason);
+                Assert.That(controller.Walls, Has.Count.EqualTo(4));
+                var edge = new WallEdge(a, b);
+                Assert.That(controller.TryDetachDestroyedWall(edge, 1, out _), Is.True);
+                Assert.That(controller.Walls, Has.Count.EqualTo(2));
+                Assert.That(controller.TryGetWallInstance(edge, 0, out _), Is.True);
+                Assert.That(controller.TryGetWallInstance(edge, 2, out _), Is.False);
+                Assert.That(controller.TryGetWallInstance(new WallEdge(b, c), 0, out _), Is.True);
+                Assert.That(controller.TryBuild(a, b, 1, WallTier.Stone, out reason), Is.True, reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void DestroyingBase_RemovesWholeStack_AndAllowsFreshConstruction()
+        {
+            var root = new GameObject("Base Collapse Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(new FakeResourceStore(1000, 1000));
+                var edge = new WallEdge(Vector2Int.zero, Vector2Int.right);
+                Assert.That(controller.TryBuild(edge.A, edge.B, 0, WallTier.Reinforced, out var reason), Is.True, reason);
+                Assert.That(controller.TryBuild(edge.A, edge.B, 1, WallTier.Stone, out reason), Is.True, reason);
+                Assert.That(controller.TryBuild(edge.A, edge.B, 2, WallTier.Timber, out reason), Is.True, reason);
+                Assert.That(controller.TryDetachDestroyedWall(edge, 0, out _), Is.True);
+                Assert.That(controller.Walls, Is.Empty);
+                Assert.That(controller.Edges, Is.Empty);
+                Assert.That(controller.TryBuild(edge.A, edge.B, 0, WallTier.Timber, out reason), Is.True, reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
         [Test]
         public void RefreshPreview_BeforeAwake_CreatesOneRendererAndClearsItOutsideMap()
         {
@@ -140,6 +258,64 @@ namespace IdleTown.Tests
                 Assert.That(resources.Stone, Is.EqualTo(initialStone - 5));
                 AssertWallsAreActiveAndPhysical(firstBuild);
                 Assert.That(GetBuiltWalls(root.transform), Has.Count.EqualTo(5));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryDetachDestroyedWall_RemovesOnlyEdgeWithoutRefund_AndAllowsRebuild()
+        {
+            var root = new GameObject("Wall Break Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(10, 10);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                GameObject eventVisual = null;
+                controller.WallRemoved += (_, instance) => { eventVisual = instance; return true; };
+                Assert.That(controller.TryBuild(Vector2Int.zero, new Vector2Int(2, 0), out var reason), Is.True, reason);
+                var broken = new WallEdge(Vector2Int.zero, Vector2Int.right);
+
+                Assert.That(controller.TryDetachDestroyedWall(broken, out var visual), Is.True);
+                Assert.That(visual, Is.Not.Null);
+                Assert.That(eventVisual, Is.SameAs(visual));
+                Assert.That(controller.Edges, Has.Count.EqualTo(1));
+                Assert.That(resources.Wood, Is.EqualTo(8));
+                Assert.That(resources.Stone, Is.EqualTo(8));
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out reason), Is.True, reason);
+                Assert.That(resources.Wood, Is.EqualTo(7));
+                Assert.That(resources.Stone, Is.EqualTo(7));
+                UnityEngine.Object.DestroyImmediate(visual);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryDetachDestroyedWall_WithoutRemovalOwner_DestroysDetachedVisual()
+        {
+            var root = new GameObject("Unobserved Wall Break Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(10, 10);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out var reason), Is.True, reason);
+
+                Assert.That(controller.TryDetachDestroyedWall(
+                    new WallEdge(Vector2Int.zero, Vector2Int.right), out var visual), Is.True);
+                Assert.That(visual, Is.Null);
+                Assert.That(controller.Edges, Is.Empty);
             }
             finally
             {
@@ -224,12 +400,238 @@ namespace IdleTown.Tests
                 Is.True);
             Assert.That(
                 WallConstructionController.IsPointerOverConstructionPanel(
-                    new Vector2(456f, Screen.height - 16f)),
+                    new Vector2(486f, Screen.height - 16f)),
                 Is.False);
             Assert.That(
                 WallConstructionController.IsPointerOverConstructionPanel(
-                    new Vector2(16f, Screen.height - 286f)),
+                    new Vector2(16f, Screen.height - 406f)),
                 Is.False);
+        }
+
+        [Test]
+        public void TryBuild_UpgradeChargesOnlyCumulativeCostDeltaAndReplacesMetadata()
+        {
+            var root = new GameObject("Tier Upgrade Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(20, 20);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out var timberReason), Is.True, timberReason);
+                Assert.That(resources.Wood, Is.EqualTo(19));
+                Assert.That(resources.Stone, Is.EqualTo(19));
+
+                Assert.That(controller.TryBuild(Vector2Int.right, Vector2Int.zero, 0, WallTier.Stone, out var stoneReason), Is.True, stoneReason);
+
+                Assert.That(resources.SpendCalls, Is.EqualTo(2));
+                Assert.That(resources.Wood, Is.EqualTo(17));
+                Assert.That(resources.Stone, Is.EqualTo(16));
+                Assert.That(controller.Edges, Has.Count.EqualTo(1));
+                Assert.That(controller.Walls, Has.Count.EqualTo(1));
+                var walls = GetBuiltWalls(root.transform);
+                Assert.That(walls, Has.Count.EqualTo(1));
+                Assert.That(walls[0].GetComponent<WallSegment>().Tier, Is.EqualTo(WallTier.Stone));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryBuild_FailedUpgradePreservesPriorWallAndResources()
+        {
+            var root = new GameObject("Failed Upgrade Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(20, 20);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out _), Is.True);
+                var original = GetBuiltWalls(root.transform)[0];
+                var woodBefore = resources.Wood;
+                var stoneBefore = resources.Stone;
+                resources.FailSpend = true;
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Stone, out _), Is.False);
+
+                Assert.That(resources.Wood, Is.EqualTo(woodBefore));
+                Assert.That(resources.Stone, Is.EqualTo(stoneBefore));
+                Assert.That(original.activeInHierarchy, Is.True);
+                Assert.That(original.GetComponent<WallSegment>().Tier, Is.EqualTo(WallTier.Timber));
+                Assert.That(controller.Walls, Has.Count.EqualTo(1));
+                Assert.That(GetBuiltWalls(root.transform), Has.Count.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryBuild_UpperFloorRequiresSupportAndUsesElevatedGeometryMetadata()
+        {
+            var root = new GameObject("Floor Support Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(20, 20);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 1, WallTier.Timber, out _), Is.False);
+                Assert.That(resources.SpendCalls, Is.Zero);
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out _), Is.True);
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 1, WallTier.Timber, out var reason), Is.True, reason);
+
+                var walls = GetBuiltWalls(root.transform);
+                Assert.That(walls, Has.Count.EqualTo(2));
+                walls.Sort((left, right) => left.GetComponent<WallSegment>().Floor.CompareTo(right.GetComponent<WallSegment>().Floor));
+                Assert.That(walls[0].transform.position.y, Is.EqualTo(0.625f).Within(0.001f));
+                Assert.That(walls[1].transform.position.y, Is.EqualTo(1.875f).Within(0.001f));
+                Assert.That(walls[1].GetComponent<WallSegment>().Floor, Is.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryBuild_ConfigurableFloorZeroBaseAndMaximumAreApplied()
+        {
+            var root = new GameObject("Floor Configuration Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(20, 20);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                var serializedController = new SerializedObject(controller);
+                serializedController.FindProperty("floorZeroBaseHeight").floatValue = 2f;
+                serializedController.FindProperty("maxFloors").intValue = 2;
+                serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out var reason), Is.True, reason);
+                Assert.That(GetBuiltWalls(root.transform)[0].transform.position.y, Is.EqualTo(2.625f).Within(0.001f));
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 2, WallTier.Timber, out _), Is.False);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryBuild_ObstacleChecksUseTheSelectedFloorElevation()
+        {
+            var root = new GameObject("Elevated Obstacle Test");
+            var obstacle = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(20, 20);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                controller.ObstacleLayers = 1 << 8;
+                obstacle.layer = 8;
+                obstacle.transform.position = new Vector3(0.5f, 1.875f, 0f);
+                obstacle.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
+                Physics.SyncTransforms();
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out var baseReason), Is.True, baseReason);
+                var woodAfterBase = resources.Wood;
+                var stoneAfterBase = resources.Stone;
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 1, WallTier.Timber, out var upperReason), Is.False);
+                Assert.That(upperReason, Does.Contain("engelle"));
+                Assert.That(resources.Wood, Is.EqualTo(woodAfterBase));
+                Assert.That(resources.Stone, Is.EqualTo(stoneAfterBase));
+                Assert.That(controller.Walls, Has.Count.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(obstacle);
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void CachedPreview_IsInvalidatedByFloorChangeAndResourceLoss()
+        {
+            var root = new GameObject("Cached Preview Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(2, 2);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+
+                controller.SetSelectedFloor(1);
+                Assert.That(controller.ConfirmLastValidPreview(), Is.False);
+
+                controller.SetSelectedFloor(0);
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(resources.TrySpend(2, 2), Is.True);
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.ConfirmLastValidPreview(), Is.False);
+                Assert.That(controller.Edges, Is.Empty);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void PreviewAndGeneratedMaterials_ReflectSelectedFloorAndTier()
+        {
+            var root = new GameObject("Floor Preview And Tier Visual Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(20, 20);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                controller.SetSelectedFloor(1);
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+
+                var preview = root.GetComponentInChildren<LineRenderer>();
+                Assert.That(preview, Is.Not.Null);
+                Assert.That(preview.GetPosition(0).y, Is.EqualTo(2.55f).Within(0.001f));
+                Assert.That(preview.GetPosition(1).y, Is.EqualTo(2.55f).Within(0.001f));
+
+                Assert.That(controller.TryBuild(new Vector2Int(0, 1), new Vector2Int(1, 1), 0, WallTier.Timber, out var timberReason), Is.True, timberReason);
+                Assert.That(controller.TryBuild(new Vector2Int(0, 2), new Vector2Int(1, 2), 0, WallTier.Stone, out var stoneReason), Is.True, stoneReason);
+                var walls = GetBuiltWalls(root.transform);
+                var timberColor = default(Color);
+                var stoneColor = default(Color);
+                foreach (var wall in walls)
+                {
+                    var segment = wall.GetComponent<WallSegment>();
+                    if (segment.Tier == WallTier.Timber)
+                        timberColor = wall.GetComponentInChildren<Renderer>().sharedMaterial.color;
+                    if (segment.Tier == WallTier.Stone)
+                        stoneColor = wall.GetComponentInChildren<Renderer>().sharedMaterial.color;
+                }
+                Assert.That(stoneColor, Is.Not.EqualTo(timberColor));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
         }
 
         [Test]

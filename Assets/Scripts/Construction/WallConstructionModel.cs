@@ -34,12 +34,44 @@ namespace IdleTown.Construction
         public override string ToString() => $"{A} -> {B}";
     }
 
+    public readonly struct WallRecord
+    {
+        public WallRecord(WallEdge edge, int floor, WallTier tier)
+        {
+            Edge = edge;
+            Floor = floor;
+            Tier = tier;
+        }
+
+        public WallEdge Edge { get; }
+        public int Floor { get; }
+        public WallTier Tier { get; }
+    }
+
+    readonly struct WallKey : IEquatable<WallKey>
+    {
+        public WallKey(WallEdge edge, int floor)
+        {
+            Edge = edge;
+            Floor = floor;
+        }
+
+        public WallEdge Edge { get; }
+        public int Floor { get; }
+        public bool Equals(WallKey other) => Floor == other.Floor && Edge.Equals(other.Edge);
+        public override bool Equals(object obj) => obj is WallKey other && Equals(other);
+        public override int GetHashCode() => (Edge.GetHashCode() * 397) ^ Floor;
+    }
+
     /// <summary>Pure grid rules shared by preview, construction and edit-mode tests.</summary>
     public sealed class WallConstructionModel
     {
-        readonly HashSet<WallEdge> edges = new();
+        readonly HashSet<WallEdge> floorZeroEdges = new();
+        readonly Dictionary<WallKey, WallRecord> walls = new();
 
-        public IReadOnlyCollection<WallEdge> Edges => edges;
+        /// <summary>Legacy floor-zero edge view.</summary>
+        public IReadOnlyCollection<WallEdge> Edges => floorZeroEdges;
+        public IReadOnlyCollection<WallRecord> Walls => walls.Values;
 
         public static List<WallEdge> CreateSnappedPath(Vector2Int start, Vector2Int end)
         {
@@ -76,9 +108,33 @@ namespace IdleTown.Construction
 
         public bool Validate(IReadOnlyList<WallEdge> path, int width, int height, out string reason)
         {
+            return Validate(path, width, height, 0, WallTier.Timber, 1, out reason);
+        }
+
+        public bool Validate(
+            IReadOnlyList<WallEdge> path,
+            int width,
+            int height,
+            int floor,
+            WallTier tier,
+            int maxFloors,
+            out string reason)
+        {
             if (path == null || path.Count == 0)
             {
                 reason = "Başlangıçtan farklı bir bitiş düğümü seçin.";
+                return false;
+            }
+
+            if (floor < 0 || floor >= maxFloors)
+            {
+                reason = $"Kat 1 ile {Math.Max(1, maxFloors)} arasında olmalı.";
+                return false;
+            }
+
+            if (!WallTierRules.IsTier(tier))
+            {
+                reason = "Geçersiz duvar seviyesi.";
                 return false;
             }
 
@@ -98,16 +154,38 @@ namespace IdleTown.Construction
                     return false;
                 }
 
-                if (edges.Contains(edge) || !pending.Add(edge))
+                if (!pending.Add(edge))
                 {
-                    reason = "Bu kenarda zaten bir duvar var.";
+                    reason = "Aynı yol içinde bir kenar tekrarlanamaz.";
+                    return false;
+                }
+
+                if (TryGet(edge, floor, out var existing))
+                {
+                    if (existing.Tier == tier)
+                    {
+                        reason = "Bu kenar ve katta aynı seviyede duvar zaten var.";
+                        return false;
+                    }
+                    if (existing.Tier > tier)
+                    {
+                        reason = "Duvar daha düşük bir seviyeye indirilemez.";
+                        return false;
+                    }
+                }
+
+                if (floor > 0 &&
+                    (!TryGet(edge, floor - 1, out var support) ||
+                     !WallTierRules.HasSufficientSupport(support.Tier, tier)))
+                {
+                    reason = "Üst kat için aynı kenarda en az aynı seviyede alt kat desteği gerekir.";
                     return false;
                 }
 
                 if (edge.IsDiagonal)
                 {
                     var crossing = edge.CrossingDiagonal();
-                    if (edges.Contains(crossing) || pending.Contains(crossing))
+                    if (walls.ContainsKey(new WallKey(crossing, floor)) || pending.Contains(crossing))
                     {
                         reason = "Çapraz duvarlar aynı hücrenin içinde kesişemez.";
                         return false;
@@ -121,8 +199,33 @@ namespace IdleTown.Construction
 
         public void Add(IReadOnlyList<WallEdge> path)
         {
+            Set(path, 0, WallTier.Timber);
+        }
+
+        public void Set(IReadOnlyList<WallEdge> path, int floor, WallTier tier)
+        {
             for (var i = 0; i < path.Count; i++)
-                edges.Add(path[i]);
+            {
+                var record = new WallRecord(path[i], floor, tier);
+                walls[new WallKey(path[i], floor)] = record;
+                if (floor == 0)
+                    floorZeroEdges.Add(path[i]);
+            }
+        }
+
+        public bool TryGet(WallEdge edge, int floor, out WallRecord record)
+        {
+            return walls.TryGetValue(new WallKey(edge, floor), out record);
+        }
+
+        /// <summary>Removes exactly one undirected edge. Used when a physical segment is destroyed.</summary>
+        public bool Remove(WallEdge edge) => Remove(edge, 0);
+
+        public bool Remove(WallEdge edge, int floor)
+        {
+            if (!walls.Remove(new WallKey(edge, floor))) return false;
+            if (floor == 0) floorZeroEdges.Remove(edge);
+            return true;
         }
 
         static bool InBounds(Vector2Int node, int width, int height)
