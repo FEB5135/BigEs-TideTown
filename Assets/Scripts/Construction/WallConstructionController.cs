@@ -19,6 +19,7 @@ namespace IdleTown.Construction
         [SerializeField] MonoBehaviour resourceStoreSource;
         [SerializeField] Camera inputCamera;
         [SerializeField] GameObject wallPrefab;
+        [SerializeField] WallTerrainSurface terrainSurface;
 
         [Header("Placement blocking")]
         [Tooltip("Additional trigger layers that block construction. Solid structures always block, even when this mask is empty.")]
@@ -37,7 +38,7 @@ namespace IdleTown.Construction
         [Header("Floors")]
         [Tooltip("Local-space height of the bottom of floor 1 relative to World.")]
         [SerializeField] float floorZeroBaseHeight;
-        [SerializeField, Min(1)] int maxFloors = 3;
+        [SerializeField, Min(1)] int maxFloors = 10;
 
         [Header("Input mode")]
         [SerializeField] bool constructionModeActive = true;
@@ -90,6 +91,13 @@ namespace IdleTown.Construction
         public IReadOnlyCollection<WallEdge> Edges => model.Edges;
         public IReadOnlyCollection<WallRecord> Walls => model.Walls;
         public int SelectedFloor => selectedFloor;
+        public int MaxFloors => maxFloors;
+        public void ConfigureTerrain(WallTerrainSurface surface, int floors = 10)
+        {
+            terrainSurface = surface;
+            maxFloors = Mathf.Max(1, floors);
+            NormalizeConfiguration();
+        }
         public WallTier SelectedTier => selectedTier;
         public bool ConstructionModeActive => constructionModeActive;
         public LayerMask ObstacleLayers
@@ -440,8 +448,10 @@ namespace IdleTown.Construction
                     int corner = OutlineCorners[i];
                     var signs = new Vector3((corner & 1) == 0 ? -1 : 1,
                         (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1);
-                    renderer.SetPosition(i, box.transform.TransformPoint(box.center +
-                        Vector3.Scale(box.size * .5f + padding, signs)));
+                    var local = box.center + Vector3.Scale(box.size * .5f + padding, signs);
+                    var slope = wall.GetComponent<WallSlopeGeometry>();
+                    if (slope != null) local.y += local.z * slope.Rise;
+                    renderer.SetPosition(i, box.transform.TransformPoint(local));
                 }
             }
             status = $"{count} duvar parçası seçili · Sol tık: sil · N / Esc: çık";
@@ -770,10 +780,18 @@ namespace IdleTown.Construction
 
             var plane = new Plane(world.transform.up, world.transform.position);
             var ray = inputCamera.ScreenPointToRay(screenPosition);
-            if (!plane.Raycast(ray, out var distance))
-                return false;
-
-            var local = world.transform.InverseTransformPoint(ray.GetPoint(distance));
+            Vector3 point;
+            if (terrainSurface != null)
+            {
+                if (!terrainSurface.Raycast(ray, out var hit)) return false;
+                point = hit.point;
+            }
+            else
+            {
+                if (!plane.Raycast(ray, out var distance)) return false;
+                point = ray.GetPoint(distance);
+            }
+            var local = world.transform.InverseTransformPoint(point);
             node = new Vector2Int(
                 Mathf.RoundToInt(local.x / world.CellSize),
                 Mathf.RoundToInt(local.z / world.CellSize));
@@ -874,6 +892,12 @@ namespace IdleTown.Construction
             stone = 0;
             if (!model.Validate(path, world.Width, world.Height, floor, tier, maxFloors, out reason))
                 return false;
+
+            if (terrainSurface != null)
+                foreach (var edge in path)
+                    if (!terrainSurface.Sample(NodePosition(edge.A, 0), out _) ||
+                        !terrainSurface.Sample(NodePosition(edge.B, 0), out _))
+                    { reason = "Duvarın iki ucu da arazi üzerinde olmalı."; return false; }
 
             if (!HasObstacleClearance(path, floor, out reason))
                 return false;
@@ -1001,11 +1025,11 @@ namespace IdleTown.Construction
                 var start = NodePosition(edge.A, FloorBaseHeight(floor) + wallHeight * 0.5f);
                 var end = NodePosition(edge.B, FloorBaseHeight(floor) + wallHeight * 0.5f);
                 var direction = end - start;
-                var rotation = Quaternion.LookRotation(direction.normalized, world.transform.up);
+                var rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(direction, world.transform.up).normalized, world.transform.up);
                 var halfExtents = new Vector3(
                     JointHalfWidth + obstaclePadding,
-                    Mathf.Max(0.001f, wallHeight * .5f - .015f),
-                    direction.magnitude * .5f + JointHalfWidth + obstaclePadding);
+                    Mathf.Max(0.001f, wallHeight * .5f - .015f) + Mathf.Abs(Vector3.Dot(direction, world.transform.up)) * .5f,
+                    Vector3.ProjectOnPlane(direction, world.transform.up).magnitude * .5f + JointHalfWidth + obstaclePadding);
 
                 int count;
                 // Grow rather than silently miss a blocker in a dense scene.
@@ -1015,6 +1039,7 @@ namespace IdleTown.Construction
                 for (var overlapIndex = 0; overlapIndex < count; overlapIndex++)
                 {
                     var overlap = overlapBuffer[overlapIndex];
+                    if (terrainSurface != null && terrainSurface.Contains(overlap)) continue;
                     // Picking/collection triggers are not solid buildings. Explicit trigger layers opt in.
                     if (overlap.isTrigger && (obstacleLayers.value & (1 << overlap.gameObject.layer)) == 0)
                         continue;
@@ -1043,7 +1068,8 @@ namespace IdleTown.Construction
             var start = NodePosition(edge.A, elevation);
             var end = NodePosition(edge.B, elevation);
             var direction = end - start;
-            var rotation = Quaternion.LookRotation(direction.normalized, world.transform.up);
+            var horizontal = Vector3.ProjectOnPlane(direction, world.transform.up);
+            var rotation = Quaternion.LookRotation(horizontal.normalized, world.transform.up);
             GameObject instance;
 
             if (wallPrefab != null)
@@ -1059,14 +1085,18 @@ namespace IdleTown.Construction
                 instance.transform.SetPositionAndRotation((start + end) * 0.5f, rotation);
                 var visual = new GameObject("Wall Art", typeof(MeshFilter), typeof(MeshRenderer));
                 visual.transform.SetParent(instance.transform, false);
-                visual.GetComponent<MeshFilter>().sharedMesh = art.Panel(record.Tier, PanelInset(edge, direction.magnitude));
+                visual.GetComponent<MeshFilter>().sharedMesh = art.Panel(record.Tier, PanelInset(edge, horizontal.magnitude));
                 visual.GetComponent<MeshRenderer>().sharedMaterials = art.Palette(record.Tier);
             }
 
             instance.name = $"Wall F{record.Floor + 1} {record.Tier} {edge.A.x},{edge.A.y} - {edge.B.x},{edge.B.y}";
-            instance.transform.localScale = new Vector3(wallThickness, wallHeight, direction.magnitude);
+            instance.transform.localScale = new Vector3(wallThickness, wallHeight, horizontal.magnitude);
             if (instance.GetComponentInChildren<Collider>() == null)
                 instance.AddComponent<BoxCollider>();
+            if (terrainSurface != null && wallPrefab == null)
+                instance.AddComponent<WallSlopeGeometry>().Configure(instance.GetComponentInChildren<MeshFilter>(),
+                    instance.GetComponentInChildren<MeshFilter>().sharedMesh,
+                    Vector3.Dot(direction, world.transform.up) / wallHeight, true);
             var metadata = instance.GetComponent<WallSegment>() ?? instance.AddComponent<WallSegment>();
             metadata.Configure(record);
 
@@ -1105,11 +1135,20 @@ namespace IdleTown.Construction
                 previewNodes.Add(edge.A); previewNodes.Add(edge.B);
                 var a = NodePosition(edge.A, FloorBaseHeight(selectedFloor) + wallHeight * .5f);
                 var b = NodePosition(edge.B, FloorBaseHeight(selectedFloor) + wallHeight * .5f);
+                var horizontal = Vector3.ProjectOnPlane(b - a, world.transform.up);
                 ghost.SetActive(true);
                 ghost.GetComponent<WallPreviewMotion>().SetTarget((a + b) * .5f,
-                    Quaternion.LookRotation((b - a).normalized, world.transform.up),
-                    new Vector3(wallThickness * 1.035f, wallHeight * 1.015f, (b - a).magnitude));
-                ghost.GetComponent<MeshFilter>().sharedMesh = art.Panel(selectedTier, PanelInset(edge, (b - a).magnitude));
+                    Quaternion.LookRotation(horizontal.normalized, world.transform.up),
+                    new Vector3(wallThickness * 1.035f, wallHeight * 1.015f, horizontal.magnitude));
+                var filter = ghost.GetComponent<MeshFilter>();
+                var panel = art.Panel(selectedTier, PanelInset(edge, horizontal.magnitude));
+                if (terrainSurface != null)
+                {
+                    var slope = ghost.GetComponent<WallSlopeGeometry>();
+                    if (slope == null) slope = ghost.AddComponent<WallSlopeGeometry>();
+                    slope.Configure(filter, panel, Vector3.Dot(b - a, world.transform.up) / wallHeight, false);
+                }
+                else filter.sharedMesh = panel;
             }
             foreach (var node in previewNodes)
             {
@@ -1283,8 +1322,9 @@ namespace IdleTown.Construction
 
         Vector3 NodePosition(Vector2Int node, float y)
         {
-            return world.transform.TransformPoint(
-                new Vector3(node.x * world.CellSize, y, node.y * world.CellSize));
+            var ground = world.transform.TransformPoint(new Vector3(node.x * world.CellSize, 0, node.y * world.CellSize));
+            if (terrainSurface != null && terrainSurface.Sample(ground, out var sampled)) ground = sampled;
+            return ground + world.transform.TransformVector(new Vector3(0, y, 0));
         }
 
         static Material CreateColorMaterial(Color color)

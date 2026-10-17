@@ -61,3 +61,9 @@ Silme: panelde SİLME MODUNU AÇ düğmesine basıp kaldırılacak duvara sol t�
 Ok tuşları tek giriş yolundan işlenir; yeni kat geçişi için tuşun bırakılması gerekir. Son doğrulama: 49/49 test geçti; Unity içinde 1 → 2 → 3 → 2 → 1 ve tıklayarak silme doğrulandı.
 
 N: normal oyun veya inşa modundan doğrudan silme moduna geçer; tekrar N veya Esc inşaya döndürür. Fare altındaki bir grid duvar parçası ve onunla birlikte silinecek üst katlar sarı çerçeveyle belirtilir. Başka duvara, boşluğa veya panele geçildiğinde seçim güncellenir; moddan çıkınca temizlenir. Ön izleme collider içermez ve duvar malzemelerini değiştirmez. Kısayol tekrarı ve ön izleme kapsamı/temizliği testleriyle 51/51 test geçti.
+
+## Arazi atölyesi
+Tools → Idle Town → Wallfix → Open Terrain Workshop: Assets/Scenes/WallfixTerrainWorkshop.unity sahnesini açar. Main ile aynı SampleScene içindeki Ground ve ilk iki Mountain geometrisi/malzemesi ayrı varlıklara kopyalandı; test alanına sığacak ölçekte yerleştirildi. Ana sahne değiştirilmedi.
+Bu sahnede 32×32 grid, çimen ve iki dağ, 5000 odun/taş bulunur. Fare arazi collider'ına vurur; grid, ön izleme, duvar ve silme çerçevesi aynı arazi yüksekliğini kullanır. Duvar panelleri iki ucun yüksekliğine göre eğilir, dikmeler dik kalır; collider da aynı eğimli hacmi izler. Sadece açıkça kayıtlı arazi collider'ları zemin sayılır, yapılar engel olmaya devam eder. Arazi dışına inşa reddedilir.
+Yeni varsayılan ve iki Wallfix atölyesinde azami yükseklik 10 kat × 1,25 m = zeminden 12,5 m. Üst katlar aynı duvarın alt kat desteğini gerektirir.
+Doğrulama: 53/53 EditMode testi geçti. Eğimli collider'ın iki uçta zemine oturması, 10 kat desteği, 11. katın reddi, arazi dışına inşanın ve bina içinden geçişin reddi test edildi. Unity'de çimenden dağa 9 parçalı duvar, onun ikinci katı, 5 parçalı çapraz eğimli duvar ve eğimde sarı silme çerçevesi denendi. Tsunami akışı bu yeni sahnede çalıştırılmadı.

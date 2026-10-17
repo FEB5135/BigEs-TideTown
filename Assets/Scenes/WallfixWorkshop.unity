@@ -541,7 +541,7 @@ MonoBehaviour:
   reinforcedWoodCost: 6
   reinforcedStoneCost: 6
   floorZeroBaseHeight: 0
-  maxFloors: 3
+  maxFloors: 10
   constructionModeActive: 1
   wallHeight: 1.25
   wallThickness: 0.18

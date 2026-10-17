@@ -7,11 +7,14 @@ namespace IdleTown.Construction
     public sealed class WallDemoGrid : MonoBehaviour
     {
         [SerializeField] World world;
+        [SerializeField] WallTerrainSurface terrainSurface;
         [SerializeField] Color color = new(0.16f, 0.24f, 0.2f, 1f);
         Mesh mesh;
         Material material;
 
         public void Configure(World targetWorld) => world = targetWorld;
+        public void Configure(World targetWorld, WallTerrainSurface surface)
+        { world = targetWorld; terrainSurface = surface; }
 
         void Awake()
         {
@@ -34,6 +37,25 @@ namespace IdleTown.Construction
             {
                 vertices[index++] = new Vector3(0f, y, z * world.CellSize);
                 vertices[index++] = new Vector3(world.Width * world.CellSize, y, z * world.CellSize);
+            }
+
+            if (terrainSurface != null)
+            {
+                var conformed = new System.Collections.Generic.List<Vector3>();
+                Physics.SyncTransforms();
+                void Add(int x, int z, int bx, int bz)
+                {
+                    var a = world.transform.TransformPoint(new Vector3(x * world.CellSize, 0, z * world.CellSize));
+                    var b = world.transform.TransformPoint(new Vector3(bx * world.CellSize, 0, bz * world.CellSize));
+                    if (!terrainSurface.Sample(a, out a) || !terrainSurface.Sample(b, out b)) return;
+                    conformed.Add(transform.InverseTransformPoint(a + Vector3.up * .035f));
+                    conformed.Add(transform.InverseTransformPoint(b + Vector3.up * .035f));
+                }
+                for (int x = 0; x <= world.Width; x++)
+                    for (int z = 0; z < world.Height; z++) Add(x, z, x, z + 1);
+                for (int z = 0; z <= world.Height; z++)
+                    for (int x = 0; x < world.Width; x++) Add(x, z, x + 1, z);
+                vertices = conformed.ToArray();
             }
 
             var indices = new int[vertices.Length];

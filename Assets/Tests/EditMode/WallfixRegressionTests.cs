@@ -9,6 +9,7 @@ namespace IdleTown.Tests
         GameObject root;
         WallConstructionController controller;
         Store store;
+        Mesh terrainMesh;
 
         [SetUp]
         public void SetUp()
@@ -21,7 +22,78 @@ namespace IdleTown.Tests
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(root);
+        public void TearDown()
+        {
+            Object.DestroyImmediate(root);
+            if (terrainMesh != null) Object.DestroyImmediate(terrainMesh);
+        }
+
+        WallTerrainSurface CreateSlope()
+        {
+            var ground = new GameObject("Test hillside", typeof(MeshFilter), typeof(MeshCollider));
+            ground.transform.SetParent(root.transform);
+            terrainMesh = new Mesh();
+            terrainMesh.vertices = new[] { new Vector3(0,0,0), new Vector3(16,4.8f,0),
+                new Vector3(0,0,16), new Vector3(16,4.8f,16) };
+            terrainMesh.triangles = new[] { 0,2,1,1,2,3 };
+            terrainMesh.RecalculateNormals(); terrainMesh.RecalculateBounds();
+            ground.GetComponent<MeshFilter>().sharedMesh = terrainMesh;
+            ground.GetComponent<MeshCollider>().sharedMesh = terrainMesh;
+            var surface = root.AddComponent<WallTerrainSurface>();
+            surface.Configure(new Collider[] { ground.GetComponent<MeshCollider>() });
+            controller.ConfigureTerrain(surface);
+            Physics.SyncTransforms();
+            return surface;
+        }
+
+        [Test]
+        public void SlopedWallColliderMeetsTerrainAtBothEndsAndSupportsTenFloors()
+        {
+            var terrain = CreateSlope();
+            var a = new Vector2Int(2, 2); var b = new Vector2Int(3, 2);
+            for (int floor = 0; floor < 10; floor++)
+                Assert.That(controller.TryBuild(a, b, floor, WallTier.Timber, out var reason), Is.True, reason);
+            Assert.That(controller.TryBuild(a, b, 10, WallTier.Timber, out _), Is.False);
+            controller.SetSelectedFloor(100);
+            Assert.That(controller.SelectedFloor, Is.EqualTo(9));
+            controller.TryGetWallInstance(new WallEdge(a, b), 0, out var wall);
+            var collider = wall.GetComponent<MeshCollider>();
+            Assert.That(collider, Is.Not.Null);
+            foreach (var vertex in collider.sharedMesh.vertices)
+                if ((vertex.y - vertex.z * wall.GetComponent<WallSlopeGeometry>().Rise) < 0)
+                {
+                    var point = wall.transform.TransformPoint(vertex);
+                    terrain.Sample(point, out var ground);
+                    // Width lies across the slope here, so each side differs by at most half wall thickness * grade.
+                    Assert.That(Mathf.Abs(point.y - ground.y), Is.LessThan(.03f));
+                }
+            Assert.That(wall.GetComponent<WallSlopeGeometry>().Rise, Is.GreaterThan(.2f));
+            controller.SetDemolitionMode(true);
+            controller.RefreshDemolitionPreview(wall.GetComponent<WallSegment>());
+            Assert.That(System.Array.FindAll(root.GetComponentsInChildren<LineRenderer>(),
+                line => line.name == "Demolition Outline"), Has.Length.EqualTo(10));
+        }
+
+        [Test]
+        public void TerrainDoesNotHideBuildingsOrAllowWallsBeyondItsFootprint()
+        {
+            CreateSlope();
+            var building = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            building.transform.SetParent(root.transform);
+            building.transform.position = new Vector3(2.5f, 1.2f, 2);
+            Assert.That(controller.TryBuild(new Vector2Int(2,2), new Vector2Int(3,2), out _), Is.False);
+            Assert.That(store.Wood, Is.EqualTo(1000));
+            Object.DestroyImmediate(building);
+            controller.transform.position = Vector3.zero;
+            terrainMesh.vertices = new[] { new Vector3(0,0,0), new Vector3(4,1.2f,0),
+                new Vector3(0,0,4), new Vector3(4,1.2f,4) };
+            terrainMesh.RecalculateBounds();
+            var collider = root.GetComponentInChildren<MeshCollider>();
+            collider.sharedMesh = null; collider.sharedMesh = terrainMesh;
+            Physics.SyncTransforms();
+            Assert.That(controller.TryBuild(new Vector2Int(6,2), new Vector2Int(7,2), out _), Is.False);
+            Assert.That(controller.Walls, Is.Empty);
+        }
 
         [Test]
         public void NEntersDemolitionFromBothModesAndIgnoresRepeat()
