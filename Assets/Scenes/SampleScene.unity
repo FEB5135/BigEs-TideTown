@@ -1064,17 +1064,32 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: 8608a2c3fecca27489e749a343983910, type: 2}
   modules:
   - Id: 0
-    Prefab: {fileID: 919132149155446097, guid: e0417344c41692a4898479b6ab2577cb, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: 89a3f678f3019bf429da1ad2e0864048, type: 3}
+    Weight: 3
+  - Id: 0
+    Prefab: {fileID: 919132149155446097, guid: 8c4d382b6a7252d4e8fec5c196af2780, type: 3}
+    Weight: 1
+  - Id: 0
+    Prefab: {fileID: 919132149155446097, guid: 5ab19e85524d0764f8a1bf3b708295f1, type: 3}
+    Weight: 1
   - Id: 1
-    Prefab: {fileID: 919132149155446097, guid: 7bcfaffc82361e849b568e2399e50987, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: 0c4cf5e4ae211e74b8838a94ffac5c00, type: 3}
+    Weight: 1
   - Id: 2
-    Prefab: {fileID: 919132149155446097, guid: 6126a47fc45c0ce468e1296f1b2acd8f, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: 335a28b1e81ea004faa6e1ba622e366f, type: 3}
+    Weight: 1
   - Id: 3
-    Prefab: {fileID: 919132149155446097, guid: 6d6cf554aa440d946a3392ce5e318043, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: b6deee4113ff2594682fcf9128468447, type: 3}
+    Weight: 1
   - Id: 4
-    Prefab: {fileID: 919132149155446097, guid: e4b488d297fe77943901225920685e19, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: 50328d8d2096f8045aaccb8727bd0f24, type: 3}
+    Weight: 1
   - Id: 5
-    Prefab: {fileID: 919132149155446097, guid: 987f0270c6cd4cb46a25c57bb83cb905, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: c9745f3cc34d6144dacbe816aafce88a, type: 3}
+    Weight: 1
+  - Id: 5
+    Prefab: {fileID: 919132149155446097, guid: e31a73e541af0194b84eb5e649c07d53, type: 3}
+    Weight: 1
 --- !u!114 &1602157105
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1135,11 +1150,6 @@ MonoBehaviour:
     Right: 010000000200000003000000i
     Front: 010000000200000003000000i
     Back: 0000000005000000i
-  - Id: 3
-    Left: 010000000200000003000000i
-    Right: 04000000i
-    Front: 04000000i
-    Back: 010000000200000003000000i
   - Id: 4
     Left: 01000000020000000300000004000000i
     Right: 01000000020000000300000004000000i

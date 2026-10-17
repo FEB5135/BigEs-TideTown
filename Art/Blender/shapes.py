@@ -15,8 +15,10 @@ def start(seed):
     OUT.clear()
     rng.seed(seed)
 
-# Palet sutunlari: 0 tas grisi (v: alt koyu -> ust acik), 1 gri->siyah, 2 ahsap, 3 sari, 4 kirmizi, 5 beyaz
-STONE, DARK, WOOD, YELLOW, RED, WHITE = range(6)
+# Palet sutunlari: 0 tas grisi (v: alt koyu -> ust acik), 1 gri->siyah, 5 beyaz, 57 ahsap, 59 sari, 61 kirmizi.
+# (2-4 ekibin harita renkleri: yesil, kiremit, gri-mavi; bizim ahsap/sari/kirmizi 57/59/61 sutunlarina tasindi.)
+STONE, DARK, WHITE = 0, 1, 5
+WOOD, YELLOW, RED = 57, 59, 61
 
 def obj_from_bm(bm, name, group):
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()

@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (11:45)
+Son güncelleme: 2026-10-17 (11:55)
 
 ## Bağlam
 
@@ -14,7 +14,7 @@ Son güncelleme: 2026-10-17 (11:45)
 
 ## Branch'ler
 
-- `main`: Ekibin ortak branch'i. Son çekilen commit: `7afe46b Wave Collapse Function` (WFC ile grid harita: `Assets/Scripts/Map/WfcSolver.cs`, `MapView`, yeni zemin/yokuş modelleri, `villager.obj`; `SampleScene`'de). `feature/main-menu`'ye merge edildi (2026-10-17), çakışma yok; `Flat.mat`'te iki tarafın değişikliği birleşti. `testground*` modelleri main'de silindi, bizim sahne onları kullanmıyordu.
+- `main`: Ekibin ortak branch'i. `feature/main-menu` main'e merge edildi (2026-10-17, ana menü + ContructionMechanics + palet düzeltmesi). Son çekilen commit: `7afe46b Wave Collapse Function` (WFC ile grid harita: `Assets/Scripts/Map/WfcSolver.cs`, `MapView`, yeni zemin/yokuş modelleri, `villager.obj`; `SampleScene`'de). `feature/main-menu`'ye merge edildi (2026-10-17), çakışma yok; `Flat.mat`'te iki tarafın değişikliği birleşti. `testground*` modelleri main'de silindi, bizim sahne onları kullanmıyordu.
 - `feature/resource-gathering`: Bizim çalışmamız (kaynak toplama). Push etmeden önce kullanıcıya sor.
 - `feature/main-menu`: `feature/resource-gathering`'den açıldı. Ana menü burada. GitHub'a push edildi (2026-10-17).
 - `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
@@ -76,6 +76,7 @@ Son güncelleme: 2026-10-17 (11:45)
   - `MainMenu.gameplayBehaviours`: menü açıkken `WallConstructionController` kapalı (yoksa OnGUI paneli menünün üstünde çiziliyor ve B tuşu çalışıyordu). `MainMenuSetup` bunu kendisi bağlar.
   - Play'de doğrulandı: menü → Oyna → kamera iner, kaynak paneli ve inşa paneli (Toplama modu) gelir, kaynaklar artar.
   - Kalan uyarı: `WallConstructionController.DestroyObject` (CS0108), arkadaşın kodu, dokunulmadı.
+- **Palet değişikliği (main, "Mesh Additions"):** Ekip `palette.png`'nin 2–4. sütunlarını harita renklerine çevirdi (yeşil, kiremit, gri-mavi). Bizim ocak ve vagon modellerinin ahşap/sarı/kırmızısı bu sütunlardaydı; eski renkler paletin boş 57/59/61. sütunlarına kopyalandı, `Art/Blender/shapes.py` sabitleri değişti ve `Quarry.fbx`, `MineCart.fbx` Blender'da yeniden üretildi (geometri aynı). Ekibe: 57/59/61 sütunlarını boyamayın.
 - **Kural uyumu:** `THIRD_PARTY.md`'de tüm hazır kaynaklar ve AI kullanımı yazılı; dosya public repoya ve jüriye uygun dille yazıldı (iç notlar `PROGRESS.md`'de). FinottiGames ağaç paketi (Asset Store EULA) `.gitignore`'da ve geçmişten silindi.
 - **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
