@@ -1,6 +1,6 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using IdleTown.Construction;
 
 // Sol tıkla bir kaynağa (ağaç...) tıklayınca kaynak kuyuya fırlatılır.
 [RequireComponent(typeof(Camera))]
@@ -10,10 +10,12 @@ public class ClickHarvester : MonoBehaviour
     [SerializeField] float maxRayDistance = 200f;
 
     Camera cam;
+    WallConstructionController construction;
 
     void Awake()
     {
         cam = GetComponent<Camera>();
+        construction = FindAnyObjectByType<WallConstructionController>();
     }
 
     void Update()
@@ -21,7 +23,10 @@ public class ClickHarvester : MonoBehaviour
         var mouse = Mouse.current;
         if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
             return;
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        construction ??= FindAnyObjectByType<WallConstructionController>();
+        if (construction != null && construction.ConstructionModeActive)
+            return;
+        if (WallConstructionController.IsPointerOverConstructionUi(mouse.position.ReadValue()))
             return;
 
         var ray = cam.ScreenPointToRay(mouse.position.ReadValue());

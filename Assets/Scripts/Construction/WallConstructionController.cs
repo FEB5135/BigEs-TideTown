@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 [assembly: InternalsVisibleTo("IdleTown.EditModeTests")]
@@ -10,7 +11,7 @@ namespace IdleTown.Construction
 {
     public sealed class WallConstructionController : MonoBehaviour
     {
-        static readonly Rect ConstructionPanelRect = new(16f, 16f, 440f, 225f);
+        static readonly Rect ConstructionPanelRect = new(16f, 16f, 440f, 270f);
 
         [Header("Scene references")]
         [SerializeField] World world;
@@ -27,6 +28,9 @@ namespace IdleTown.Construction
         [Header("Cost per edge")]
         [SerializeField, Min(0)] int woodCost = 1;
         [SerializeField, Min(0)] int stoneCost = 1;
+
+        [Header("Input mode")]
+        [SerializeField] bool constructionModeActive = true;
 
         [Header("Generated wall geometry")]
         [SerializeField, Min(0.01f)] float wallHeight = 1.25f;
@@ -55,6 +59,7 @@ namespace IdleTown.Construction
         int lastValidPreviewStone;
 
         public IReadOnlyCollection<WallEdge> Edges => model.Edges;
+        public bool ConstructionModeActive => constructionModeActive;
         public LayerMask ObstacleLayers
         {
             get => obstacleLayers;
@@ -80,6 +85,15 @@ namespace IdleTown.Construction
         void Update()
         {
             var keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.bKey.wasPressedThisFrame)
+            {
+                SetConstructionMode(!constructionModeActive);
+                return;
+            }
+
+            if (!constructionModeActive)
+                return;
+
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
                 CancelSelection();
@@ -93,7 +107,7 @@ namespace IdleTown.Construction
                 return;
             }
 
-            var pointerOverPanel = mouse != null && IsPointerOverConstructionPanel(mouse.position.ReadValue());
+            var pointerOverPanel = mouse != null && IsPointerOverConstructionUi(mouse.position.ReadValue());
             var hoveredNode = default(Vector2Int);
             var hasNode = mouse != null && TryGetNode(mouse.position.ReadValue(), out hoveredNode);
             if (hasStart && !pointerOverPanel)
@@ -122,6 +136,14 @@ namespace IdleTown.Construction
         {
             GUILayout.BeginArea(ConstructionPanelRect, GUI.skin.box);
             GUILayout.Label("DUVAR İNŞASI");
+            if (GUILayout.Button(constructionModeActive ? "Mod: İnşa (B ile toplamaya geç)" : "Mod: Toplama (B ile inşaata geç)"))
+                SetConstructionMode(!constructionModeActive);
+            if (!constructionModeActive)
+            {
+                GUILayout.Label("Kaynak toplamak için dünyadaki kaynaklara sol tıklayın.");
+                GUILayout.EndArea();
+                return;
+            }
             GUILayout.Label("Sol tık: başlangıç / bitiş   •   Enter: ön izlemeyi inşa et");
             GUILayout.Label("Sağ tık veya Esc: iptal");
             if (resourceStore != null)
@@ -162,6 +184,15 @@ namespace IdleTown.Construction
         {
             resourceStore = store;
             resourceStoreSource = store as MonoBehaviour;
+        }
+
+        public void SetConstructionMode(bool active)
+        {
+            if (constructionModeActive == active)
+                return;
+            constructionModeActive = active;
+            CancelSelection();
+            status = active ? "İnşa modu: ilk düğümü seçin." : "Toplama modu etkin.";
         }
 
         public bool TryBuild(Vector2Int start, Vector2Int end, out string reason)
@@ -398,6 +429,12 @@ namespace IdleTown.Construction
             // Input System screen coordinates start at bottom-left; IMGUI starts at top-left.
             var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
             return ConstructionPanelRect.Contains(guiPosition);
+        }
+
+        public static bool IsPointerOverConstructionUi(Vector2 screenPosition)
+        {
+            return IsPointerOverConstructionPanel(screenPosition) ||
+                   (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject());
         }
 
         bool Validate(IReadOnlyList<WallEdge> path, out string reason, out int wood, out int stone)

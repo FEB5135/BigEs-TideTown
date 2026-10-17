@@ -108,23 +108,24 @@ Köyün ortasında bulunan delik, toplanan kaynakların depolandığı merkezdir
 - **Girdi:** Input System `1.20.0`; eski `UnityEngine.Input` API'si kullanılmaz.
 - **Harita uyumu:** Mevcut `World.Width`, `World.Height`, `World.CellSize` ve dünya dönüşümü kaynak kabul edilir. `MapView` ve hücrelerin 90° dönüş davranışı değiştirilmez. Duvarlar, mevcut hücre verisini değiştirmeyen ayrı bir düğüm/kenar katmanıdır.
 - **Maliyet:** Her kenarın odun ve taş maliyeti `WallConstructionController` Inspector alanlarından ayrı ayrı ayarlanır. Yolun tamamı geçerliyse `IWallResourceStore.TrySpend` bir kez çağrılır; kısmi inşa/harcama yapılmaz.
+- **Entegre depo ve varsayılan denge:** `Well`, doğrudan `IWallResourceStore` uygular ve hem toplamanın hem inşaatın tek yetkili bakiyesidir. `ResourceTest` entegrasyonu kaynak üretmez veya boş depoyu doldurmaz; duvar için odun ve taş normal toplama döngüsüyle kazanılır. Yalnız ayrı, küçük duvar demosu başlangıçta **60 odun / 30 taş** verir. Varsayılan duvar bedeli kenar başına **1 odun / 1 taş**tır. `ResourceHUD`, Well değişiklik olayından harcamaları da anında gösterir.
 - **İşlem güvenliği:** Tüm duvar görselleri önce etkin olmayan bir alanda hazırlanır. Hazırlama tamamlanmadan kaynak harcanmaz; harcama başarısızsa hazırlanan nesneler silinir. Kenarlar yalnızca başarılı harcamadan sonra modele eklenir. `WallBuilt` dinleyicilerindeki hatalar tamamlanmış inşayı geri alamaz ve aynı işlem içinden tekrar inşa çağrısı engellenir.
 - **Yapı engelleri:** `Obstacle Layers` varsayılan olarak **Nothing** değerindedir. Köy, maden, orman veya merkezi depoyu korumak için bu nesneleri özel bir “ConstructionObstacle” layer'ına taşıyıp yalnızca bu layer'ı maskeye ekleyin. Zemin ve duvar layer'larını maskeye eklemeyin; böylece zemin ve ortak duvar uçları yanlışlıkla engel sayılmaz. Bu kontrol hem ön izlemede hem kesin inşada çalışır; `Obstacle Padding` ek boşluğu ayarlar.
 - **Fizik:** Oluşan her parça statiktir ve en az bir 3D `Collider` içerir. Su/dalga ekibi parçaları fizik sorgularıyla bulabilir veya `WallBuilt` olayına abone olabilir.
 
 ### Tek komutla demo
 
-1. Unity'de proje açıldıktan sonra **Tools > Idle Town > Create Wall Construction Demo Scene** komutunu çalıştırın.
+1. Entegre oynanış için `Assets/Scenes/ResourceTest.unity` sahnesini açıp Play'e basın. Eksik/eski sahneyi tek seferde hazırlamak için **Tools > BigEs > Kaynak Test Sahnesine Duvar Entegrasyonu Ekle** komutunu kullanın. Bu komut mevcut bakiyeyi değiştirmez; duvar kaynaklarını oynayarak toplamak gerekir. Ayrı, küçük demo için **Tools > Idle Town > Create Wall Construction Demo Scene** kullanılabilir; iki kurulum da bağımsız prototip deposu yerine `Well` kullanır.
 2. Komut, `SampleScene` dosyasına dokunmadan `Assets/Scenes/WallConstructionDemo.unity` (isim doluysa benzersiz yeni bir ad) oluşturur ve açar.
 3. Play'e basın. Perspektif kamera, görünür grid, zemin, merkezi başlangıç deposu ve durum/kontrol paneli hazırdır.
-4. Sol tıkla başlangıç ve bitiş düğümlerini seçin. Yeşil ön izleme geçerli, kırmızı ön izleme geçersizdir. Geçerli ön izlemeyi ikinci sol tıkla, `Enter` ile veya paneldeki **İnşa Et** düğmesiyle onaylayın. Düğmeye giderken son geçerli hedef korunur; panel üzerindeki tıklamalar haritaya seçim olarak aktarılmaz. Sağ tık veya `Esc` ile iptal edin.
+4. `ResourceTest` mevcut toplama davranışını korumak için **Toplama** modunda, ayrı duvar demosu **İnşa** modunda başlar. **B** veya paneldeki mod düğmesiyle İnşa/Toplama arasında geçin. İnşa modunda sol tıkla başlangıç ve bitiş düğümlerini seçin; yeşil ön izleme geçerli, kırmızı ön izleme geçersizdir. İkinci sol tık, `Enter` veya **İnşa Et** onaylar. Toplama modunda kaynaklara sol tıklama çalışır. UI/panel tıklamaları iki sistemde de dünyaya aktarılmaz; sağ tık veya `Esc` seçimi iptal eder.
 
 ### Mevcut sahneye elle ekleme
 
 1. `World` nesnesinden ayrı bir GameObject oluşturup `WallConstructionController` ekleyin.
 2. `World`, kamera ve `IWallResourceStore` uygulayan `MonoBehaviour` referanslarını atayın.
 3. İsteğe bağlı `Wall Prefab` atayın. Prefabın merkezi pivotlu, ileri ekseni **+Z**, model ölçüsü **1×1×1** olmalıdır; controller kalınlığı X'e, yüksekliği Y'ye ve kenar uzunluğunu Z'ye uygular. Prefab verilmezse renkli küp parça üretilir.
-4. Kaynak sistemi hazır değilse prototip için `SimpleWallResourceStore` kullanın. Takım entegrasyonunda `IWallResourceStore` uygulaması `CanAfford` yanında özellikle `TrySpend` içinde odun ve taşı atomik kontrol edip azaltmalıdır. Oyun sırasında depo değiştirilecekse `SetResourceStore` kullanılabilir.
+4. Sahnedeki `Well` bileşenini kaynak referansı olarak verin. `Well.TrySpend`, odun ve taşı tek atomik işlemde azaltır; yetersizlikte iki bakiyeyi de değiştirmez. Oyun sırasında depo değiştirilecekse `SetResourceStore` kullanılabilir. `SimpleWallResourceStore` yalnız eski test/uyumluluk amaçlıdır.
 
 Bu teslim yalnızca duvar inşa çekirdeğini kapsar; idle üretim, menü, tsunami/akışkan simülasyonu ve duvar hasarı eklenmemiştir.
 

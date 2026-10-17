@@ -46,7 +46,9 @@ namespace IdleTown.Editor
                 0.25f,
                 world.Height * world.CellSize * 0.5f);
             storeObject.transform.localScale = new Vector3(0.8f, 0.25f, 0.8f);
-            var store = storeObject.AddComponent<SimpleWallResourceStore>();
+            var store = storeObject.AddComponent<Well>();
+            store.Deposit(ResourceType.Wood, 60);
+            store.Deposit(ResourceType.Stone, 30);
 
             var cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";

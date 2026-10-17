@@ -228,7 +228,7 @@ namespace IdleTown.Tests
                 Is.False);
             Assert.That(
                 WallConstructionController.IsPointerOverConstructionPanel(
-                    new Vector2(16f, Screen.height - 241f)),
+                    new Vector2(16f, Screen.height - 286f)),
                 Is.False);
         }
 

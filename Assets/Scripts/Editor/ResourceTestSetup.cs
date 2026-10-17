@@ -1,4 +1,5 @@
 using System.IO;
+using IdleTown.Construction;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -114,7 +115,94 @@ public static class ResourceTestSetup
             BuildHud();
             changed = true;
         }
+        changed |= EnsureConstructionFeatures(camera);
         return changed;
+    }
+
+    // Kaynak test haritası dünya merkezinin iki tarafına yayıldığı için World kökeni negatife
+    // taşınır. 120x120 ve 2 m hücre, mevcut 300 m zeminin kullanılabilir bölümünü kapsar.
+    static bool EnsureConstructionFeatures(Camera camera)
+    {
+        var well = Object.FindAnyObjectByType<Well>();
+        if (well == null)
+            return false;
+
+        bool changed = false;
+        var world = Object.FindAnyObjectByType<World>();
+        if (world == null)
+        {
+            var worldObject = new GameObject("Construction World");
+            var root = GameObject.Find(RootName);
+            if (root != null)
+                worldObject.transform.SetParent(root.transform, false);
+            worldObject.transform.position = new Vector3(-120f, 0f, -120f);
+            world = worldObject.AddComponent<World>();
+            var serializedWorld = new SerializedObject(world);
+            serializedWorld.FindProperty("width").intValue = 120;
+            serializedWorld.FindProperty("height").intValue = 120;
+            serializedWorld.FindProperty("cellSize").floatValue = 2f;
+            serializedWorld.ApplyModifiedPropertiesWithoutUndo();
+
+            var grid = new GameObject("Visible Construction Grid");
+            grid.transform.SetParent(worldObject.transform, false);
+            grid.AddComponent<WallDemoGrid>().Configure(world);
+            changed = true;
+        }
+
+        var controller = Object.FindAnyObjectByType<WallConstructionController>();
+        if (controller == null)
+        {
+            var controllerObject = new GameObject("Wall Construction");
+            var root = GameObject.Find(RootName);
+            if (root != null)
+                controllerObject.transform.SetParent(root.transform, false);
+            controller = controllerObject.AddComponent<WallConstructionController>();
+            controller.Configure(world, well, camera);
+            changed = true;
+        }
+        else
+        {
+            // Daha önce SimpleWallResourceStore veya başka bir World ile kurulmuş sahneleri de
+            // aynı komutla güvenli biçimde gerçek merkezi depoya yükselt.
+            var serializedController = new SerializedObject(controller);
+            var worldProperty = serializedController.FindProperty("world");
+            var storeProperty = serializedController.FindProperty("resourceStoreSource");
+            var cameraProperty = serializedController.FindProperty("inputCamera");
+            if (worldProperty.objectReferenceValue != world ||
+                storeProperty.objectReferenceValue != well ||
+                cameraProperty.objectReferenceValue != camera)
+            {
+                controller.Configure(world, well, camera);
+                changed = true;
+            }
+        }
+
+        // ResourceTest mevcut toplama demosu olarak açılır. Eski controller'lar da tek seferde
+        // aynı başlangıç moduna yükseltilir; bakiye burada asla üretilmez veya yenilenmez.
+        if (controller.ConstructionModeActive)
+        {
+            controller.SetConstructionMode(false);
+            changed = true;
+        }
+        return changed;
+    }
+
+    [MenuItem("Tools/BigEs/Kaynak Test Sahnesine Duvar Entegrasyonu Ekle")]
+    public static void IntegrateResourceTestScene()
+    {
+        if (!File.Exists(ScenePath))
+        {
+            Debug.LogError($"Sahne bulunamadı: {ScenePath}");
+            return;
+        }
+        if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            return;
+
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        if (EnsureGameplayFeatures())
+            EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("ResourceTest sahnesi Well tabanlı duvar inşasıyla hazır.");
     }
 
     static void BuildHud()
