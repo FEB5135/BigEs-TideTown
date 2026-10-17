@@ -3,30 +3,17 @@ using UnityEngine;
 namespace Tsunami
 {
     /// <summary>
-    /// The tsunami coming in from the open sea, beyond where the camera can go. While the controller is in its
-    /// Warning state, a long ridge of water rises far out on the approach axis and travels to the source position;
-    /// when it arrives the controller releases the simulated wave there, under it. The ridge has the simulated
-    /// wave's shape, moves at its speed (long-wave speed in the deep sea) and is drawn with the same water data
-    /// (real depth and flow speed), so the water shader gives both the same look: whitecaps on the raised crest,
-    /// the same colours and storm darkening. After the release it carries on with the simulated wave and fades
-    /// into it: one wave from the horizon to the coast.
-    /// The simulation grid only covers the map and a band of sea, so this part is drawn rather than simulated.
+    /// Draws the incoming tsunami (WaterSimulation's incoming wave) beyond the simulated area, where the camera
+    /// cannot go: a long ridge of water rising far out on the approach axis and travelling in. It is the same wave
+    /// the simulation lets in through its edge: same formula, same simulation clock, same water data for the
+    /// shader. Inside the simulated area the ridge fades out over the edge band (shader clip box) and the simulated
+    /// water carries the wave on to the coast, so there is only ever one wave.
     /// </summary>
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public class TsunamiSwell : MonoBehaviour
     {
         [SerializeField] TsunamiController controller;
-        [Tooltip("Distance (m) beyond the source where the swell first rises. Unused while Match Wave Speed is on: " +
-                 "then it is the distance the simulated wave covers in the warning time.")]
-        [SerializeField, Min(50f)] float startDistance = 520f;
-        [Tooltip("Travel at the simulated wave's speed, sqrt(g (depth + height/2)) in the deep sea, so the hand-over " +
-                 "at the source has no jump in speed.")]
-        [SerializeField] bool matchWaveSpeed = true;
-        [Tooltip("Height at the start as a share of the wave height (deep water: low and long).")]
-        [SerializeField, Range(0f, 1f)] float startHeight = 0.35f;
-        [Tooltip("Seconds the ridge keeps travelling with the simulated wave while it fades into it after the release.")]
-        [SerializeField, Min(0.05f)] float fadeTime = 1.5f;
-        [SerializeField, Range(4, 64)] int crossSegments = 14;
+        [SerializeField, Range(4, 64)] int crossSegments = 20;
         [SerializeField, Range(8, 128)] int frontSegments = 48;
 
         Mesh mesh;
@@ -34,8 +21,9 @@ namespace Tsunami
         Vector2[] uvs;
         MeshRenderer meshRenderer;
         Material material;
-        float fade;              // 1 while travelling, falls to 0 after the release
-        float sinceRelease;
+
+        static readonly int ClipBoxId = Shader.PropertyToID("_ClipBox");
+        static readonly int ClipBandId = Shader.PropertyToID("_ClipBand");
 
         void Awake()
         {
@@ -61,63 +49,56 @@ namespace Tsunami
 
         void LateUpdate()
         {
-            if (controller == null) return;
-            bool warning = controller.State == TsunamiState.Warning && controller.WarningDuration > 0f;
-            if (warning)
-            {
-                Place(-controller.WarningRemaining, 1f);
-                fade = 1f;
-                sinceRelease = 0f;
-            }
-            else if (fade > 0f && controller.State == TsunamiState.Running)
-            {
-                // The simulated wave has taken over at the source and moves on at the same speed: travel with it
-                // and sink into it.
-                sinceRelease += Time.deltaTime;
-                fade = Mathf.Clamp01(1f - sinceRelease / fadeTime);
-                Place(sinceRelease, fade * fade);
-            }
-            else
-            {
-                fade = 0f;
-            }
-            meshRenderer.enabled = fade > 0f;
+            meshRenderer.enabled = controller != null && controller.Simulation != null && Place(controller.Simulation);
         }
 
         float SeaDepth => controller.MapAdapter != null ? controller.MapAdapter.Bathymetry.Validated().deepDepth : 35f;
 
-        /// <summary>Long-wave speed of the simulated wave in the deep sea (m/s).</summary>
-        float WaveSpeed() => Mathf.Sqrt(9.81f * (SeaDepth + 0.5f * Mathf.Max(0f, controller.Current.amplitude)));
-
-        /// <param name="time">Seconds relative to the release: negative while coming in, positive after.</param>
-        void Place(float time, float heightScale)
+        /// <summary>Places and shapes the ridge; false when there is nothing to draw outside the simulated area.</summary>
+        bool Place(WaterSimulation sim)
         {
-            float duration = Mathf.Max(0.01f, controller.WarningDuration);
-            float speed = matchWaveSpeed ? WaveSpeed() : startDistance / duration;
-            float t = Mathf.Clamp01(1f + time / duration); // trip progress: 0 = far out, 1 = at the source
-            Vector3 source = controller.SourcePosition;
-            Vector2 d = controller.TravelDirection;
-            if (d.sqrMagnitude < 1e-4f) d = Vector2.up;
-            Vector3 travel = new Vector3(d.x, 0f, d.y).normalized;
-            float seaY = controller.Simulation != null ? controller.Simulation.SeaLevel : 0f;
-            if (controller.MapAdapter != null && controller.MapAdapter.World != null)
-                seaY += controller.MapAdapter.World.transform.position.y;
-            // Constant speed: the swell reaches the source exactly when the countdown ends, then keeps going.
-            Vector3 position = source + travel * (speed * time);
-            position.y = seaY;
-            transform.SetPositionAndRotation(position, Quaternion.LookRotation(travel, Vector3.up));
+            if (!sim.IncomingWaveActive) return false;
+            IncomingWave wave = sim.Incoming;
+            double time = sim.SimTime;
+            float height = wave.CrestHeight(time);
+            if (height < 0.05f) return false;
 
-            TsunamiScenario s = controller.Current;
-            float height = Mathf.Max(0f, s.amplitude) * Mathf.Lerp(startHeight, 1f, t * t) * heightScale;
-            UpdateMesh(height, Mathf.Max(4f, s.lengthRadius), Mathf.Max(4f, s.widthRadius), SeaDepth);
+            TerrainGrid grid = sim.Terrain;
+            Vector3 centre = grid.transform.position;
+            wave.CrestCentre(time, out float cx, out float cz);
+            Vector3 travel = new Vector3(wave.dirX, 0f, wave.dirZ);
+            Vector3 across = new Vector3(travel.z, 0f, -travel.x);
+            Vector3 crest = new Vector3(centre.x + cx, sim.SeaLevelWorld, centre.z + cz);
+            float halfFront = wave.widthRadius * 2.5f, halfCross = wave.lengthRadius * 3f;
+
+            // Hidden once the whole ridge is inside the simulated area beyond the edge band.
+            float bandStart = grid.CellSize, bandEnd = sim.EdgeFadeWidth;
+            bool outside = false;
+            for (int k = 0; k < 4 && !outside; k++)
+            {
+                Vector3 corner = crest + across * ((k & 1) == 0 ? -halfFront : halfFront) +
+                                 travel * ((k & 2) == 0 ? -halfCross : halfCross);
+                float inside = grid.HalfExtent - Mathf.Max(Mathf.Abs(corner.x - centre.x), Mathf.Abs(corner.z - centre.z));
+                outside = inside < bandEnd;
+            }
+            if (!outside) return false;
+
+            transform.SetPositionAndRotation(crest, Quaternion.LookRotation(travel, Vector3.up));
+            if (material != null)
+            {
+                material.SetVector(ClipBoxId, new Vector4(centre.x, centre.z, grid.HalfExtent, 1f));
+                material.SetVector(ClipBandId, new Vector4(bandStart, bandEnd, 0f, 0f));
+            }
+            UpdateMesh(height, wave.lengthRadius, wave.widthRadius, halfFront, halfCross, SeaDepth, sim.Gravity);
+            return true;
         }
 
-        // Local space: +Z = travel direction, X = along the wave front. Vertices on a grid, heights from a
-        // Gaussian across the ridge, tapering towards the ends of the front like the simulated source.
+        // Local space: +Z = travel direction, X = along the wave front. Vertices on a grid, heights from the same
+        // Gaussian as WaterSimulation's incoming wave.
         void BuildMesh()
         {
-            int nx = frontSegments + 1, nz = crossSegments + 1;
-            vertices = new Vector3[nx * nz];
+            int nx = frontSegments + 1;
+            vertices = new Vector3[nx * (crossSegments + 1)];
             uvs = new Vector2[vertices.Length];
             var tris = new int[frontSegments * crossSegments * 6];
             int k = 0;
@@ -137,28 +118,24 @@ namespace Tsunami
             GetComponent<MeshFilter>().sharedMesh = mesh;
         }
 
-        void UpdateMesh(float height, float lengthRadius, float widthRadius, float seaDepth)
+        void UpdateMesh(float height, float lengthRadius, float widthRadius, float halfFront, float halfCross,
+            float seaDepth, float gravity)
         {
             int nx = frontSegments + 1, nz = crossSegments + 1;
-            float halfFront = widthRadius * 2.5f, halfCross = lengthRadius * 3f;
             for (int z = 0; z < nz; z++)
             {
                 float v = (z / (float)crossSegments * 2f - 1f) * halfCross;
-                float across = Mathf.Exp(-0.5f * v * v / (lengthRadius * lengthRadius));
+                float acrossCrest = Mathf.Exp(-0.5f * v * v / (lengthRadius * lengthRadius));
                 for (int x = 0; x < nx; x++)
                 {
                     float u = (x / (float)frontSegments * 2f - 1f) * halfFront;
-                    float along = Mathf.Exp(-0.5f * u * u / (widthRadius * widthRadius));
-                    // The rim sits a little under the sea surface so the ocean hides the seam.
-                    float crest = across * along;
-                    float y = height * crest - 0.3f;
+                    float shape = acrossCrest * Mathf.Exp(-0.5f * u * u / (widthRadius * widthRadius));
+                    float eta = height * shape;
                     int i = z * nx + x;
-                    vertices[i] = new Vector3(u, y, v);
-                    // Water shader: x = depth, y = flow speed, exactly what the simulation gives the same wave (the
-                    // real depth under the crest, long-wave flow speed eta * sqrt(g / h)). The shader's crest foam
-                    // comes from the height above the still sea, so far out and after the hand-over look the same.
-                    float eta = Mathf.Max(0f, y);
-                    uvs[i] = new Vector2(seaDepth + eta, eta * Mathf.Sqrt(9.81f / seaDepth));
+                    // The rim sits a little under the sea surface so the ocean hides the seam.
+                    vertices[i] = new Vector3(u, eta - 0.3f * (1f - shape), v);
+                    // Water shader: x = depth, y = flow speed, exactly what the simulation has for the same wave.
+                    uvs[i] = new Vector2(seaDepth + eta, IncomingWave.FlowSpeed(eta, seaDepth, gravity));
                 }
             }
             mesh.vertices = vertices;

@@ -45,6 +45,10 @@ Shader "Tsunami/StylizedWater"
 
         [Header(Storm)]
         _StormSeaColor ("Stormy Sea Colour", Color) = (0.03, 0.05, 0.09, 1)
+
+        [Header(Clip Box)]
+        _ClipBox ("Clip Box (centre XZ, half size, W = on)", Vector) = (0, 0, 0, 0)
+        _ClipBand ("Clip Band (fade from X to Y m inside the box)", Vector) = (0, 1, 0, 0)
     }
 
     SubShader
@@ -105,6 +109,8 @@ Shader "Tsunami/StylizedWater"
                 float _EdgeFade;
                 float _FoamNoiseScale;
                 half4 _StormSeaColor;
+                float4 _ClipBox;
+                float4 _ClipBand;
             CBUFFER_END
 
             struct Attributes
@@ -241,6 +247,15 @@ Shader "Tsunami/StylizedWater"
 
                 // Thin water fades out where it meets the ground, so the waterline is soft instead of hard-edged.
                 col.a *= saturate(depth / max(_EdgeFade, 0.001));
+
+                // Clip box (the incoming swell): fade out inside the simulated area, over the same edge band where
+                // the simulated water blends into the open sea, so the simulation carries the wave on from there.
+                if (_ClipBox.w > 0.5)
+                {
+                    float2 d = abs(i.positionWS.xz - _ClipBox.xy);
+                    float inside = _ClipBox.z - max(d.x, d.y);
+                    col.a *= 1.0 - smoothstep(0.0, 1.0, saturate((inside - _ClipBand.x) / max(_ClipBand.y - _ClipBand.x, 0.01)));
+                }
 
                 col.rgb = MixFog(col.rgb, i.fogFactor);
                 return col;

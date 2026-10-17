@@ -37,9 +37,13 @@ namespace Tsunami
 
         [Header("Gameplay")]
         [Tooltip("Show a countdown before the tsunami is released (gameplay). Restart skips it. During the countdown the " +
-                 "incoming swell (TsunamiSwell) travels in from the open sea to the source.")]
+                 "wave travels in from the open sea (drawn by TsunamiSwell beyond the simulated area) and flows into " +
+                 "the simulation through its edge: the wave that hits the coast is the same wave, never a new one.")]
         [SerializeField] bool useWarning = true;
         [SerializeField, Range(0f, 30f)] float warningDuration = 4f;
+        [Tooltip("Crest height of the incoming wave far out at the start of the countdown, as a share of the wave " +
+                 "height; it reaches the full height where it enters the simulated area.")]
+        [SerializeField, Range(0f, 1f)] float incomingStartHeight = 0.35f;
         [Tooltip("Release the tsunami by itself a random time after the game starts (MainMenu.GameStarted, or Start " +
                  "when the scene has no main menu). The storm clouds approach during this time.")]
         [SerializeField] bool autoRelease;
@@ -55,6 +59,8 @@ namespace Tsunami
         bool hasCustomPosition;
         Vector3 customPosition;
         float timer;
+        bool incomingRun;    // the current tsunami comes in from the open sea through the domain edge
+        float warningLength; // simulation seconds from the start of the incoming wave to its release point
         BathymetryProfile appliedBathymetry;
         bool appliedBathymetryValid;
         bool gameStarted;
@@ -63,8 +69,20 @@ namespace Tsunami
         float releaseRemaining;
 
         public TsunamiState State { get; private set; } = TsunamiState.Idle;
-        public float WarningRemaining => State == TsunamiState.Warning ? Mathf.Max(0f, timer) : 0f;
+        public float WarningRemaining
+        {
+            get
+            {
+                if (State != TsunamiState.Warning) return 0f;
+                return incomingRun ? Mathf.Max(0f, warningLength - (float)simulation.SimTime) : Mathf.Max(0f, timer);
+            }
+        }
         public float WarningDuration => warningDuration;
+        /// <summary>
+        /// Deep-sea speed of the incoming wave (m/s): long-wave speed sqrt(g (depth + height / 2)), the speed the
+        /// simulated wave keeps in the deep part of the domain.
+        /// </summary>
+        public float IncomingSpeed => Mathf.Sqrt(9.81f * (Current.bathymetry.Validated().deepDepth + 0.5f * Mathf.Max(0f, Current.amplitude)));
         /// <summary>True while the automatic release is counting down.</summary>
         public bool ReleaseScheduled => releaseScheduled && State == TsunamiState.Idle;
         /// <summary>Seconds until the automatic release, or 0 when none is scheduled.</summary>
@@ -153,6 +171,13 @@ namespace Tsunami
                 return;
             }
             if (State != TsunamiState.Warning) return;
+            if (incomingRun)
+            {
+                // The wave is already on its way in the simulation: the release is only the moment its crest
+                // passes the source point. Nothing is reset or added.
+                if (simulation.SimTime >= warningLength) SetState(TsunamiState.Running);
+                return;
+            }
             timer -= Time.deltaTime;
             if (timer <= 0f) BeginRun();
         }
@@ -194,7 +219,15 @@ namespace Tsunami
             releaseScheduled = false;
             if (useWarning && warningDuration > 0f)
             {
-                timer = warningDuration;
+                if (UsesIncomingWave)
+                {
+                    BeginIncoming(warningDuration, incomingStartHeight);
+                }
+                else
+                {
+                    incomingRun = false;
+                    timer = warningDuration;
+                }
                 SetState(TsunamiState.Warning);
             }
             else BeginRun();
@@ -209,8 +242,7 @@ namespace Tsunami
             }
             else if (State == TsunamiState.Warning)
             {
-                SetState(TsunamiState.Idle); // cancel the pending release
-                ScheduleRelease();
+                ResetSimulation(); // cancel the pending release (the wave may already be entering)
             }
         }
 
@@ -237,6 +269,7 @@ namespace Tsunami
             if (village != null) village.ResetVillage();
             HasPendingChanges = false;
             timer = 0f;
+            incomingRun = false;
             SetState(TsunamiState.Idle);
             SimulationReset?.Invoke();
             ScheduleRelease();
@@ -257,6 +290,13 @@ namespace Tsunami
         {
             if (State != TsunamiState.Idle && State != TsunamiState.Warning) ResetSimulation();
             if (HasPendingChanges) ResetSimulation();
+            if (UsesIncomingWave)
+            {
+                // No countdown: the wave starts just beyond the simulated area at its full height.
+                BeginIncoming(0f, 1f);
+                SetState(TsunamiState.Running);
+                return;
+            }
             ApplyBathymetryIfNeeded(false);
             // Fresh initial state: sea at rest + the scenario's disturbance.
             simulation.ResetWater();
@@ -264,10 +304,47 @@ namespace Tsunami
             TsunamiScenario s = Current;
             LastSourceVolume = simulation.AddSource(SourcePosition, TravelDirection, s.amplitude, s.lengthRadius,
                 s.widthRadius, s.profile, s.motion);
+            incomingRun = false;
             HasPendingChanges = false;
             releaseScheduled = false;
             simulation.Paused = false;
             SetState(TsunamiState.Running);
+        }
+
+        /// <summary>
+        /// A directional Gaussian wave comes in from the open sea (the game's tsunami). Other set-ups (radial
+        /// spreading, N-wave) start from an initial disturbance at the source as before.
+        /// </summary>
+        bool UsesIncomingWave => Current.profile == SourceProfile.Gaussian && Current.motion == SourceMotion.Directional;
+
+        /// <summary>
+        /// Sea at rest, then the wave on its way in: its crest starts far enough out that it reaches the source point
+        /// after <paramref name="lead"/> seconds (at least: from beyond the domain edge), grows to the full height
+        /// by the time it reaches the domain edge and flows in through it. From then on the simulation carries it.
+        /// </summary>
+        void BeginIncoming(float lead, float startShare)
+        {
+            ApplyBathymetryIfNeeded(false);
+            simulation.ResetWater();
+            SimulationReset?.Invoke();
+            TsunamiScenario s = Current;
+            Vector2 dir = TravelDirection;
+            Vector3 source = SourcePosition;
+            float speed = IncomingSpeed;
+            float length = Mathf.Max(4f, s.lengthRadius);
+            float toEdge = simulation.DistanceToEdge(source, -dir);
+            // The whole hump starts outside the domain, so nothing appears inside out of nowhere.
+            lead = Mathf.Max(lead, (toEdge + 3f * length) / speed);
+            Vector3 crestAtStart = source - new Vector3(dir.x, 0f, dir.y) * (speed * lead);
+            float growTime = Mathf.Max(0f, lead - toEdge / speed);
+            simulation.StartIncomingWave(crestAtStart, dir, speed, s.amplitude, startShare, growTime, length,
+                Mathf.Max(4f, s.widthRadius));
+            LastSourceVolume = 0;
+            incomingRun = true;
+            warningLength = lead;
+            HasPendingChanges = false;
+            releaseScheduled = false;
+            simulation.Paused = false;
         }
 
         // ------------------------------------------------------------------ scenarios and parameters
