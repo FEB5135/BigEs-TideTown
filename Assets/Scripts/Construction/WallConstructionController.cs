@@ -38,6 +38,7 @@ namespace IdleTown.Construction
 
         readonly WallConstructionModel model = new();
         readonly List<WallEdge> previewPath = new();
+        readonly Dictionary<WallEdge, GameObject> wallInstances = new();
         IWallResourceStore resourceStore;
         LineRenderer previewLine;
         Material previewMaterial;
@@ -66,6 +67,14 @@ namespace IdleTown.Construction
             set => obstacleLayers = value;
         }
         public event Action<WallEdge, GameObject> WallBuilt;
+        /// <summary>
+        /// Raised after an edge leaves the registry. A subscriber returns true only when it takes ownership of the
+        /// detached visual (for example, to make debris); otherwise the controller destroys it. No resource refund.
+        /// </summary>
+        public event Func<WallEdge, GameObject, bool> WallRemoved;
+
+        public bool TryGetWallInstance(WallEdge edge, out GameObject instance) =>
+            wallInstances.TryGetValue(edge, out instance) && instance != null;
 
         void Awake()
         {
@@ -258,6 +267,7 @@ namespace IdleTown.Construction
 
                 // Resource spend and model mutation are the commit point. All visuals already exist.
                 model.Add(path);
+                for (var i = 0; i < path.Count; i++) wallInstances.Add(path[i], stagedWalls[i]);
                 stagingRoot.name = "Wall Build";
                 // Instantiate preserves the prefab root's activeSelf value. A prefab kept inactive as
                 // a scene template would otherwise remain invisible after its staging parent commits.
@@ -273,6 +283,29 @@ namespace IdleTown.Construction
             {
                 buildInProgress = false;
             }
+        }
+
+        /// <summary>
+        /// Removes a destroyed edge from the model. A WallRemoved subscriber may claim the detached visual for
+        /// debris; otherwise it is destroyed and the output is null. Rebuild uses normal cost; no resources refund.
+        /// </summary>
+        public bool TryDetachDestroyedWall(WallEdge edge, out GameObject instance)
+        {
+            instance = null;
+            if (buildInProgress || !wallInstances.TryGetValue(edge, out instance)) return false;
+            if (!model.Remove(edge)) return false;
+            wallInstances.Remove(edge);
+
+            Transform oldParent = instance != null ? instance.transform.parent : null;
+            if (instance != null) instance.transform.SetParent(null, true);
+            bool hasRemovalOwner = NotifyWallRemoved(edge, instance);
+            if (!hasRemovalOwner && instance != null)
+            {
+                DestroyObject(instance);
+                instance = null;
+            }
+            if (oldParent != null && oldParent.childCount == 0) DestroyObject(oldParent.gameObject);
+            return true;
         }
 
         internal void HandleNodeClick(Vector2Int node)
@@ -605,6 +638,19 @@ namespace IdleTown.Construction
                     }
                 }
             }
+        }
+
+        bool NotifyWallRemoved(WallEdge edge, GameObject instance)
+        {
+            var subscribers = WallRemoved?.GetInvocationList();
+            if (subscribers == null || subscribers.Length == 0) return false;
+            bool claimed = false;
+            for (var i = 0; i < subscribers.Length; i++)
+            {
+                try { claimed |= ((Func<WallEdge, GameObject, bool>)subscribers[i])(edge, instance); }
+                catch (Exception exception) { Debug.LogException(exception, this); }
+            }
+            return claimed;
         }
 
         Vector3 NodePosition(Vector2Int node, float y)

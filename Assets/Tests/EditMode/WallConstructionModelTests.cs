@@ -70,6 +70,20 @@ namespace IdleTown.Tests
 
             Assert.That(model.Validate(edge, 4, 4, out _), Is.True);
         }
+
+        [Test]
+        public void Remove_OnlyRemovesRequestedEdge_AndAllowsRebuild()
+        {
+            var model = new WallConstructionModel();
+            var first = new WallEdge(Vector2Int.zero, Vector2Int.right);
+            var neighbour = new WallEdge(Vector2Int.right, new Vector2Int(2, 0));
+            model.Add(new List<WallEdge> { first, neighbour });
+
+            Assert.That(model.Remove(first), Is.True);
+            Assert.That(model.Edges, Has.Count.EqualTo(1));
+            Assert.That(model.Edges, Does.Contain(neighbour));
+            Assert.That(model.Validate(new List<WallEdge> { first }, 4, 4, out _), Is.True);
+        }
     }
 
     public sealed class WallConstructionControllerTests
@@ -140,6 +154,64 @@ namespace IdleTown.Tests
                 Assert.That(resources.Stone, Is.EqualTo(initialStone - 5));
                 AssertWallsAreActiveAndPhysical(firstBuild);
                 Assert.That(GetBuiltWalls(root.transform), Has.Count.EqualTo(5));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryDetachDestroyedWall_RemovesOnlyEdgeWithoutRefund_AndAllowsRebuild()
+        {
+            var root = new GameObject("Wall Break Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(10, 10);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                GameObject eventVisual = null;
+                controller.WallRemoved += (_, instance) => { eventVisual = instance; return true; };
+                Assert.That(controller.TryBuild(Vector2Int.zero, new Vector2Int(2, 0), out var reason), Is.True, reason);
+                var broken = new WallEdge(Vector2Int.zero, Vector2Int.right);
+
+                Assert.That(controller.TryDetachDestroyedWall(broken, out var visual), Is.True);
+                Assert.That(visual, Is.Not.Null);
+                Assert.That(eventVisual, Is.SameAs(visual));
+                Assert.That(controller.Edges, Has.Count.EqualTo(1));
+                Assert.That(resources.Wood, Is.EqualTo(8));
+                Assert.That(resources.Stone, Is.EqualTo(8));
+
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out reason), Is.True, reason);
+                Assert.That(resources.Wood, Is.EqualTo(7));
+                Assert.That(resources.Stone, Is.EqualTo(7));
+                UnityEngine.Object.DestroyImmediate(visual);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TryDetachDestroyedWall_WithoutRemovalOwner_DestroysDetachedVisual()
+        {
+            var root = new GameObject("Unobserved Wall Break Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var resources = new FakeResourceStore(10, 10);
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(resources);
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out var reason), Is.True, reason);
+
+                Assert.That(controller.TryDetachDestroyedWall(
+                    new WallEdge(Vector2Int.zero, Vector2Int.right), out var visual), Is.True);
+                Assert.That(visual, Is.Null);
+                Assert.That(controller.Edges, Is.Empty);
             }
             finally
             {

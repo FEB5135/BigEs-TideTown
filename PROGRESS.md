@@ -28,11 +28,13 @@ Son güncelleme: 2026-10-17 (tsunami simülasyonu)
 
 ## Aktif çalışma
 
-- Dal: `main`. `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
+- Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 - Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
 - Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
+
+- **Tsunami–duvar çarpışması (2026-10-17, `collision`):** Mevcut sığ su çözücüsünün bariyer yüzleri gerçek inşa segmentleriyle handle üzerinden eşlendi. Owner-aware bariyer bileşimi statik/external crest'i ve örtüşen diğer segmentleri kaldırma sırasından bağımsız koruyor. Her owner ortak yüzlerde bile kendi yönlü metadata'sını alıyor; görsel yüz dedup'u yalnız emitter'da uygulanıyor. Hasar dinamik girişlerin toplamı ve iki taraflı hidrostatik net farkla segment/solver-adımı başına yalnız bir kez ilerliyor. Sustained-only kırılma gerçek segment merkezi ve hidrostatik yönüyle enkaz üretir; stale/default impact kullanılmaz. Yalnız ıslak normal akış damla/köpük/hafif sis üretiyor; emitter yüz gate'i ve genel tarama ayrımı çift efekti önlüyor. Renderer tepe yüksekliği, yatay/dikey ve iki yüzlü çapraz merdiven temsili ile taşma korunuyor. Pause hasar vermiyor. Tek kırılan kenar model/visual/collider/sayısal owner'dan birlikte çıkarılıyor, komşular kalıyor, normal maliyetle yeniden yapılabiliyor ve iade yok. Disable/re-enable ve solver recreation model-authoritative reconcile ediliyor; subscriber yoksa orphan görsel controller tarafından siliniyor. Enkaz 20/8 sn, parçacıklar 900/320/160 ile sınırlı. Su reseti hasarı koruyor; tam reset/restart yaşayan duvar hasarını ve efekt/enkazı temizliyor, yıkıkları diriltmiyor. Dış bağımlılıksız saf .NET testleri 10/10 geçti; Unity kurulmadığı için Play/EditMode bekliyor. Ayrıntı: `COLLISION_HANDOFF.md`.
 
 - **Tsunami simülasyonu (2026-10-17, `Terrain-1` dalı, `Assets/Tsunami/`):**
   - **Çözücü:** Eski "sanal boru" çözücüsü kaldırıldı. Yerine fizik tabanlı `TsunamiPhysicsSolver` geldi: sığ su denklemleri, 2. dereceden sonlu hacim (MUSCL + HLL), Audusse hidrostatik yeniden yapılandırma (kıyıda dengeli ıslanma/kuruma, negatif derinlik yok), RK2, CFL'li adım, Manning sürtünmesi, çok çekirdek.
@@ -103,6 +105,8 @@ Son güncelleme: 2026-10-17 (tsunami simülasyonu)
 - **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
 ## Sıradaki işler / açık konular
+
+- [ ] Collision devir kontrolü: `COLLISION_HANDOFF.md` listesindeki düşük/yüksek dalga, bloklama/taşma/kırık boşluk, yatay/dikey/çapraz, pause/reset ve uzun çalışma sınırlarını Unity 6000.6.6f1 Play Mode'da doğrula.
 
 - [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.

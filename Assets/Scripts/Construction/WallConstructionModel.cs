@@ -125,6 +125,9 @@ namespace IdleTown.Construction
                 edges.Add(path[i]);
         }
 
+        /// <summary>Removes exactly one undirected edge. Used when a physical segment is destroyed.</summary>
+        public bool Remove(WallEdge edge) => edges.Remove(edge);
+
         static bool InBounds(Vector2Int node, int width, int height)
         {
             // Walls live on cell corners, so the final row/column is inclusive.

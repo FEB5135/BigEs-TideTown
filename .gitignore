@@ -67,6 +67,11 @@ ExportedObj/
 *.opendb
 *.VC.db
 
+# Hand-written, dependency-free .NET test harnesses (Unity-generated projects remain ignored).
+!/Tests/**/*.csproj
+/Tests/**/bin/
+/Tests/**/obj/
+
 # Unity3D generated meta files
 *.pidb.meta
 *.pdb.meta

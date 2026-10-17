@@ -16,13 +16,15 @@ namespace Tsunami
         /// <param name="impactSpeed">Velocity into the face (m/s).</param>
         /// <param name="obstacleTop">Height of the obstacle (ground or wall top) relative to the grid (m).</param>
         public static bool Find(TsunamiPhysicsSolver s, float[] bed, int i, float minDepth, float minSpeed, float clearance,
-            out int dirX, out int dirZ, out float impactSpeed, out float obstacleTop)
+            out int dirX, out int dirZ, out float impactSpeed, out float obstacleTop, out bool isWall)
         {
             int bx = 0, bz = 0;
             float best = 0f, bestTop = 0f;
+            bool bestIsWall = false;
             dirX = dirZ = 0;
             impactSpeed = 0f;
             obstacleTop = 0f;
+            isWall = false;
             float h = s.Depth[i];
             if (h < minDepth) return false;
             int n = s.Size;
@@ -37,14 +39,15 @@ namespace Tsunami
             // z faces
             if (vz > minSpeed && z < n - 1) Check(0, 1, vz, bed[i + n], s.BarrierZ[i]);
             else if (vz < -minSpeed && z > 0) Check(0, -1, -vz, bed[i - n], s.BarrierZ[i - n]);
-            dirX = bx; dirZ = bz; impactSpeed = best; obstacleTop = bestTop;
+            dirX = bx; dirZ = bz; impactSpeed = best; obstacleTop = bestTop; isWall = bestIsWall;
             return best > 0f;
 
             void Check(int dx, int dz, float un, float groundNext, float wall)
             {
-                float top = groundNext > wall ? groundNext : wall;
+                bool wallWins = wall > groundNext;
+                float top = wallWins ? wall : groundNext;
                 if (top <= limit || un <= best) return;
-                best = un; bestTop = top; bx = dx; bz = dz;
+                best = un; bestTop = top; bestIsWall = wallWins; bx = dx; bz = dz;
             }
         }
     }

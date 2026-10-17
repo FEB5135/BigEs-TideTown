@@ -32,6 +32,7 @@ namespace Tsunami
         [SerializeField, Range(1, 200)] int maxImpactsPerFrame = 24;
         [SerializeField, Range(100, 4000)] int maxDroplets = 900;
         [SerializeField, Range(10, 1000)] int maxMist = 160;
+        [SerializeField, Range(20, 2000)] int maxFoam = 320;
 
         [Header("Look")]
         [Tooltip("Vertical splash speed per m/s of impact speed.")]
@@ -43,10 +44,15 @@ namespace Tsunami
         [SerializeField] Color dropletColor = new Color(0.95f, 0.98f, 1f, 0.9f);
         [SerializeField] Color mistColor = new Color(0.92f, 0.96f, 1f, 0.32f);
 
-        ParticleSystem droplets, mist;
+        ParticleSystem droplets, mist, foam;
+        TsunamiController controller;
         int cursor;
         float nextHouseCheck;
         ParticleSystem.EmitParams ep;
+        int wallImpactFrame = -1;
+        int wallImpactsThisFrame;
+        ImpactFaceEmissionGate wallFaceGate;
+        int wallFaceGateSize;
 
         void Awake()
         {
@@ -56,10 +62,15 @@ namespace Tsunami
             mistGO.transform.SetParent(transform, false);
             mist = mistGO.GetComponent<ParticleSystem>();
             Configure(mist, maxMist, 0.12f, 1.5f);
+            var foamGO = new GameObject("Impact Foam", typeof(ParticleSystem));
+            foamGO.transform.SetParent(transform, false);
+            foam = foamGO.GetComponent<ParticleSystem>();
+            Configure(foam, maxFoam, 0.25f, 2.2f);
             var src = droplets.GetComponent<ParticleSystemRenderer>();
             var dst = mist.GetComponent<ParticleSystemRenderer>();
             dst.sharedMaterial = src.sharedMaterial;
             dst.sortingFudge = 10f;
+            foam.GetComponent<ParticleSystemRenderer>().sharedMaterial = src.sharedMaterial;
             ep = new ParticleSystem.EmitParams { applyShapeToPosition = false };
         }
 
@@ -102,7 +113,19 @@ namespace Tsunami
             {
                 Debug.LogError("[ImpactSplashEmitter] No WaterSimulation assigned.", this);
                 enabled = false;
+                return;
             }
+            simulation.WallFaceImpactSampled += OnWallImpact;
+            controller = GetComponentInParent<TsunamiController>();
+            if (controller == null && transform.parent != null)
+                controller = transform.parent.GetComponentInChildren<TsunamiController>(true);
+            if (controller != null) controller.SimulationReset += ClearParticles;
+        }
+
+        void OnDestroy()
+        {
+            if (simulation != null) simulation.WallFaceImpactSampled -= OnWallImpact;
+            if (controller != null) controller.SimulationReset -= ClearParticles;
         }
 
         void LateUpdate()
@@ -110,6 +133,7 @@ namespace Tsunami
             bool paused = simulation.Paused;
             SetPaused(droplets, paused);
             SetPaused(mist, paused);
+            SetPaused(foam, paused);
             if (paused || !simulation.WaterMoving) return;
 
             TerrainGrid terrain = simulation.Terrain;
@@ -128,7 +152,7 @@ namespace Tsunami
                 cursor = (cursor + 1) % count;
                 if (blend[i] > 0f) continue;
                 if (!ImpactDetection.Find(s, bed, i, minDepth, minImpactSpeed, clearance,
-                        out int dx, out int dz, out float un, out float top)) continue;
+                        out int dx, out int dz, out float un, out float top, out bool isWall) || isWall) continue;
                 // Stronger impacts are more likely to throw water each scan.
                 if (Random.value > Mathf.Clamp01(0.25f + (un - minImpactSpeed) / (minImpactSpeed * 3f))) continue;
                 int x = i % n, z = i / n;
@@ -151,6 +175,30 @@ namespace Tsunami
                     HouseSplash(terrain, s, pos, radius, roof, ref impacts);
                 }
             }
+        }
+
+        void OnWallImpact(WallFaceImpactSample sample)
+        {
+            // Wall events are indexed by registered barrier faces and carry the real segment's projected contact
+            // point/normal. The generic cell scan explicitly skips those faces, so each wall impact emits once.
+            if (!enabled || simulation.Paused || sample.WaterDepth < minDepth || sample.InflowSpeed < minImpactSpeed) return;
+            int size = simulation.Solver.Size;
+            if (wallFaceGate == null || wallFaceGateSize != size)
+            {
+                wallFaceGate = new ImpactFaceEmissionGate(size * size);
+                wallFaceGateSize = size;
+            }
+            if (!wallFaceGate.ShouldEmit(sample.SampleSequence, sample.FaceIndex, sample.AlongX)) return;
+            if (wallImpactFrame != Time.frameCount)
+            {
+                wallImpactFrame = Time.frameCount;
+                wallImpactsThisFrame = 0;
+            }
+            if (wallImpactsThisFrame >= maxImpactsPerFrame) return;
+            wallImpactsThisFrame++;
+            Vector3 along = Vector3.Cross(Vector3.up, sample.IntoNormal).normalized;
+            Splash(sample.Position, sample.IntoNormal, along, Mathf.Max(0.1f, sample.ContactWidth),
+                sample.InflowSpeed, Mathf.Min(sample.WaterDepth, 6f));
         }
 
         void HouseSplash(TerrainGrid terrain, TsunamiPhysicsSolver s, Vector3 pos, float radius, float roof, ref int impacts)
@@ -189,6 +237,16 @@ namespace Tsunami
                 ep.startColor = dropletColor;
                 droplets.Emit(ep, 1);
             }
+            int foamCount = 1 + Mathf.Min(4, Mathf.FloorToInt(impactSpeed / 4f));
+            for (int k = 0; k < foamCount && foam.particleCount < maxFoam; k++)
+            {
+                ep.position = face + along * ((Random.value - 0.5f) * width) - into * Random.Range(0.05f, 0.35f);
+                ep.velocity = Vector3.up * Random.Range(0.3f, 1.2f) - into * (impactSpeed * Random.Range(0.05f, 0.18f));
+                ep.startSize = Random.Range(0.5f, 1.5f);
+                ep.startLifetime = Random.Range(0.6f, 1.4f);
+                ep.startColor = dropletColor;
+                foam.Emit(ep, 1);
+            }
             if (mist.particleCount < maxMist && Random.value < 0.5f)
             {
                 ep.position = face + Vector3.up * Mathf.Clamp(obstacleRise * 0.5f, 0.5f, 3f) - into * 0.5f;
@@ -198,6 +256,13 @@ namespace Tsunami
                 ep.startColor = mistColor;
                 mist.Emit(ep, 1);
             }
+        }
+
+        void ClearParticles()
+        {
+            if (droplets != null) droplets.Clear(true);
+            if (mist != null) mist.Clear(true);
+            if (foam != null) foam.Clear(true);
         }
 
         static void SetPaused(ParticleSystem ps, bool paused)

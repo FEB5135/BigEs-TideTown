@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Tsunami
@@ -114,6 +115,26 @@ namespace Tsunami
         readonly float[] fzM, fzL, fzR, fzT;       // z faces: Size per row, index k*Size+x, face k between z=k-1 and k
         readonly float[] rowA, rowB;               // per-row reductions
         readonly float[] spongeWeight;
+        readonly float[] staticBarrierX, staticBarrierZ;
+        readonly Dictionary<int, List<OwnedBarrier>> barriersByOwner = new Dictionary<int, List<OwnedBarrier>>();
+        readonly Dictionary<BarrierFaceKey, List<OwnedBarrier>> barriersByFace = new Dictionary<BarrierFaceKey, List<OwnedBarrier>>();
+
+        sealed class OwnedBarrier
+        {
+            public int owner;
+            public BarrierFaceKey face;
+            public float top;
+        }
+
+        readonly struct BarrierFaceKey : IEquatable<BarrierFaceKey>
+        {
+            public readonly int x, z;
+            public readonly bool alongX;
+            public BarrierFaceKey(int x, int z, bool alongX) { this.x = x; this.z = z; this.alongX = alongX; }
+            public bool Equals(BarrierFaceKey other) => x == other.x && z == other.z && alongX == other.alongX;
+            public override bool Equals(object obj) => obj is BarrierFaceKey other && Equals(other);
+            public override int GetHashCode() => ((z * 397) ^ x) * 2 + (alongX ? 1 : 0);
+        }
 
         public TsunamiPhysicsSolver(int size, float cellSize)
         {
@@ -136,6 +157,7 @@ namespace Tsunami
             fzM = new float[faces]; fzL = new float[faces]; fzR = new float[faces]; fzT = new float[faces];
             rowA = new float[size]; rowB = new float[size];
             spongeWeight = new float[c];
+            staticBarrierX = new float[c]; staticBarrierZ = new float[c];
             ClearBarriers();
             BuildSponge();
         }
@@ -257,32 +279,135 @@ namespace Tsunami
 
         public void ClearBarriers()
         {
+            barriersByOwner.Clear();
+            barriersByFace.Clear();
             for (int i = 0; i < BarrierX.Length; i++)
             {
+                staticBarrierX[i] = float.NegativeInfinity;
+                staticBarrierZ[i] = float.NegativeInfinity;
                 BarrierX[i] = float.NegativeInfinity;
                 BarrierZ[i] = float.NegativeInfinity;
                 BarrierMask[i] = 0;
             }
         }
 
-        /// <summary>Thin wall on the face between (x,z) and (x+1,z) (alongX) or (x,z) and (x,z+1). Keeps the higher top.</summary>
+        /// <summary>
+        /// Adds or raises a persistent, unowned barrier on a face. Owned player walls compose with this baseline;
+        /// removing an owner never removes this contribution. ClearBarriers removes both kinds.
+        /// </summary>
         public void SetBarrier(int x, int z, bool alongX, float top)
         {
-            int n = Size;
-            if (x < 0 || z < 0 || x >= n || z >= n) return;
-            int i = z * n + x;
-            if (alongX)
+            if (!ValidFace(x, z, alongX)) return;
+            int i = z * Size + x;
+            float[] baseline = alongX ? staticBarrierX : staticBarrierZ;
+            if (top <= baseline[i]) return;
+            baseline[i] = top;
+            if (top > (alongX ? BarrierX[i] : BarrierZ[i])) ApplyEffective(new BarrierFaceKey(x, z, alongX), top);
+        }
+
+        /// <summary>Adds one owner contribution. An owner can cover multiple faces and is removed atomically.</summary>
+        public bool SetOwnedBarrier(int owner, int x, int z, bool alongX, float top)
+        {
+            if (owner <= 0 || !ValidFace(x, z, alongX)) return false;
+            var key = new BarrierFaceKey(x, z, alongX);
+            if (!barriersByOwner.TryGetValue(owner, out List<OwnedBarrier> ownerFaces))
             {
-                if (x >= n - 1) return;
-                if (top > BarrierX[i]) BarrierX[i] = top;
-                BarrierMask[i] |= 2; BarrierMask[i + 1] |= 1;
+                ownerFaces = new List<OwnedBarrier>(2);
+                barriersByOwner.Add(owner, ownerFaces);
+            }
+            for (int i = 0; i < ownerFaces.Count; i++)
+            {
+                OwnedBarrier existing = ownerFaces[i];
+                if (!existing.face.Equals(key)) continue;
+                if (top <= existing.top) return true;
+                existing.top = top;
+                RecomputeFace(key);
+                return true;
+            }
+
+            var contribution = new OwnedBarrier { owner = owner, face = key, top = top };
+            ownerFaces.Add(contribution);
+            if (!barriersByFace.TryGetValue(key, out List<OwnedBarrier> faceOwners))
+            {
+                faceOwners = new List<OwnedBarrier>(2);
+                barriersByFace.Add(key, faceOwners);
+            }
+            faceOwners.Add(contribution);
+            int index = z * Size + x;
+            if (top > (alongX ? BarrierX[index] : BarrierZ[index])) ApplyEffective(key, top);
+            return true;
+        }
+
+        /// <summary>Removes all faces owned by owner while preserving static and other-owner crests.</summary>
+        public bool RemoveBarrierOwner(int owner)
+        {
+            if (!barriersByOwner.TryGetValue(owner, out List<OwnedBarrier> owned)) return false;
+            barriersByOwner.Remove(owner);
+            for (int i = 0; i < owned.Count; i++)
+            {
+                OwnedBarrier contribution = owned[i];
+                if (barriersByFace.TryGetValue(contribution.face, out List<OwnedBarrier> faceOwners))
+                {
+                    faceOwners.Remove(contribution);
+                    if (faceOwners.Count == 0) barriersByFace.Remove(contribution.face);
+                }
+                RecomputeFace(contribution.face);
+            }
+            return true;
+        }
+
+        /// <summary>Removes every owned contribution but leaves persistent SetBarrier baselines intact.</summary>
+        public void ClearBarrierOwners()
+        {
+            barriersByOwner.Clear();
+            barriersByFace.Clear();
+            for (int z = 0; z < Size; z++)
+                for (int x = 0; x < Size; x++)
+                {
+                    int i = z * Size + x;
+                    if (x < Size - 1) ApplyEffective(new BarrierFaceKey(x, z, true), staticBarrierX[i]);
+                    if (z < Size - 1) ApplyEffective(new BarrierFaceKey(x, z, false), staticBarrierZ[i]);
+                }
+        }
+
+        void RecomputeFace(BarrierFaceKey key)
+        {
+            int i = key.z * Size + key.x;
+            float top = key.alongX ? staticBarrierX[i] : staticBarrierZ[i];
+            if (barriersByFace.TryGetValue(key, out List<OwnedBarrier> owners))
+                for (int k = 0; k < owners.Count; k++) if (owners[k].top > top) top = owners[k].top;
+            ApplyEffective(key, top);
+        }
+
+        void ApplyEffective(BarrierFaceKey key, float top)
+        {
+            int i = key.z * Size + key.x;
+            if (key.alongX)
+            {
+                BarrierX[i] = top;
+                if (float.IsNegativeInfinity(top)) { BarrierMask[i] &= 253; BarrierMask[i + 1] &= 254; }
+                else { BarrierMask[i] |= 2; BarrierMask[i + 1] |= 1; }
             }
             else
             {
-                if (z >= n - 1) return;
-                if (top > BarrierZ[i]) BarrierZ[i] = top;
-                BarrierMask[i] |= 8; BarrierMask[i + n] |= 4;
+                BarrierZ[i] = top;
+                if (float.IsNegativeInfinity(top)) { BarrierMask[i] &= 247; BarrierMask[i + Size] &= 251; }
+                else { BarrierMask[i] |= 8; BarrierMask[i + Size] |= 4; }
             }
+        }
+
+        bool ValidFace(int x, int z, bool alongX)
+        {
+            return x >= 0 && z >= 0 && x < Size && z < Size && (alongX ? x < Size - 1 : z < Size - 1);
+        }
+
+        /// <summary>Returns true when the addressed internal face currently carries a barrier.</summary>
+        public bool HasBarrier(int x, int z, bool alongX)
+        {
+            if (x < 0 || z < 0 || x >= Size || z >= Size) return false;
+            if (alongX)
+                return x < Size - 1 && !float.IsNegativeInfinity(BarrierX[z * Size + x]);
+            return z < Size - 1 && !float.IsNegativeInfinity(BarrierZ[z * Size + x]);
         }
 
         // ------------------------------------------------------------------ time stepping

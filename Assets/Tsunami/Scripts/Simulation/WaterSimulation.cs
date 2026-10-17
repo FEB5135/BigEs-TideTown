@@ -1,7 +1,80 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Tsunami
 {
+    /// <summary>Opaque identifier for one registered physical wall segment.</summary>
+    public readonly struct WallSegmentHandle : IEquatable<WallSegmentHandle>
+    {
+        internal readonly int Value;
+        internal WallSegmentHandle(int value) { Value = value; }
+        public bool IsValid => Value > 0;
+        public bool Equals(WallSegmentHandle other) => Value == other.Value;
+        public override bool Equals(object obj) => obj is WallSegmentHandle other && Equals(other);
+        public override int GetHashCode() => Value;
+    }
+
+    /// <summary>Per-segment hydraulic totals sampled once after one completed solver step.</summary>
+    public readonly struct WallLoadSample
+    {
+        public readonly WallSegmentHandle Handle;
+        public readonly float ImpactForceNewtons;
+        public readonly float SustainedForceNewtons;
+        public readonly float SolverTimestep;
+        public readonly Vector3 LoadPosition;
+        public readonly Vector3 LoadNormal;
+        public readonly bool HasDirectionalImpact;
+
+        internal WallLoadSample(WallSegmentHandle handle, float impactForceNewtons,
+            float sustainedForceNewtons, float solverTimestep, Vector3 loadPosition, Vector3 loadNormal,
+            bool hasDirectionalImpact)
+        {
+            Handle = handle;
+            ImpactForceNewtons = impactForceNewtons;
+            SustainedForceNewtons = sustainedForceNewtons;
+            SolverTimestep = solverTimestep;
+            LoadPosition = loadPosition;
+            LoadNormal = loadNormal;
+            HasDirectionalImpact = hasDirectionalImpact;
+        }
+    }
+
+    /// <summary>Strongest directional inflow on one numerical face of a real segment.</summary>
+    public readonly struct WallFaceImpactSample
+    {
+        public readonly WallSegmentHandle Handle;
+        public readonly Vector3 Position;
+        /// <summary>Real segment normal, oriented to agree with the selected grid-face inflow.</summary>
+        public readonly Vector3 IntoNormal;
+        /// <summary>Axis-aligned numerical face normal used to calculate normal velocity and force.</summary>
+        public readonly Vector3 GridIntoNormal;
+        public readonly float WaterDepth;
+        public readonly float InflowSpeed;
+        public readonly float ContactWidth;
+        public readonly float ImpactForceNewtons;
+        public readonly long SampleSequence;
+        public readonly int FaceIndex;
+        public readonly bool AlongX;
+
+        internal WallFaceImpactSample(WallSegmentHandle handle, Vector3 position, Vector3 intoNormal,
+            Vector3 gridIntoNormal, float waterDepth, float inflowSpeed, float contactWidth, float impactForceNewtons,
+            long sampleSequence, int faceIndex, bool alongX)
+        {
+            Handle = handle;
+            Position = position;
+            IntoNormal = intoNormal;
+            GridIntoNormal = gridIntoNormal;
+            WaterDepth = waterDepth;
+            InflowSpeed = inflowSpeed;
+            ContactWidth = contactWidth;
+            ImpactForceNewtons = impactForceNewtons;
+            SampleSequence = sampleSequence;
+            FaceIndex = faceIndex;
+            AlongX = alongX;
+        }
+    }
+
     /// <summary>
     /// Drives the TsunamiPhysicsSolver on the TerrainGrid. Simulation time is separate from rendering time:
     /// every frame the solver advances (frame time x TimeScale) in CFL-limited steps, capped by a per-frame
@@ -58,6 +131,27 @@ namespace Tsunami
         double pendingSimTime;
         float[] edgeBlend;
         readonly System.Diagnostics.Stopwatch budget = new System.Diagnostics.Stopwatch();
+        readonly Dictionary<int, RegisteredWall> walls = new Dictionary<int, RegisteredWall>();
+        readonly List<RegisteredWall> wallIteration = new List<RegisteredWall>();
+        int nextWallHandle = 1;
+        long impactSampleSequence;
+
+        const float WaterDensity = 1000f;
+
+        sealed class RegisteredWall
+        {
+            public int id;
+            public Vector3 worldA, worldB;
+            public float topLocal;
+            public readonly List<WallFace> faces = new List<WallFace>(2);
+        }
+
+        readonly struct WallFace
+        {
+            public readonly int x, z;
+            public readonly bool alongX;
+            public WallFace(int x, int z, bool alongX) { this.x = x; this.z = z; this.alongX = alongX; }
+        }
 
         public TerrainGrid Terrain => terrain;
         public TsunamiPhysicsSolver Solver { get { EnsureInitialized(); return solver; } }
@@ -77,6 +171,12 @@ namespace Tsunami
         public float SolverMsLastFrame { get; private set; }
         /// <summary>Incremented after every frame in which the solver advanced (renderers use it to skip work).</summary>
         public int StepCount { get; private set; }
+        /// <summary>Raised on Unity's main thread exactly once per loaded segment and completed solver step.</summary>
+        public event Action<WallLoadSample> WallLoadSampled;
+        /// <summary>Raised at most once per numerical face with normal inflow; visual effects consume this event.</summary>
+        public event Action<WallFaceImpactSample> WallFaceImpactSampled;
+        /// <summary>Raised after grid-size changes recreate the solver and invalidate all segment handles.</summary>
+        public event Action WallRegistryInvalidated;
 
         /// <summary>Still-water level relative to the terrain transform. Takes effect on the next ResetWater.</summary>
         public float SeaLevel
@@ -112,11 +212,14 @@ namespace Tsunami
             terrain.EnsureInitialized();
             if (solver != null && solver.Size == terrain.Resolution && Mathf.Approximately(solver.CellSize, terrain.CellSize)) return;
 
+            walls.Clear();
+            wallIteration.Clear();
             solver = new TsunamiPhysicsSolver(terrain.Resolution, terrain.CellSize) { SpongeCells = spongeCells };
             PushSettings();
             solver.ResetToSeaLevel(terrain.Heights);
             BuildEdgeBlend();
             StepCount++;
+            WallRegistryInvalidated?.Invoke();
         }
 
         void PushSettings()
@@ -148,6 +251,7 @@ namespace Tsunami
                 float dt = solver.Step(h, Mathf.Min(maxTimestep, (float)pendingSimTime));
                 if (dt <= 0f) break;
                 pendingSimTime -= dt;
+                SampleWallLoads(dt);
                 steps++;
             }
             if (pendingSimTime > maxTimestep)
@@ -239,7 +343,7 @@ namespace Tsunami
         /// on a grid aligned with this simulation). Diagonal segments become a two-face staircase.
         /// <paramref name="topWorldY"/> is the world height of the wall top; water above it spills over.
         /// </summary>
-        public void AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY)
+        public WallSegmentHandle AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY)
         {
             EnsureInitialized();
             float top = topWorldY - terrain.transform.position.y;
@@ -248,29 +352,178 @@ namespace Tsunami
             var a = new Vector2Int(Mathf.RoundToInt(ga.x + 0.5f), Mathf.RoundToInt(ga.y + 0.5f));
             var b = new Vector2Int(Mathf.RoundToInt(gb.x + 0.5f), Mathf.RoundToInt(gb.y + 0.5f));
             var corner = new Vector2Int(b.x, a.y);
-            WallAlongX(a.y, a.x, corner.x, top);      // horizontal leg a -> corner
-            WallAlongZ(corner.x, corner.y, b.y, top); // vertical leg corner -> b
+            int id = nextWallHandle++;
+            if (nextWallHandle <= 0) nextWallHandle = 1;
+            var wall = new RegisteredWall { id = id, worldA = worldA, worldB = worldB, topLocal = top };
+            WallAlongX(a.y, a.x, corner.x, top, wall);      // horizontal leg a -> corner
+            WallAlongZ(corner.x, corner.y, b.y, top, wall); // vertical leg corner -> b
+            if (wall.faces.Count == 0) return default;
+            walls.Add(id, wall);
+            wallIteration.Add(wall);
+            return new WallSegmentHandle(id);
         }
 
         // Horizontal edge on corner row v between corner columns u0..u1: separates cells (u, v-1) and (u, v).
-        void WallAlongX(int v, int u0, int u1, float top)
+        void WallAlongX(int v, int u0, int u1, float top, RegisteredWall wall)
         {
             if (u0 > u1) { int t = u0; u0 = u1; u1 = t; }
-            for (int u = u0; u < u1; u++) solver.SetBarrier(u, v - 1, false, top);
+            for (int u = u0; u < u1; u++) AddFace(u, v - 1, false, top, wall);
         }
 
         // Vertical edge on corner column u between corner rows v0..v1: separates cells (u-1, v) and (u, v).
-        void WallAlongZ(int u, int v0, int v1, float top)
+        void WallAlongZ(int u, int v0, int v1, float top, RegisteredWall wall)
         {
             if (v0 > v1) { int t = v0; v0 = v1; v1 = t; }
-            for (int v = v0; v < v1; v++) solver.SetBarrier(u - 1, v, true, top);
+            for (int v = v0; v < v1; v++) AddFace(u - 1, v, true, top, wall);
         }
 
-        /// <summary>Removes all thin walls.</summary>
+        void AddFace(int x, int z, bool alongX, float top, RegisteredWall wall)
+        {
+            if (x < 0 || z < 0 || x >= solver.Size || z >= solver.Size ||
+                (alongX ? x >= solver.Size - 1 : z >= solver.Size - 1)) return;
+            solver.SetOwnedBarrier(wall.id, x, z, alongX, top);
+            wall.faces.Add(new WallFace(x, z, alongX));
+        }
+
+        /// <summary>Removes one registered segment and rebuilds shared faces so adjacent walls remain intact.</summary>
+        public bool RemoveWallSegment(WallSegmentHandle handle)
+        {
+            EnsureInitialized();
+            if (!handle.IsValid || !walls.Remove(handle.Value)) return false;
+            for (int i = 0; i < wallIteration.Count; i++)
+                if (wallIteration[i].id == handle.Value) { wallIteration.RemoveAt(i); break; }
+            solver.RemoveBarrierOwner(handle.Value);
+            return true;
+        }
+
+        /// <summary>Removes all thin walls and their segment registrations.</summary>
         public void ClearWalls()
         {
             EnsureInitialized();
-            solver.ClearBarriers();
+            solver.ClearBarrierOwners();
+            walls.Clear();
+            wallIteration.Clear();
+        }
+
+        void SampleWallLoads(float dt)
+        {
+            Action<WallLoadSample> loadCallback = WallLoadSampled;
+            Action<WallFaceImpactSample> impactCallback = WallFaceImpactSampled;
+            if ((loadCallback == null && impactCallback == null) || wallIteration.Count == 0) return;
+            float[] bed = terrain.Heights;
+            int n = solver.Size;
+            impactSampleSequence++;
+            if (impactSampleSequence <= 0) impactSampleSequence = 1;
+            for (int w = 0; w < wallIteration.Count; w++)
+            {
+                RegisteredWall wall = wallIteration[w];
+                float impact = 0f, sustained = 0f;
+                float strongestImpact = 0f, strongestHydro = 0f;
+                WallFace impactFace = default, hydroFace = default;
+                Vector3 impactGridInto = Vector3.zero, hydroGridInto = Vector3.zero;
+                float impactSurface = 0f;
+                for (int f = 0; f < wall.faces.Count; f++)
+                {
+                    WallFace face = wall.faces[f];
+                    int low = face.z * n + face.x;
+                    int high = face.alongX ? low + 1 : low + n;
+                    float lowInto = face.alongX ? solver.VelocityX[low] : solver.VelocityZ[low];
+                    float highInto = face.alongX ? -solver.VelocityX[high] : -solver.VelocityZ[high];
+                    float lowDepth = solver.Depth[low], highDepth = solver.Depth[high];
+                    float lowSurface = bed[low] + lowDepth, highSurface = bed[high] + highDepth;
+                    float lowWet = Mathf.Min(lowDepth, Mathf.Max(0f, wall.topLocal - bed[low]));
+                    float highWet = Mathf.Min(highDepth, Mathf.Max(0f, wall.topLocal - bed[high]));
+                    float lowSpeed = Mathf.Max(0f, lowInto), highSpeed = Mathf.Max(0f, highInto);
+                    WallFaceLoad load = WallFaceLoad.Calculate(WaterDensity, gravity, solver.CellSize,
+                        lowWet, lowSpeed, highWet, highSpeed);
+                    impact += load.ImpactForceNewtons;
+                    sustained += load.SustainedForceNewtons;
+
+                    float faceImpact = Mathf.Max(load.LowImpactForceNewtons, load.HighImpactForceNewtons);
+                    if (faceImpact > 0f)
+                    {
+                        bool useLow = load.LowImpactForceNewtons >= load.HighImpactForceNewtons;
+                        float sampleDepth = useLow ? lowDepth : highDepth;
+                        float sampleSpeed = useLow ? lowSpeed : highSpeed;
+                        float sampleSurface = useLow ? lowSurface : highSurface;
+                        float sign = useLow ? 1f : -1f;
+                        Vector3 gridInto = face.alongX ? new Vector3(sign, 0f, 0f) : new Vector3(0f, 0f, sign);
+                        if (faceImpact > strongestImpact)
+                        {
+                            strongestImpact = faceImpact;
+                            impactFace = face;
+                            impactGridInto = gridInto;
+                            impactSurface = sampleSurface;
+                        }
+                        if (impactCallback != null)
+                            EmitFaceImpact(impactCallback, wall, face, low, gridInto, sampleSurface, sampleDepth,
+                                sampleSpeed, faceImpact);
+                    }
+
+                    if (load.SustainedForceNewtons > strongestHydro)
+                    {
+                        strongestHydro = load.SustainedForceNewtons;
+                        hydroFace = face;
+                        float sign = load.LowHydroForceNewtons >= load.HighHydroForceNewtons ? 1f : -1f;
+                        hydroGridInto = face.alongX ? new Vector3(sign, 0f, 0f) : new Vector3(0f, 0f, sign);
+                    }
+                }
+                if (loadCallback != null && (impact > 0f || sustained > 0f))
+                {
+                    bool hasImpact = strongestImpact > 0f;
+                    Vector3 position, normal;
+                    if (hasImpact)
+                        SegmentContact(wall, impactFace, impactGridInto, impactSurface, false, out position, out normal);
+                    else
+                        SegmentContact(wall, hydroFace, hydroGridInto, 0f, true, out position, out normal);
+                    loadCallback(new WallLoadSample(new WallSegmentHandle(wall.id), impact, sustained, dt,
+                        position, normal, hasImpact));
+                }
+            }
+        }
+
+        void EmitFaceImpact(Action<WallFaceImpactSample> callback, RegisteredWall wall, WallFace face, int faceIndex,
+            Vector3 gridInto, float surfaceLocal, float depth, float speed, float force)
+        {
+            SegmentContact(wall, face, gridInto, surfaceLocal, false, out Vector3 position, out Vector3 realNormal);
+            WallImpactDelivery.Deliver(callback, new WallFaceImpactSample(new WallSegmentHandle(wall.id), position,
+                realNormal, gridInto, depth, speed, solver.CellSize, force, impactSampleSequence, faceIndex,
+                face.alongX));
+        }
+
+        void SegmentContact(RegisteredWall wall, WallFace face, Vector3 gridInto, float surfaceLocal,
+            bool segmentCentre, out Vector3 position, out Vector3 realNormal)
+        {
+            Vector3 segment = wall.worldB - wall.worldA;
+            segment.y = 0f;
+            float lengthSq = segment.sqrMagnitude;
+            if (segmentCentre)
+            {
+                position = Vector3.Lerp(wall.worldA, wall.worldB, 0.5f);
+                position.y = (position.y + terrain.transform.position.y + wall.topLocal) * 0.5f;
+            }
+            else
+            {
+                Vector3 faceWorld = FaceWorldPosition(face, surfaceLocal);
+                float t = lengthSq > 1e-6f
+                    ? Mathf.Clamp01(Vector3.Dot(faceWorld - wall.worldA, segment) / lengthSq)
+                    : 0.5f;
+                position = Vector3.Lerp(wall.worldA, wall.worldB, t);
+                position.y = Mathf.Min(faceWorld.y, terrain.transform.position.y + wall.topLocal);
+            }
+            Vector3 tangent = lengthSq > 1e-6f ? segment / Mathf.Sqrt(lengthSq) : Vector3.right;
+            realNormal = new Vector3(-tangent.z, 0f, tangent.x);
+            if (Vector3.Dot(realNormal, gridInto) < 0f) realNormal = -realNormal;
+        }
+
+        Vector3 FaceWorldPosition(WallFace face, float surfaceLocal)
+        {
+            float half = (solver.Size - 1) * 0.5f;
+            float gx = face.x + (face.alongX ? 0.5f : 0f);
+            float gz = face.z + (face.alongX ? 0f : 0.5f);
+            Vector3 origin = terrain.transform.position;
+            return new Vector3(origin.x + (gx - half) * solver.CellSize, origin.y + surfaceLocal,
+                origin.z + (gz - half) * solver.CellSize);
         }
 
         /// <summary>Water depth (m) at a world position, bilinearly interpolated.</summary>
