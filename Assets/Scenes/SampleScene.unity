@@ -1062,6 +1062,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MapView
   world: {fileID: 1602157105}
   material: {fileID: 2100000, guid: 8608a2c3fecca27489e749a343983910, type: 2}
+  chunkSize: 16
   modules:
   - Id: 0
     Prefab: {fileID: 919132149155446097, guid: 89a3f678f3019bf429da1ad2e0864048, type: 3}
@@ -1102,8 +1103,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e4b9f289cf7a93449f4b44dbe4e1fb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::World
-  width: 32
-  height: 32
+  width: 128
+  height: 128
   cellSize: 1
 --- !u!4 &1602157106
 Transform:
@@ -1134,6 +1135,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WfcSolver
   world: {fileID: 1602157105}
   seed: 0
+  maxDistance: 16
   rules:
   - Id: 0
     Left: 0000000001000000020000000300000005000000i
