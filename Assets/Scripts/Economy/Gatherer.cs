@@ -36,8 +36,8 @@ public class Gatherer : MonoBehaviour
     [SerializeField] bool villager;
     [SerializeField] float wanderRadius = 5f;
     [SerializeField] Vector2 wanderPause = new(1.5f, 4f);
-    [Tooltip("Vagonu iterken vagonun merkezinin bu kadar arkasında durur.")]
-    [SerializeField] float pushDistance = 2f;
+    [Tooltip("Vagonu iterken vagonun arka ucuyla arasında kalan boşluk (eller kasaya değsin).")]
+    [SerializeField] float pushGap = 0.35f;
 
     [Header("Vagon")]
     [Tooltip("Yalnız bir köylü iterken ilerler.")]
@@ -68,6 +68,9 @@ public class Gatherer : MonoBehaviour
     public Gatherer PushedCart => pushedCart;
     public bool NeedsPusher { get => needsPusher; set => needsPusher = value; }
     public bool IsReserved => reservedBy != null;
+    // Ağaca son vuruşun zamanı ve vuruş aralığı (balta animasyonu vuruşa denk gelsin diye).
+    public float LastHitTime { get; private set; } = -100f;
+    public float HitInterval => hitInterval;
 
     public void SetHome(ResourceNode node) => home = node;
 
@@ -240,7 +243,33 @@ public class Gatherer : MonoBehaviour
     {
         var back = -cart.transform.forward;
         back.y = 0f;
-        return cart.transform.position + back.normalized * pushDistance;
+        return cart.transform.position + back.normalized * (cart.BackLength + pushGap);
+    }
+
+    float backLength = -1f;
+
+    // Vagonun merkezinden arka ucuna uzaklık (modelin kendi boyutundan, bir kez hesaplanır).
+    float BackLength
+    {
+        get
+        {
+            if (backLength >= 0f)
+                return backLength;
+            backLength = 0f;
+            foreach (var filter in GetComponentsInChildren<MeshFilter>())
+            {
+                if (filter.sharedMesh == null || filter.GetComponentInParent<Gatherer>() != this)
+                    continue;
+                var b = filter.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = new Vector3(i % 2 == 0 ? b.min.x : b.max.x, (i / 2) % 2 == 0 ? b.min.y : b.max.y, i < 4 ? b.min.z : b.max.z);
+                    var local = transform.InverseTransformPoint(filter.transform.TransformPoint(corner));
+                    backLength = Mathf.Max(backLength, -local.z);
+                }
+            }
+            return backLength;
+        }
     }
 
     // ---------------------------------------------------------------- Toplama döngüsü
@@ -293,7 +322,10 @@ public class Gatherer : MonoBehaviour
             for (float t = 0f; t < harvestDuration; t += hitInterval)
             {
                 if (node != null && resourceType == ResourceType.Wood && hitInterval > 0f)
+                {
+                    LastHitTime = Time.time;
                     node.PlayHitFeedback();
+                }
                 yield return new WaitForSeconds(hitInterval > 0f ? Mathf.Min(hitInterval, harvestDuration - t) : harvestDuration);
                 if (hitInterval <= 0f)
                     break;

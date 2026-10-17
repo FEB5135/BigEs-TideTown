@@ -7647,7 +7647,7 @@ MonoBehaviour:
   hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
-  stopDistance: 1.5
+  stopDistance: 1.1
   wellStopDistance: 3
   carryVisual: {fileID: 2122952734}
   groundMask:
@@ -7656,7 +7656,7 @@ MonoBehaviour:
   villager: 1
   wanderRadius: 5
   wanderPause: {x: 1.5, y: 4}
-  pushDistance: 2
+  pushGap: 0.35
   needsPusher: 0
 --- !u!23 &347427875
 MeshRenderer:
@@ -7735,7 +7735,11 @@ MonoBehaviour:
   walkAngle: 15
   strideLength: 2
   walkBob: 0.045
-  chopFrequency: 1.8
+  bodyRock: 3
+  strikeAngle: -70
+  windUpAngle: -165
+  pushArmAngle: -72
+  pushLean: 12
   blendSpeed: 12
 --- !u!1 &349177942
 GameObject:
@@ -22173,7 +22177,7 @@ MonoBehaviour:
   hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
-  stopDistance: 1.5
+  stopDistance: 1.1
   wellStopDistance: 3
   carryVisual: {fileID: 688744042}
   groundMask:
@@ -22182,7 +22186,7 @@ MonoBehaviour:
   villager: 1
   wanderRadius: 5
   wanderPause: {x: 1.5, y: 4}
-  pushDistance: 2
+  pushGap: 0.35
   needsPusher: 0
 --- !u!23 &929072202
 MeshRenderer:
@@ -22261,7 +22265,11 @@ MonoBehaviour:
   walkAngle: 15
   strideLength: 2
   walkBob: 0.045
-  chopFrequency: 1.8
+  bodyRock: 3
+  strikeAngle: -70
+  windUpAngle: -165
+  pushArmAngle: -72
+  pushLean: 12
   blendSpeed: 12
 --- !u!21 &934693504
 Material:
@@ -25698,7 +25706,7 @@ MonoBehaviour:
   hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
-  stopDistance: 1.5
+  stopDistance: 1.1
   wellStopDistance: 3
   carryVisual: {fileID: 1358345792}
   groundMask:
@@ -25707,7 +25715,7 @@ MonoBehaviour:
   villager: 1
   wanderRadius: 5
   wanderPause: {x: 1.5, y: 4}
-  pushDistance: 2
+  pushGap: 0.35
   needsPusher: 0
 --- !u!23 &1046114095
 MeshRenderer:
@@ -25786,7 +25794,11 @@ MonoBehaviour:
   walkAngle: 15
   strideLength: 2
   walkBob: 0.045
-  chopFrequency: 1.8
+  bodyRock: 3
+  strikeAngle: -70
+  windUpAngle: -165
+  pushArmAngle: -72
+  pushLean: 12
   blendSpeed: 12
 --- !u!1 &1047777691
 GameObject:
@@ -68710,7 +68722,7 @@ MonoBehaviour:
   hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
-  stopDistance: 1.5
+  stopDistance: 1.1
   wellStopDistance: 3
   carryVisual: {fileID: 330973436}
   groundMask:
@@ -68719,7 +68731,7 @@ MonoBehaviour:
   villager: 1
   wanderRadius: 5
   wanderPause: {x: 1.5, y: 4}
-  pushDistance: 2
+  pushGap: 0.35
   needsPusher: 0
 --- !u!23 &2070435451
 MeshRenderer:
@@ -68798,7 +68810,11 @@ MonoBehaviour:
   walkAngle: 15
   strideLength: 2
   walkBob: 0.045
-  chopFrequency: 1.8
+  bodyRock: 3
+  strikeAngle: -70
+  windUpAngle: -165
+  pushArmAngle: -72
+  pushLean: 12
   blendSpeed: 12
 --- !u!1 &2071430013
 GameObject:
@@ -69863,7 +69879,7 @@ MonoBehaviour:
   hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
-  stopDistance: 1.5
+  stopDistance: 1.1
   wellStopDistance: 3
   carryVisual: {fileID: 1363561157}
   groundMask:
@@ -69872,7 +69888,7 @@ MonoBehaviour:
   villager: 1
   wanderRadius: 5
   wanderPause: {x: 1.5, y: 4}
-  pushDistance: 2
+  pushGap: 0.35
   needsPusher: 0
 --- !u!23 &2120344315
 MeshRenderer:
@@ -69951,7 +69967,11 @@ MonoBehaviour:
   walkAngle: 15
   strideLength: 2
   walkBob: 0.045
-  chopFrequency: 1.8
+  bodyRock: 3
+  strikeAngle: -70
+  windUpAngle: -165
+  pushArmAngle: -72
+  pushLean: 12
   blendSpeed: 12
 --- !u!1 &2120990946
 GameObject:

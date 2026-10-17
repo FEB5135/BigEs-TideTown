@@ -265,6 +265,8 @@ public static class SampleSceneSetup
                     continue;
                 var workerSettings = new SerializedObject(worker);
                 workerSettings.FindProperty("villager").boolValue = true;
+                // Hücre 2 m, gövde ince: kol boyu kadar yakına gelsin (önceki 5 m hücrelik haritada 2.5 m idi).
+                workerSettings.FindProperty("stopDistance").floatValue = 1.1f;
                 workerSettings.ApplyModifiedPropertiesWithoutUndo();
             }
         return true;
