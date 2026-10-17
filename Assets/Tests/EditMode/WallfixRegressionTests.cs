@@ -24,6 +24,54 @@ namespace IdleTown.Tests
         public void TearDown() => Object.DestroyImmediate(root);
 
         [Test]
+        public void NEntersDemolitionFromBothModesAndIgnoresRepeat()
+        {
+            controller.SetConstructionMode(false);
+            controller.HandleDemolitionKey(true);
+            Assert.That(controller.ConstructionModeActive, Is.True);
+            Assert.That(controller.DemolitionMode, Is.True);
+            controller.HandleDemolitionKey(true);
+            Assert.That(controller.DemolitionMode, Is.True);
+            controller.HandleDemolitionKey(false);
+            controller.HandleDemolitionKey(true);
+            Assert.That(controller.DemolitionMode, Is.False);
+            controller.HandleDemolitionKey(false);
+            controller.HandleDemolitionKey(true);
+            Assert.That(controller.DemolitionMode, Is.True);
+        }
+
+        [Test]
+        public void DemolitionPreviewShowsOnlySelectedColumnAndClearsOnModeExit()
+        {
+            var a = new Vector2Int(2, 2);
+            var b = new Vector2Int(3, 2);
+            for (int floor = 0; floor < 3; floor++)
+                Assert.That(controller.TryBuild(a, b, floor, WallTier.Timber, out _), Is.True);
+            Assert.That(controller.TryBuild(b, new Vector2Int(4, 2), out _), Is.True);
+            controller.SetDemolitionMode(true);
+            controller.TryGetWallInstance(new WallEdge(a, b), 1, out var wall);
+            controller.RefreshDemolitionPreview(wall.GetComponent<WallSegment>());
+            var outlines = System.Array.FindAll(root.GetComponentsInChildren<LineRenderer>(),
+                line => line.name == "Demolition Outline");
+            Assert.That(outlines, Has.Length.EqualTo(2));
+            foreach (var line in outlines)
+            {
+                Assert.That(line.positionCount, Is.EqualTo(16));
+                Assert.That(line.sharedMaterial.color.r, Is.GreaterThan(.9f));
+                Assert.That(line.sharedMaterial.color.b, Is.LessThan(.1f));
+                Assert.That(line.GetComponent<Collider>(), Is.Null);
+            }
+            Assert.That(controller.Walls.Count, Is.EqualTo(4));
+            controller.RefreshDemolitionPreview(null);
+            Assert.That(System.Array.FindAll(root.GetComponentsInChildren<LineRenderer>(),
+                line => line.name == "Demolition Outline"), Is.Empty);
+            controller.RefreshDemolitionPreview(wall.GetComponent<WallSegment>());
+            controller.SetConstructionMode(false);
+            Assert.That(System.Array.FindAll(root.GetComponentsInChildren<LineRenderer>(),
+                line => line.name == "Demolition Outline"), Is.Empty);
+        }
+
+        [Test]
         public void FloorKeysRequireReleaseBeforeAnotherStep()
         {
             controller.HandleFloorKey(KeyCode.UpArrow, true);

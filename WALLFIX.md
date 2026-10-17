@@ -59,3 +59,5 @@ Unity Play modunda ayrıca ahşap inşa, bina üzerinden geçen kırmızı yol, 
 
 Silme: panelde SİLME MODUNU AÇ düğmesine basıp kaldırılacak duvara sol tıkla. Ona bağlı üst katlar da kaldırılır; kaynak iadesi yapılmaz. Aynı düğme inşa moduna döndürür.
 Ok tuşları tek giriş yolundan işlenir; yeni kat geçişi için tuşun bırakılması gerekir. Son doğrulama: 49/49 test geçti; Unity içinde 1 → 2 → 3 → 2 → 1 ve tıklayarak silme doğrulandı.
+
+N: normal oyun veya inşa modundan doğrudan silme moduna geçer; tekrar N veya Esc inşaya döndürür. Fare altındaki bir grid duvar parçası ve onunla birlikte silinecek üst katlar sarı çerçeveyle belirtilir. Başka duvara, boşluğa veya panele geçildiğinde seçim güncellenir; moddan çıkınca temizlenir. Ön izleme collider içermez ve duvar malzemelerini değiştirmez. Kısayol tekrarı ve ön izleme kapsamı/temizliği testleriyle 51/51 test geçti.
