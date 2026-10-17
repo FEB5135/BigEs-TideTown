@@ -15,7 +15,7 @@ Son güncelleme: 2026-10-17 (feature/storm-warning: tsunami öncesi fırtına)
 ## Branch'ler
 
 - `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi. Ardından `collision-main-merge` (tsunami, duvar çarpışması, katlı inşa) da fast-forward ile main'e alındı.
-- `feature/storm-warning` (yerelde, **aktif dal**, main'den): tsunami öncesi fırtına bulutları/şimşek, 2-3 dk sonra kendiliğinden gelen tsunami, uzaktan gelen dalga kabarması, "Anında Etkinleştir" butonu. Push edilmedi.
+- `feature/storm-warning` (GitHub'da, **aktif dal**, main'den): tsunami öncesi fırtına bulutları/şimşek, 2-3 dk sonra kendiliğinden gelen tsunami, uzaktan gelen dalga kabarması, "Anında Etkinleştir" butonu. 2026-10-17'de `origin`e push edildi; main'e birleştirilmedi.
 - `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
 - `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
@@ -151,7 +151,7 @@ Son güncelleme: 2026-10-17 (feature/storm-warning: tsunami öncesi fırtına)
 
 ## Sıradaki işler / açık konular
 
-- [ ] `feature/storm-warning`'i kullanıcı denesin; beğenirse commit/push ve main'e birleştirme. İstenirse: gök gürültüsü sesi (indirme izni gerekir), yağmur, bulutların oyun bakışında daha görünür olması.
+- [ ] `feature/storm-warning`'i kullanıcı denesin; beğenirse main'e birleştirme (dal GitHub'da). İstenirse: gök gürültüsü sesi (indirme izni gerekir), yağmur, bulutların oyun bakışında daha görünür olması.
 - [ ] Collision devir kontrolü: `COLLISION_HANDOFF.md` listesindeki düşük/yüksek dalga, bloklama/taşma/kırık boşluk, yatay/dikey/çapraz, pause/reset ve uzun çalışma sınırlarını Unity 6000.6.6f1 Play Mode'da doğrula.
 - [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.
