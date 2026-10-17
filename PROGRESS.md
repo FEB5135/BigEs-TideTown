@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
+Son güncelleme: 2026-10-17 (SampleScene'deki eski kapalı Forest silindi)
 
 ## Bağlam
 
@@ -32,6 +32,8 @@ Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Eski Forest SampleScene'den silindi (17 Ekim 2026, `fix/remove-old-forest`):** Kullanıcının OneDrive'daki kopyasında FinottiGames paketi yok; SampleScene açılınca `Gameplay/Forest` altındaki kapalı ağaçlar için "Missing Prefab" hataları çıkıyordu (Tree 11/12/30, üç GUID). Kullanıcı isteğiyle kapalı `Gameplay/Forest` Unity'de silinip sahne kaydedildi; SampleScene'de FinottiGames referansı kalmadı, oyundaki orman zaten `GridForest`'tan geliyor. Unity kaydederken tsunami adaptörünün yeni alanlarını ve birkaç UI anchor'ını da yazdı (değer değişikliği yok). `MergedAssetIntegrationTests`: 34 ağaçlı Forest artık yalnız ResourceTest'te beklenir, SampleScene'de olmaması beklenir. Unity Console temiz; testler bu değişiklikten sonra çalıştırılmadı. ResourceTest hâlâ FinottiGames'e bağlı (paket yoksa orada aynı hata çıkar).
 
 - **Tsunami WFC arazisi + otomatik dalga yönü (17 Ekim 2026, `collision-main-merge`):** Oyun başlayınca WFC haritası kurulduktan 2 kare sonra `TeamMapTsunamiAdapter`, `MapView` parçalarını (eğim, düzlük, tepe, dağ: karo 1–4 ve 6–9) su arazisine çiziyor; ağaç karoları (5) atlanıyor, su aralarından akıyor. Sonra köyden harita kenarına 16 yöndeki koridorları tepe yüksekliğine göre puanlayıp dalgayı en açık koridordan getiriyor, okyanusu o tarafa taşıyor. Editörde arazi düz kalır (WFC yalnız oyunda çalışır). Unity'de geçici Play Mode testiyle doğrulandı: 1907 tepe karosunun hepsi araziye girdi (en yüksek 8.9 m), yön 270° (batı), 25 sn'de köyde 1.26 m su, geçersiz derinlik yok. EditMode 1696 geçti, 13 başarısız (önceki gibi: 3'ü eksik FinottiGames paketi, 10'u URP paket testleri).
 
