@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (collision-main-merge: tsunami WFC arazisi ve otomatik dalga yönü)
+Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
 
 ## Bağlam
 
@@ -14,7 +14,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge: tsunami WFC arazisi ve otomat
 
 ## Branch'ler
 
-- `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi.
+- `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi. Ardından `collision-main-merge` (tsunami, duvar çarpışması, katlı inşa) da fast-forward ile main'e alındı.
 - `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
 - `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
@@ -28,7 +28,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge: tsunami WFC arazisi ve otomat
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
 - ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
 - Kullanıcı dağ/tepe düzeni için "tam böyle olmayacak, şimdilik beklesin" dedi; odun kesme animasyonu için "hâlâ garip ama şimdilik kalsın".
-- `collision-main-merge` dalı: collision + tsunami çalışmasının üstüne güncel main birleştirildi (2026-10-17). SampleScene main'den alındı; tsunami nesnesi kurulum komutuyla yeniden eklendi. WFC arazisi ve otomatik dalga yönüyle birlikte `origin`e push edildi (2026-10-17, `45c1bd6`).
+- `collision-main-merge` dalı: collision + tsunami çalışmasının üstüne güncel main birleştirildi (2026-10-17). SampleScene main'den alındı; tsunami nesnesi kurulum komutuyla yeniden eklendi. WFC arazisi ve otomatik dalga yönüyle birlikte `origin`e push edildi (2026-10-17, `45c1bd6`). Kullanıcı isteğiyle main'e birleştirildi; öncesinde build listesinde SampleScene yeniden ilk sıraya alındı (TsunamiDemo ikinci) ve `QualitySettings` PC seviyesinin URP ayarı main'deki haline döndü (Tsunami'nin hızlı ayarı kullanılmıyor).
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
@@ -143,7 +143,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge: tsunami WFC arazisi ve otomat
 - [ ] Collision devir kontrolü: `COLLISION_HANDOFF.md` listesindeki düşük/yüksek dalga, bloklama/taşma/kırık boşluk, yatay/dikey/çapraz, pause/reset ve uzun çalışma sınırlarını Unity 6000.6.6f1 Play Mode'da doğrula.
 - [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.
-- [ ] Tsunami, main'e birleştirmeden önce: `Terrain-1`'de PC kalite seviyesi hızlı grafik ayarlarına çevrili (`Assets/Tsunami/Settings`), build sahne listesinde ilk sırada `TsunamiDemo` var. İkisi de ekiple konuşulmalı.
+- [ ] Tsunami ekibine söylenmeli: main'de PC kalite seviyesi Tsunami'nin hızlı URP ayarını (`Assets/Tsunami/Settings`) kullanmıyor, build'de ilk sahne SampleScene. Hızlı ayara ihtiyaçları varsa ayrıca konuşulacak. Main'de Play ile kontrol edilmedi.
 - [ ] Unity'de yeni duvar EditMode regresyonlarını ve Play modunda kat/seviye paneli, yükseltilmiş ön izleme ile materyal ayrımını doğrulamak.
 - [ ] Tsunami: WFC arazisi ve otomatik dalga yönü grafik açık Play'de gözle kontrol edilmeli (deniz tarafı haritaya göre değiştiği için kamera/okyanus görünümü, ilk karelerdeki düz arazi geçişi).
 
