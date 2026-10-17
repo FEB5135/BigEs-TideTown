@@ -9,6 +9,42 @@ namespace IdleTown.Tests
 {
     public sealed class MergedAssetIntegrationTests
     {
+        [Test]
+        public void MainGridScene_HasWorldSolverAndAllSixModelReferences()
+        {
+            var scene = EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity", OpenSceneMode.Additive);
+            try
+            {
+                World world = null;
+                MapView view = null;
+                WfcSolver solver = null;
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    world ??= root.GetComponentInChildren<World>(true);
+                    view ??= root.GetComponentInChildren<MapView>(true);
+                    solver ??= root.GetComponentInChildren<WfcSolver>(true);
+                }
+                Assert.That(world, Is.Not.Null);
+                Assert.That(world.Width, Is.EqualTo(32));
+                Assert.That(world.Height, Is.EqualTo(32));
+                Assert.That(view, Is.Not.Null);
+                Assert.That(solver, Is.Not.Null);
+                var viewSettings = new SerializedObject(view);
+                Assert.That(viewSettings.FindProperty("world").objectReferenceValue, Is.EqualTo(world));
+                var modules = viewSettings.FindProperty("modules");
+                Assert.That(modules.arraySize, Is.EqualTo(6));
+                for (var i = 0; i < modules.arraySize; i++)
+                    Assert.That(modules.GetArrayElementAtIndex(i).FindPropertyRelative("Prefab").objectReferenceValue,
+                        Is.Not.Null, "Grid model " + i);
+                var solverSettings = new SerializedObject(solver);
+                Assert.That(solverSettings.FindProperty("world").objectReferenceValue, Is.EqualTo(world));
+                Assert.That(solverSettings.FindProperty("rules").arraySize, Is.GreaterThan(0));
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
         [TestCase("Assets/UI/Icons/Wood.png")]
         [TestCase("Assets/UI/Icons/Stone.png")]
         [TestCase("Assets/UI/Kenney/buttonLong_brown.png")]

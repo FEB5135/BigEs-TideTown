@@ -27,6 +27,8 @@ Son güncelleme: 2026-10-17
 
 ## Son durum (yapılanlar)
 
+- **Güncel main grid (7afe46b):** GitHub'dan yeniden fetch edildi ve `Wave Collapse Function` commiti birleştirildi. Grid/WFC kurulumu `Assets/Scenes/SampleScene.unity` içindedir (32x32 dünya, altı model); `ResourceTest` ayrı kaynak/inşa test sahnesidir. MapView ağırlıklı görsel varyant seçimini içerir. ProBuilder ayar çakışması main değerleri korunarak çözüldü. Yeni sahne bağlantı testi dahil 35/35 EditMode testi başarılı.
+
 - **Uzak construction dalıyla uzlaştırma:** Pull sonrası 232 add/add çakışması çözüldü. 225 paket meta dosyasında Unity 6000.6.6f1 kurulumuyla eşleşen uzak kimlikler, 5 UI meta dosyasında özgün sprite ayarları korundu. ResourceTest sahnesindeki inşa/kuyu entegrasyonu ve main WFC kodu korundu. URP ayarlarındaki eski bir dosya kimliği doğru değere bağlandı. Yinelenen GUID yok; `MergedAssetIntegrationTests` dahil 34/34 EditMode testi geçti. Push yapılmadı.
 
 - **Main birleştirmesi:** Yereldeki `origin/main` (`5002591`, WFC/grid ve zemin modelleri), `cbb3e6e` ile `ContructionMechanics` dalına çakışmasız birleştirildi. Yerel değişiklikler öncesinde `059eb1a` ile kaydedildi. Unity EditMode: `IdleTown.EditModeTests` derlemesinde 26/26 test başarılı. Sonraki başarılı fetch ile GitHub main sürümünün de 5002591 olduğu doğrulandı.
