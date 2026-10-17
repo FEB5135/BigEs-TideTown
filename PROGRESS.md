@@ -22,6 +22,8 @@ Son güncelleme: 2026-10-17
 
 ## Son durum (yapılanlar)
 
+- **Construction güncellemesi (ff6d8c9):** GitHub ContructionMechanics dalındaki çok katlı duvar ve malzeme seviye yükseltmeleri çekildi; yerel SampleScene/yeşil zemin a5e25b5 ile korunup 10bb1a5 ile çakışmasız birleştirildi. Unity 48/48 test başarılı. Genişletilmiş SampleScene Play testi normal toplanan 20 odun/16 taşla dört duvar kurdu, Taş ve Güçlendirilmiş yükseltmeleri ile destekli üst katı ve kümülatif maliyet farklarını doğruladı. Push yapılmadı.
+
 - **Yeşil zemin geri yüklendi:** SampleScene MapView, model paleti Flat.mat yerine ayrı TerrainGround.mat kullanır. Eski zemin rengi (0.35, 0.55, 0.3) korunur; kuyu/ev/maden malzemeleri değişmez. Play görünümünde yeşil arazi ve çalışan grid doğrulandı. Yeni sahne kurulumu da bu malzemeyi atar.
 
 - **SampleScene ortak oynanış:** ResourceTest içindeki çalışan kuyu/depo, 40 ev, 34 ağaç, 5 oduncu, 3 maden ve vagon üreticileri, HUD, kamera ve navigasyon taşındı. Ayrı inşa World kaldırılıp controller mevcut WFC World bileşenine bağlandı. Grid 32x32, hücre 6 m, köken (-96,0,-96); modeller hücre boyutuna ölçeklenir ve arazi collider üretir. Köy/kaynaklar ve bağlantı yollarının altı başlangıç WFC hücreleriyle düz tutulur. Eski örnek platform ve görsel kuyu yerine çalışan kuyu kullanılır. Arazi WFC sonrasında, toplayıcılar başlamadan önce oluşturulur. Son kontrol: 38/38 test başarılı; Play testi normal toplamayla odun/taş kazanıp aynı kuyudan harcayarak dört duvar kurdu. SampleSceneSetup menüsü bir defalık taşıma içindir, kurulu sahneyi tekrar yazmaz.
@@ -68,6 +70,8 @@ Son güncelleme: 2026-10-17
 - **Duvar katları ve seviyeleri (kod tamamlandı, Unity doğrulaması bekliyor):** İnşada panel veya `PageUp/PageDown` ile kat, `1/2/3` ile Ahşap/Taş/Güçlendirilmiş seçilir. Kat 1 tabanı, duvar/kat yüksekliği ve azami kat sayısı ayarlanabilir. Üst kenarlar aynı kenarda eşit ya da daha güçlü doğrudan alt destek ister; doluluk ve çapraz kesişme kat bazındadır. Maliyetler kümülatif ve monotondur; yükseltme yalnız farkı öder, düşürme/aynı seviye reddedilir. Görsel önce hazırlanır, depo bir kez harcanır, sonra model commit edilir ve ancak bundan sonra eski yükseltme görseli kaldırılır. Ön izleme, collider/engel sorgusu ve oluşturulan geometri seçili kat yüksekliğini kullanır. `WallSegment` kenar/kat/seviye metadata'sı ile `WallTierBuilt` olayı eklendi; eski `TryBuild`, `Edges` ve `WallBuilt` korunuyor. Unity'den bağımsız `WallTierRules` için 5 senaryolu .NET çalıştırılabilir testi geçti. Kat/destek/yükseltme/rollback/cache/engel regresyonları EditMode testlerine yazıldı fakat kullanıcının isteğiyle Unity çalıştırılmadı.
 
 ## Sıradaki işler / açık konular
+
+- [x] ff6d8c9 kat/seviye güncellemesini ortak SampleScene kaynak akışıyla Unity Play modunda doğrulamak.
 
 - [ ] Yeni oynanış ve harita düzenlemelerini SampleScene üzerinde sürdür; ResourceTest kurucusunu ana sahneyi yenilemek için kullanma.
 

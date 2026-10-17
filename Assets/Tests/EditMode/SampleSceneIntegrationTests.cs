@@ -70,10 +70,10 @@ namespace IdleTown.Tests
             Assert.That(ground.GetComponent<MeshCollider>(), Is.Not.Null);
 
             var deadline = Time.realtimeSinceStartup + 75f;
-            while ((well.Wood < 4 || well.Stone < 4) && Time.realtimeSinceStartup < deadline)
+            while ((well.Wood < 12 || well.Stone < 13) && Time.realtimeSinceStartup < deadline)
                 yield return null;
-            Assert.That(well.Wood, Is.GreaterThanOrEqualTo(4), "Woodcutters must deposit wood in the well.");
-            Assert.That(well.Stone, Is.GreaterThanOrEqualTo(4), "Mine carts must deposit stone in the well.");
+            Assert.That(well.Wood, Is.GreaterThanOrEqualTo(12), "Woodcutters must deposit wood in the well.");
+            Assert.That(well.Stone, Is.GreaterThanOrEqualTo(13), "Mine carts must deposit stone in the well.");
             int wood = well.Wood, stone = well.Stone;
             var controller = Object.FindAnyObjectByType<WallConstructionController>();
             Assert.That(controller.TryBuild(new Vector2Int(13, 9), new Vector2Int(17, 9), out var reason),
@@ -81,7 +81,25 @@ namespace IdleTown.Tests
             Assert.That(controller.Edges.Count, Is.EqualTo(4));
             Assert.That(well.Wood, Is.EqualTo(wood - 4));
             Assert.That(well.Stone, Is.EqualTo(stone - 4));
-            Debug.Log($"SampleScene smoke test passed: gathered {wood} wood/{stone} stone, built 4 walls on shared WFC world.");
+            var a = new Vector2Int(13, 9);
+            var b = new Vector2Int(14, 9);
+            Assert.That(controller.TryBuild(a, b, 0, WallTier.Stone, out reason), Is.True, reason);
+            Assert.That(well.Wood, Is.EqualTo(wood - 6));
+            Assert.That(well.Stone, Is.EqualTo(stone - 7));
+            Assert.That(controller.TryBuild(a, b, 1, WallTier.Stone, out reason), Is.True, reason);
+            Assert.That(well.Wood, Is.EqualTo(wood - 9));
+            Assert.That(well.Stone, Is.EqualTo(stone - 11));
+            Assert.That(controller.TryBuild(a, b, 0, WallTier.Reinforced, out reason), Is.True, reason);
+            Assert.That(well.Wood, Is.EqualTo(wood - 12));
+            Assert.That(well.Stone, Is.EqualTo(stone - 13));
+            Assert.That(controller.Walls.Count, Is.EqualTo(5));
+            Assert.That(controller.Walls.Any(w => w.Floor == 1 && w.Tier == WallTier.Stone), Is.True);
+            Assert.That(controller.Walls.Any(w => w.Floor == 0 && w.Tier == WallTier.Reinforced), Is.True);
+            var segments = controller.GetComponentsInChildren<WallSegment>();
+            Assert.That(segments.Length, Is.EqualTo(5));
+            Assert.That(segments.Single(s => s.Floor == 1).transform.position.y,
+                Is.GreaterThan(segments.First(s => s.Floor == 0).transform.position.y));
+            Debug.Log($"SampleScene smoke test passed: gathered {wood} wood/{stone} stone; built 4 walls, upgraded Stone/Reinforced, added supported Stone floor, verified cumulative costs.");
             yield return new ExitPlayMode();
         }
 
@@ -93,5 +111,3 @@ namespace IdleTown.Tests
         }
     }
 }
-
-
