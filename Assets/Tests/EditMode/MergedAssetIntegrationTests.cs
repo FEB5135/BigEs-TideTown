@@ -31,10 +31,11 @@ namespace IdleTown.Tests
                 Assert.That(mesh.sharedMesh, Is.Not.Null, path + "/" + mesh.name);
         }
 
-        [Test]
-        public void ResourceScene_KeepsForestQuarriesAndConstructionReferences()
+        [TestCase("Assets/Scenes/ResourceTest.unity")]
+        [TestCase("Assets/Scenes/SampleScene.unity")]
+        public void ResourceScene_KeepsForestQuarriesAndConstructionReferences(string scenePath)
         {
-            var scene = EditorSceneManager.OpenScene("Assets/Scenes/ResourceTest.unity", OpenSceneMode.Additive);
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
             try
             {
                 Transform forest = null;
@@ -50,7 +51,8 @@ namespace IdleTown.Tests
                             Is.Not.EqualTo(PrefabAssetType.MissingAsset), child.name);
                         foreach (var component in child.GetComponents<Component>())
                         {
-                            if (component != null && component.GetType().FullName == "UnityEngine.UI.Image")
+                            if (component != null && component.GetType().FullName == "UnityEngine.UI.Image" &&
+                                child.GetComponentInParent<ResourceHUD>(true) != null)
                             {
                                 var image = new SerializedObject(component);
                                 Assert.That(image.FindProperty("m_Sprite").objectReferenceValue,

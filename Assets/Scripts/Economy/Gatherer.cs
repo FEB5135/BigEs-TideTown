@@ -5,6 +5,8 @@ using UnityEngine;
 // Idle toplayıcı: kaynağa gider, toplar, kuyuya getirip içine atar. Sonsuz döngü.
 // Ev kaynağı verilirse (vagonun ocağı) yalnız oraya gider; verilmezse en yakın boş kaynağı arar (oduncu).
 // Sahnede NavigationBaker varsa engellerin etrafından dolaşır, yoksa düz çizgide yürür.
+public enum GathererActivity { Idle, Walking, Harvesting }
+
 public class Gatherer : MonoBehaviour
 {
     [SerializeField] ResourceType resourceType = ResourceType.Wood;
@@ -31,6 +33,8 @@ public class Gatherer : MonoBehaviour
     float heightOffset;
 
     public ResourceType Type => resourceType;
+    public GathererActivity Activity { get; private set; }
+    public ResourceNode CurrentTarget { get; private set; }
 
     public void SetHome(ResourceNode node) => home = node;
 
@@ -48,6 +52,8 @@ public class Gatherer : MonoBehaviour
         {
             var well = Well.Instance;
             var node = home != null ? home : ResourceNode.FindNearestFree(resourceType, transform.position);
+            CurrentTarget = node;
+            Activity = GathererActivity.Idle;
             if (well == null || node == null)
             {
                 yield return new WaitForSeconds(1f);
@@ -75,11 +81,18 @@ public class Gatherer : MonoBehaviour
                 yield return TravelTo(node.transform.position, stopDistance);
             if (node == null)
                 continue;
+            if (resourceType == ResourceType.Wood)
+                yield return FaceTarget(node.transform.position);
+            if (node == null)
+                continue;
+            Activity = GathererActivity.Harvesting;
             yield return new WaitForSeconds(harvestDuration);
+            Activity = GathererActivity.Idle;
             if (node == null)
                 continue;
             int carried = node.Harvest(carryCapacity);
             node.Release(this);
+            CurrentTarget = null;
             SetCarrying(carried > 0);
             for (int i = path.Length - 2; i >= 0; i--)
                 yield return MoveTo(path[i], PathStopDistance);
@@ -126,8 +139,12 @@ public class Gatherer : MonoBehaviour
             var toTarget = target - transform.position;
             toTarget.y = 0f;
             if (toTarget.magnitude <= distance)
+            {
+                Activity = GathererActivity.Idle;
                 yield break;
+            }
 
+            Activity = GathererActivity.Walking;
             var step = Vector3.ClampMagnitude(toTarget, moveSpeed * Time.deltaTime);
             var next = transform.position + step;
             if (TryGetGroundHeight(next, out float groundY))
@@ -136,6 +153,21 @@ public class Gatherer : MonoBehaviour
             transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(toTarget), turnSpeed * Time.deltaTime);
             yield return null;
         }
+    }
+
+    IEnumerator FaceTarget(Vector3 target)
+    {
+        var direction = target - transform.position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.001f)
+            yield break;
+        var facing = Quaternion.LookRotation(direction);
+        while (Quaternion.Angle(transform.rotation, facing) > 1f)
+        {
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, facing, Mathf.Max(1f, turnSpeed) * Time.deltaTime);
+            yield return null;
+        }
+        transform.rotation = facing;
     }
 
     bool TryGetGroundHeight(Vector3 position, out float height)

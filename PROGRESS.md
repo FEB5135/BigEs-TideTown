@@ -26,7 +26,15 @@ Son güncelleme: 2026-10-17 (11:55)
 - Tasarım: Ekranın sağında, kasabanın dışında (TownRadius+9) 3 ocak, girişleri kasabaya bakıyor. Her ocak bir Stone `ResourceNode` (kapasite 200, yenilenme 15 sn, en fazla 3 vagon); tıklayınca taş kuyuya atılır. 3 vagon (`Gatherer`, Stone, 8 taş, hız 4, girişin 5 m önünde durur) taşı kuyuya götürüp atar.
 - Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
 
+## Aktif çalışma
+
+- Dal: `villageranimations` (main 0a0d7c2 tabanı).
+- Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
+- Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
+
 ## Son durum (yapılanlar)
+
+- **villageranimations — köylü hareketleri:** Kullanıcının `Assets/Prefabs/villager.prefab` kaynağı iç içe prefab olarak kullanılır; `Woodcutter.prefab` ve `VillagerVisual.prefab` ayrı üretilir. Mevcut köylü Gatherer bileşenleri/tuning korunup görselleri yerinde yükseltilir. Yürüyüşte görsel kök ±15 derece sallanır, kollar/bacaklar hafifçe salınır; ağaca dönüp odun toplarken omuzlar 45–125 derece kaldırılıp indirilir. Pozlar durunca yumuşakça normale döner; animasyon yön bulma kökünü oynatmaz. Scriptler: VillagerAnimation, GathererActivity; kurulum: VillagerPrefabSetup. Son Unity kontrolü: 37/37 test başarılı; Play testinde yürüyüş, ağaç yönüne dönme, omuz/mesh hareketi, odun taşıma ve 20 odun/8 taş teslimi doğrulandı.
 
 - **Uzak construction dalıyla uzlaştırma:** Pull sonrası 232 add/add çakışması çözüldü. 225 paket meta dosyasında Unity 6000.6.6f1 kurulumuyla eşleşen uzak kimlikler, 5 UI meta dosyasında özgün sprite ayarları korundu. ResourceTest sahnesindeki inşa/kuyu entegrasyonu ve main WFC kodu korundu. URP ayarlarındaki eski bir dosya kimliği doğru değere bağlandı. Yinelenen GUID yok; `MergedAssetIntegrationTests` dahil 34/34 EditMode testi geçti. Push yapılmadı.
 
@@ -85,7 +93,7 @@ Son güncelleme: 2026-10-17 (11:55)
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir).
 - [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Ana menü: eğimli kamera girişi (CameraIntro'da `menuPitch`/`menuYaw` değiştirmek yeterli).
-- [ ] Tek sahne kararı: kullanıcı önce "tek sahne SampleScene" dedi, sonra ContructionMechanics haritasını (ResourceTest) tercih etti. Hangi sahnenin kalacağı ve Build Settings (şu an yalnız `SampleScene`) netleşmeli. ContructionMechanics'ten gelen `WallConstructionDemo*` sahneleri de duruyor.
+- [x] Tek sahne kararı: kullanıcı kaynak toplama düzeninin SampleScene içine taşınmasını istedi; animasyonlu köylüler, menü ve kaynak sistemleri burada kuruldu.
 
 - [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
