@@ -56,3 +56,6 @@ Mevcut duvar modeli, depo, yükseltme, kat desteği ve yıkım testlerine ek ola
 - Üç duvar tasarımı yerleşim hacminin içinde kalır.
 
 Unity Play modunda ayrıca ahşap inşa, bina üzerinden geçen kırmızı yol, başarısız inşada bakiyenin değişmemesi ve ↑/↓ ile kat değişimi ekranda kontrol edildi. Üç seviyeli varlıklar üretildi. Ana oyun sahnesinin bütün tsunami ve köylü akışı bu oturumda baştan sona oynanmadı.
+
+Silme: panelde SİLME MODUNU AÇ düğmesine basıp kaldırılacak duvara sol tıkla. Ona bağlı üst katlar da kaldırılır; kaynak iadesi yapılmaz. Aynı düğme inşa moduna döndürür.
+Ok tuşları tek giriş yolundan işlenir; yeni kat geçişi için tuşun bırakılması gerekir. Son doğrulama: 49/49 test geçti; Unity içinde 1 → 2 → 3 → 2 → 1 ve tıklayarak silme doğrulandı.

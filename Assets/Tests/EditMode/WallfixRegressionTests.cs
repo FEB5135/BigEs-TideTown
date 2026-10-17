@@ -24,6 +24,45 @@ namespace IdleTown.Tests
         public void TearDown() => Object.DestroyImmediate(root);
 
         [Test]
+        public void FloorKeysRequireReleaseBeforeAnotherStep()
+        {
+            controller.HandleFloorKey(KeyCode.UpArrow, true);
+            Assert.That(controller.SelectedFloor, Is.EqualTo(1));
+            controller.HandleFloorKey(KeyCode.UpArrow, true);
+            Assert.That(controller.SelectedFloor, Is.EqualTo(1));
+            controller.HandleFloorKey(KeyCode.UpArrow, false);
+            controller.HandleFloorKey(KeyCode.UpArrow, true);
+            Assert.That(controller.SelectedFloor, Is.EqualTo(2));
+            controller.HandleFloorKey(KeyCode.DownArrow, true);
+            Assert.That(controller.SelectedFloor, Is.EqualTo(1));
+            controller.HandleFloorKey(KeyCode.DownArrow, true);
+            Assert.That(controller.SelectedFloor, Is.EqualTo(1));
+            controller.HandleFloorKey(KeyCode.DownArrow, false);
+            controller.HandleFloorKey(KeyCode.DownArrow, true);
+            Assert.That(controller.SelectedFloor, Is.Zero);
+        }
+
+        [Test]
+        public void DemolitionRemovesUpperFloorsWithoutRefundAndAllowsRebuild()
+        {
+            var a = new Vector2Int(2, 2);
+            var b = new Vector2Int(3, 2);
+            for (int floor = 0; floor < 3; floor++)
+                Assert.That(controller.TryBuild(a, b, floor, WallTier.Timber, out var reason), Is.True, reason);
+            controller.TryGetWallInstance(new WallEdge(a, b), 0, out var wall);
+            Assert.That(controller.TryDemolishWall(wall.GetComponent<WallSegment>()), Is.False);
+            controller.SetDemolitionMode(true);
+            int wood = store.Wood, stone = store.Stone;
+            Assert.That(controller.TryDemolishWall(wall.GetComponent<WallSegment>()), Is.True);
+            Assert.That(controller.Walls, Is.Empty);
+            Assert.That(CountJoints(), Is.Zero);
+            Assert.That(store.Wood, Is.EqualTo(wood));
+            Assert.That(store.Stone, Is.EqualTo(stone));
+            controller.SetDemolitionMode(false);
+            Assert.That(controller.TryBuild(a, b, out _), Is.True);
+        }
+
+        [Test]
         public void DefaultLayerBuildingAndLowFoundationBlockWithoutSpending()
         {
             var building = GameObject.CreatePrimitive(PrimitiveType.Cube);

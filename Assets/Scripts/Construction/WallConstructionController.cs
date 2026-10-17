@@ -62,7 +62,8 @@ namespace IdleTown.Construction
         Material ghostMaterial;
         Collider[] overlapBuffer = new Collider[32];
         GUIStyle titleStyle, labelStyle, buttonStyle, statusStyle;
-        int floorKeyFrame = -1;
+        bool upArrowHeld, downArrowHeld;
+        bool demolitionMode;
         bool hasStart;
         Vector2Int startNode;
         string status = "İlk düğümü seçin.";
@@ -156,17 +157,7 @@ namespace IdleTown.Construction
 
             if (keyboard != null)
             {
-                if (keyboard.upArrowKey.wasPressedThisFrame)
-                {
-                    SetSelectedFloor(selectedFloor + 1);
-                    floorKeyFrame = Time.frameCount;
-                }
-                else if (keyboard.downArrowKey.wasPressedThisFrame)
-                {
-                    SetSelectedFloor(selectedFloor - 1);
-                    floorKeyFrame = Time.frameCount;
-                }
-                else if (keyboard.digit1Key.wasPressedThisFrame)
+                if (keyboard.digit1Key.wasPressedThisFrame)
                     SetSelectedTier(WallTier.Timber);
                 else if (keyboard.digit2Key.wasPressedThisFrame)
                     SetSelectedTier(WallTier.Stone);
@@ -188,6 +179,12 @@ namespace IdleTown.Construction
             }
 
             var pointerOverPanel = mouse != null && IsPointerOverConstructionUi(mouse.position.ReadValue());
+            if (demolitionMode)
+            {
+                if (mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverPanel)
+                    TryDemolishAt(mouse.position.ReadValue());
+                return;
+            }
             var hoveredNode = default(Vector2Int);
             var hasNode = mouse != null && TryGetNode(mouse.position.ReadValue(), out hoveredNode);
             if (hasStart && !pointerOverPanel)
@@ -214,16 +211,11 @@ namespace IdleTown.Construction
 
         void OnGUI()
         {
-            // IMGUI also receives editor Game-view keyboard events. Avoid handling one press twice
-            // when both IMGUI and the Input System deliver it in the same frame.
+            // Arrows have one input route, latched until release to ignore key repeat.
             var input = Event.current;
-            if (constructionModeActive && input.type == EventType.KeyDown && floorKeyFrame != Time.frameCount &&
-                (input.keyCode == KeyCode.UpArrow || input.keyCode == KeyCode.DownArrow))
-            {
-                SetSelectedFloor(selectedFloor + (input.keyCode == KeyCode.UpArrow ? 1 : -1));
-                floorKeyFrame = Time.frameCount;
+            if ((input.type == EventType.KeyDown || input.type == EventType.KeyUp) &&
+                HandleFloorKey(input.keyCode, input.type == EventType.KeyDown))
                 input.Use();
-            }
             EnsureStyles();
             var oldColor = GUI.color;
             var oldBackground = GUI.backgroundColor;
@@ -240,6 +232,19 @@ namespace IdleTown.Construction
             if (!constructionModeActive)
             {
                 GUILayout.Label("Kaynak toplamak için dünyadaki kaynaklara sol tıklayın.", labelStyle);
+                GUILayout.EndArea();
+                GUI.backgroundColor = oldBackground;
+                GUI.contentColor = oldContent;
+                GUI.color = oldColor;
+                return;
+            }
+            if (GUILayout.Button(demolitionMode ? "SİLME MODU AÇIK · İnşa moduna dön" : "SİLME MODUNU AÇ", buttonStyle))
+                SetDemolitionMode(!demolitionMode);
+            if (demolitionMode)
+            {
+                GUILayout.Label("Kaldırmak istediğin duvara sol tıkla.", labelStyle);
+                GUILayout.Label("Bağlı üst katlar da kalkar. Kaynak iadesi yok.", labelStyle);
+                GUILayout.Label(status, statusStyle);
                 GUILayout.EndArea();
                 GUI.backgroundColor = oldBackground;
                 GUI.contentColor = oldContent;
@@ -324,6 +329,54 @@ namespace IdleTown.Construction
             constructionModeActive = active;
             CancelSelection();
             status = active ? "İnşa modu: ilk düğümü seçin." : "Toplama modu etkin.";
+        }
+
+        internal bool HandleFloorKey(KeyCode key, bool pressed)
+        {
+            if (key != KeyCode.UpArrow && key != KeyCode.DownArrow) return false;
+            ref bool held = ref (key == KeyCode.UpArrow ? ref upArrowHeld : ref downArrowHeld);
+            bool wasHeld = held;
+            held = pressed;
+            if (constructionModeActive && pressed && !wasHeld)
+                SetSelectedFloor(selectedFloor + (key == KeyCode.UpArrow ? 1 : -1));
+            return constructionModeActive;
+        }
+
+        void OnApplicationFocus(bool focused)
+        {
+            if (!focused) upArrowHeld = downArrowHeld = false;
+        }
+
+        public void SetDemolitionMode(bool active)
+        {
+            CancelSelection();
+            demolitionMode = active;
+            status = active ? "Silmek için bir duvara tıkla." : "İlk düğümü seçin.";
+        }
+
+        internal bool TryDemolishAt(Vector2 screenPosition)
+        {
+            var camera = inputCamera != null ? inputCamera : Camera.main;
+            if (camera == null) return false;
+            Physics.SyncTransforms();
+            if (!Physics.Raycast(camera.ScreenPointToRay(screenPosition), out var hit, Mathf.Infinity,
+                ~0, QueryTriggerInteraction.Ignore)) return false;
+            return TryDemolishWall(hit.collider.GetComponentInParent<WallSegment>());
+        }
+
+        internal bool TryDemolishWall(WallSegment segment)
+        {
+            if (!constructionModeActive || !demolitionMode || segment == null ||
+                !TryGetWallInstance(segment.Edge, segment.Floor, out var owned) || owned != segment.gameObject)
+            {
+                status = "Bu atölyede inşa edilmiş bir duvara tıkla.";
+                return false;
+            }
+            int before = model.Walls.Count;
+            if (!TryDetachDestroyedWall(segment.Edge, segment.Floor, out _)) return false;
+            status = $"{before - model.Walls.Count} duvar parçası kaldırıldı.";
+            confirmationStatus = status;
+            return true;
         }
 
         public void SetSelectedFloor(int floor)
