@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (19:10)
+Son güncelleme: 2026-10-17 (19:30)
 
 ## Bağlam
 
@@ -14,9 +14,9 @@ Son güncelleme: 2026-10-17 (19:10)
 
 ## Branch'ler
 
-- `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. Bizim main'e giren son işimiz `fbd8b40` (ana menü yeniden tasarımı); GitHub'da main o günden beri ilerledi (son çekilen: `5077d4f`, "Slope half-fix"). Yerel `main` origin'in 2 commit gerisinde.
-- `fix/tree-cell-ground` (GitHub'da): main üstüne ağaç/maden düzeltmeleri: ekibin güncel ağaç meshi, ağaçlar orijinal boyda, ocak ve vagon için ayrı palet (`EconomyPalette.png`). **Main'e birleştirilmedi.**
-- `feature/villager-jobs` (GitHub'da, **aktif dal**): `fix/tree-cell-ground` + güncel main üstüne köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. **Main'e birleştirilmedi.**
+- `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi.
+- `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
+- `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
 - `feature/wfc-forest`: Eski ResourceTest tabanlı orman çalışması; main'e alınmadı, yerine SampleScene'e yalnız ağaç kısmı taşındı. Arşiv.
 - `feature/main-menu`, `feature/resource-gathering`: Eski dallar; işleri main'de.
@@ -24,7 +24,7 @@ Son güncelleme: 2026-10-17 (19:10)
 
 ## Aktif çalışma
 
-- Dal: `feature/villager-jobs`. Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
+- Dal: `main` (yeni iş için ondan dal açılır). Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
 - ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
 - Kullanıcı dağ/tepe düzeni için "tam böyle olmayacak, şimdilik beklesin" dedi; odun kesme animasyonu için "hâlâ garip ama şimdilik kalsın".
@@ -117,7 +117,6 @@ Son güncelleme: 2026-10-17 (19:10)
 
 ## Sıradaki işler / açık konular
 
-- [ ] `fix/tree-cell-ground` ve `feature/villager-jobs`'ı main'e birleştirmek (kullanıcıya sor; main ilerlediği için önce main çekilmeli).
 - [ ] Vagon yuvarlanma sesi: sentez beğenilmedi; kullanıcı gerçek bir tekerlek kaydı seçecek, döngülü yapılıp `GameAudio.cartRoll`'a bağlanacak.
 - [ ] Odun kesme animasyonu hâlâ garip (kullanıcı ertelendi dedi); istenirse elde balta modeli ve daha belirgin vuruş.
 - [ ] Dağ/tepe düzeni değişecek (kullanıcı ayrıntı verecek). Eski elle konmuş dağlar kapalı; tsunaminin geleceği vadi artık yok, dalga tasarımı bunu dikkate almalı.
