@@ -27,7 +27,9 @@ Son güncelleme: 2026-10-17
 
 ## Son durum (yapılanlar)
 
-- **Main birleştirmesi:** Yereldeki `origin/main` (`5002591`, WFC/grid ve zemin modelleri), `cbb3e6e` ile `ContructionMechanics` dalına çakışmasız birleştirildi. Yerel değişiklikler öncesinde `059eb1a` ile kaydedildi. Unity EditMode: `IdleTown.EditModeTests` derlemesinde 26/26 test başarılı. GitHub fetch kimlik doğrulaması başarısız olduğundan main'in sunucudaki en son hali doğrulanamadı; origin/ContructionMechanics ile uzlaştırma ve push yapılmadı.
+- **Uzak construction dalıyla uzlaştırma:** Pull sonrası 232 add/add çakışması çözüldü. 225 paket meta dosyasında Unity 6000.6.6f1 kurulumuyla eşleşen uzak kimlikler, 5 UI meta dosyasında özgün sprite ayarları korundu. ResourceTest sahnesindeki inşa/kuyu entegrasyonu ve main WFC kodu korundu. URP ayarlarındaki eski bir dosya kimliği doğru değere bağlandı. Yinelenen GUID yok; `MergedAssetIntegrationTests` dahil 34/34 EditMode testi geçti. Push yapılmadı.
+
+- **Main birleştirmesi:** Yereldeki `origin/main` (`5002591`, WFC/grid ve zemin modelleri), `cbb3e6e` ile `ContructionMechanics` dalına çakışmasız birleştirildi. Yerel değişiklikler öncesinde `059eb1a` ile kaydedildi. Unity EditMode: `IdleTown.EditModeTests` derlemesinde 26/26 test başarılı. Sonraki başarılı fetch ile GitHub main sürümünün de 5002591 olduğu doğrulandı.
 
 - **Maden/vagon prefab bağlantısı:** Yerelde yeniden oluşturulan FBX meta GUID'leri kaynak dalındaki özgün değerlere döndürüldü (Quarry: `de100f7e611584749bb32c5aff7ca2c6`, MineCart: `1e0776f0470e66e418ee02157ce9870e`). Prefab kaynak referansları artık mevcut model dosyalarını buluyor. Orman için Git'ten hariç tutulan `Assets/FinottiGames` paketi resmi Asset Store üzerinden bu makineye içe aktarıldı; sahnedeki 34 ağacın özgün prefab bağlantıları geri geldi. ResourceTest Play modunda orman ve üç maden görünür, Console hata ve uyarı sayıları 0.
 
