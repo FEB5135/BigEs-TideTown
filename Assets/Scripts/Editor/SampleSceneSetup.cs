@@ -180,16 +180,24 @@ public static class SampleSceneSetup
         return true;
     }
 
-    // Ekibin ağaç karosunun büyütülmüş kopyası: zemin plakası çıkarılır (yoksa büyüyünce komşu karoların
-    // üstüne biner), ağaçlar karonun ortası etrafında TreeScale kadar büyür, böylece hücrenin ortasında kalır.
-    // Ekibin modeline dokunulmaz; mesh ve prefab Assets/Prefabs/Map'e yazılır.
+    // Ekibin ağaç karosunun büyütülmüş kopyası: ağaçlar karonun ortası etrafında TreeScale kadar büyür, böylece
+    // hücrenin ortasında kalır. Zemin plakası büyütülmez (yoksa komşu karoların üstüne biner), hücre boyunda ayrı
+    // bir "Plate" çocuğu olarak kalır; plakasız hücrenin altı boş görünürdü. Ekibin modeline dokunulmaz;
+    // mesh'ler ve prefab Assets/Prefabs/Map'e yazılır. Plakası olmayan eski sürüm aynı yolda yeniden kurulur.
     static GameObject BigTreeTile(GameObject tile)
     {
         if (tile.name.EndsWith("_big"))
-            return tile;
+        {
+            if (tile.transform.Find("Plate") != null)
+                return tile;
+            var original = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Meshes/WorldMeshes/{tile.name.Substring(0, tile.name.Length - 4)}.obj");
+            if (original == null)
+                return tile;
+            tile = original;
+        }
         var prefabPath = $"{BigTreeDir}/{tile.name}_big.prefab";
         var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-        if (existing != null)
+        if (existing != null && existing.transform.Find("Plate") != null)
             return existing;
 
         var filter = tile.GetComponentInChildren<MeshFilter>();
@@ -198,17 +206,18 @@ public static class SampleSceneSetup
             return tile;
         var vertices = source.vertices;
         var kept = new List<int>();
+        var ground = new List<int>();
         for (int s = 0; s < source.subMeshCount; s++)
         {
             var triangles = source.GetTriangles(s);
             for (int t = 0; t < triangles.Length; t += 3)
             {
                 // Tamamı yerde olan üçgenler zemin plakası (ve gövdelerin görünmeyen alt yüzü).
-                if (vertices[triangles[t]].y < 0.001f && vertices[triangles[t + 1]].y < 0.001f && vertices[triangles[t + 2]].y < 0.001f)
-                    continue;
-                kept.Add(triangles[t]);
-                kept.Add(triangles[t + 1]);
-                kept.Add(triangles[t + 2]);
+                bool flat = vertices[triangles[t]].y < 0.001f && vertices[triangles[t + 1]].y < 0.001f && vertices[triangles[t + 2]].y < 0.001f;
+                var target = flat ? ground : kept;
+                target.Add(triangles[t]);
+                target.Add(triangles[t + 1]);
+                target.Add(triangles[t + 2]);
             }
         }
         var mesh = Object.Instantiate(source);
@@ -219,6 +228,12 @@ public static class SampleSceneSetup
         if (!AssetDatabase.IsValidFolder(BigTreeDir))
             AssetDatabase.CreateFolder("Assets/Prefabs", "Map");
         AssetDatabase.CreateAsset(mesh, $"{BigTreeDir}/{tile.name}_big.asset");
+        var plateMesh = Object.Instantiate(source);
+        plateMesh.name = tile.name + "_plate";
+        plateMesh.subMeshCount = 1;
+        plateMesh.SetTriangles(ground, 0);
+        plateMesh.RecalculateBounds();
+        AssetDatabase.CreateAsset(plateMesh, $"{BigTreeDir}/{tile.name}_plate.asset");
 
         // Karo merkezi (plakanın ortası) büyütmede yerinde kalsın: kök TreeScale, çocuk merkez × (1/ölçek − 1).
         var center = source.bounds.center;
@@ -231,6 +246,14 @@ public static class SampleSceneSetup
         child.transform.localRotation = filter.transform.localRotation;
         child.GetComponent<MeshFilter>().sharedMesh = mesh;
         child.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
+        // Plaka karonun kendi boyunda: kökün büyütmesini geri alır.
+        var plate = new GameObject("Plate", typeof(MeshFilter), typeof(MeshRenderer));
+        plate.transform.SetParent(root.transform, false);
+        plate.transform.localPosition = filter.transform.localPosition / TreeScale;
+        plate.transform.localRotation = filter.transform.localRotation;
+        plate.transform.localScale = Vector3.one / TreeScale;
+        plate.GetComponent<MeshFilter>().sharedMesh = plateMesh;
+        plate.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
         var prefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
         Object.DestroyImmediate(root);
         return prefab;
