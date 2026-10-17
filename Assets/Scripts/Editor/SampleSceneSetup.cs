@@ -183,22 +183,18 @@ public static class SampleSceneSetup
     // Ekibin ağaç karosunun büyütülmüş kopyası: ağaçlar karonun ortası etrafında TreeScale kadar büyür, böylece
     // hücrenin ortasında kalır. Zemin plakası büyütülmez (yoksa komşu karoların üstüne biner), hücre boyunda ayrı
     // bir "Plate" çocuğu olarak kalır; plakasız hücrenin altı boş görünürdü. Ekibin modeline dokunulmaz;
-    // mesh'ler ve prefab Assets/Prefabs/Map'e yazılır. Plakası olmayan eski sürüm aynı yolda yeniden kurulur.
+    // mesh'ler ve prefab Assets/Prefabs/Map'e yazılır. Ekip modeli güncelleyebildiği için her kurulumda ekibin
+    // güncel .obj'sinden aynı yola yeniden üretilir (prefab'ın GUID'i korunur).
     static GameObject BigTreeTile(GameObject tile)
     {
         if (tile.name.EndsWith("_big"))
         {
-            if (tile.transform.Find("Plate") != null)
-                return tile;
             var original = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Meshes/WorldMeshes/{tile.name.Substring(0, tile.name.Length - 4)}.obj");
             if (original == null)
                 return tile;
             tile = original;
         }
         var prefabPath = $"{BigTreeDir}/{tile.name}_big.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-        if (existing != null && existing.transform.Find("Plate") != null)
-            return existing;
 
         var filter = tile.GetComponentInChildren<MeshFilter>();
         var source = filter != null ? filter.sharedMesh : null;
@@ -212,9 +208,14 @@ public static class SampleSceneSetup
             var triangles = source.GetTriangles(s);
             for (int t = 0; t < triangles.Length; t += 3)
             {
-                // Tamamı yerde olan üçgenler zemin plakası (ve gövdelerin görünmeyen alt yüzü).
-                bool flat = vertices[triangles[t]].y < 0.001f && vertices[triangles[t + 1]].y < 0.001f && vertices[triangles[t + 2]].y < 0.001f;
-                var target = flat ? ground : kept;
+                // Zemin plakası: tam y = 0'da, karo boyunda (1 x 1) iki üçgen. Gövdelerin kapalı altları
+                // (zeminin biraz altında, küçük) ağaçta kalır; yoksa devrilen ağacın altı boş görünür.
+                var a = vertices[triangles[t]];
+                var b = vertices[triangles[t + 1]];
+                var c = vertices[triangles[t + 2]];
+                bool onGround = Mathf.Abs(a.y) < 0.001f && Mathf.Abs(b.y) < 0.001f && Mathf.Abs(c.y) < 0.001f;
+                float span = Mathf.Max(Mathf.Max(a.x, b.x, c.x) - Mathf.Min(a.x, b.x, c.x), Mathf.Max(a.z, b.z, c.z) - Mathf.Min(a.z, b.z, c.z));
+                var target = onGround && span > 0.9f ? ground : kept;
                 target.Add(triangles[t]);
                 target.Add(triangles[t + 1]);
                 target.Add(triangles[t + 2]);
@@ -227,13 +228,13 @@ public static class SampleSceneSetup
         mesh.RecalculateBounds();
         if (!AssetDatabase.IsValidFolder(BigTreeDir))
             AssetDatabase.CreateFolder("Assets/Prefabs", "Map");
-        AssetDatabase.CreateAsset(mesh, $"{BigTreeDir}/{tile.name}_big.asset");
+        mesh = SaveMesh(mesh, $"{BigTreeDir}/{tile.name}_big.asset");
         var plateMesh = Object.Instantiate(source);
         plateMesh.name = tile.name + "_plate";
         plateMesh.subMeshCount = 1;
         plateMesh.SetTriangles(ground, 0);
         plateMesh.RecalculateBounds();
-        AssetDatabase.CreateAsset(plateMesh, $"{BigTreeDir}/{tile.name}_plate.asset");
+        plateMesh = SaveMesh(plateMesh, $"{BigTreeDir}/{tile.name}_plate.asset");
 
         // Karo merkezi (plakanın ortası) büyütmede yerinde kalsın: kök TreeScale, çocuk merkez × (1/ölçek − 1).
         var center = source.bounds.center;
@@ -257,6 +258,26 @@ public static class SampleSceneSetup
         var prefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
         Object.DestroyImmediate(root);
         return prefab;
+    }
+
+    // Var olan mesh asset'inin içeriğini yerinde değiştirir (CreateAsset aynı yola yeniden yazınca eski nesneyi siler,
+    // bağlı referanslar "Missing" olur). Yazdıktan sonra zorla yeniden içe aktarılır: yapılmazsa Unity'nin
+    // önbelleği eski kalıp mesh'i yükleyemiyor ve ağaçlar çizilmiyordu (hücrede gri delik).
+    static Mesh SaveMesh(Mesh mesh, string path)
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        if (existing == null)
+            AssetDatabase.CreateAsset(mesh, path);
+        else
+        {
+            EditorUtility.CopySerialized(mesh, existing);
+            existing.name = System.IO.Path.GetFileNameWithoutExtension(path);
+            Object.DestroyImmediate(mesh);
+            EditorUtility.SetDirty(existing);
+        }
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+        return AssetDatabase.LoadAssetAtPath<Mesh>(path);
     }
 
     public static void RestoreTerrainColor()
