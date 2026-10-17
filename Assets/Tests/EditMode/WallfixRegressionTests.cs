@@ -1,0 +1,138 @@
+using IdleTown.Construction;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace IdleTown.Tests
+{
+    public sealed class WallfixRegressionTests
+    {
+        GameObject root;
+        WallConstructionController controller;
+        Store store;
+
+        [SetUp]
+        public void SetUp()
+        {
+            root = new GameObject("Wallfix test world");
+            var world = root.AddComponent<World>();
+            controller = root.AddComponent<WallConstructionController>();
+            controller.Configure(world, null);
+            controller.SetResourceStore(store = new Store());
+        }
+
+        [TearDown]
+        public void TearDown() => Object.DestroyImmediate(root);
+
+        [Test]
+        public void DefaultLayerBuildingAndLowFoundationBlockWithoutSpending()
+        {
+            var building = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            building.transform.SetParent(root.transform);
+            building.transform.position = new Vector3(2.5f, .02f, 3);
+            building.transform.localScale = new Vector3(.15f, .04f, .15f);
+            Assert.That(controller.ObstacleLayers.value, Is.Zero);
+            Assert.That(controller.TryBuild(new Vector2Int(1, 3), new Vector2Int(4, 3), out var reason), Is.False);
+            Assert.That(reason, Does.Contain("çakışıyor"));
+            Assert.That(store.Wood, Is.EqualTo(1000));
+            Assert.That(controller.Walls.Count, Is.Zero);
+        }
+
+        [Test]
+        public void ForeignControllerWallBlocksEvenWithEmptyMask()
+        {
+            var foreign = new GameObject("Other construction owner");
+            foreign.transform.SetParent(root.transform);
+            var other = foreign.AddComponent<WallConstructionController>();
+            other.Configure(root.GetComponent<World>(), null);
+            other.SetResourceStore(new Store());
+            Assert.That(other.TryBuild(new Vector2Int(2, 3), new Vector2Int(3, 3), out _), Is.True);
+            Assert.That(controller.TryBuild(new Vector2Int(2, 3), new Vector2Int(3, 3), out _), Is.False);
+            Assert.That(store.Wood, Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void SharedCornerHasOnePostAndUpgradeDoesNotCreateOverlappingDuplicates()
+        {
+            Assert.That(controller.TryBuild(new Vector2Int(2, 2), new Vector2Int(4, 2), out var a), Is.True, a);
+            Assert.That(controller.TryBuild(new Vector2Int(4, 2), new Vector2Int(4, 4), out var b), Is.True, b);
+            Assert.That(CountJoints(), Is.EqualTo(5));
+            Assert.That(controller.TryBuild(new Vector2Int(2, 2), new Vector2Int(4, 2), 0, WallTier.Stone, out var c), Is.True, c);
+            Assert.That(CountJoints(), Is.EqualTo(5));
+            Assert.That(root.GetComponentsInChildren<WallSegment>(), Has.Length.EqualTo(4));
+            Assert.That(controller.TryBuild(new Vector2Int(4, 2), new Vector2Int(2, 2), out _), Is.False);
+            Assert.That(controller.TryDetachDestroyedWall(new WallEdge(new Vector2Int(4, 3), new Vector2Int(4, 4)), out _), Is.True);
+            Assert.That(CountJoints(), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void RejectedConfirmationUsesRedMaterialAndGhostsNeverBlockPhysics()
+        {
+            controller.HandleNodeClick(new Vector2Int(1, 4));
+            controller.RefreshPreview(new Vector2Int(3, 4));
+            var line = root.GetComponentInChildren<LineRenderer>();
+            Assert.That(line.sharedMaterial.color.g, Is.GreaterThan(line.sharedMaterial.color.r));
+            Assert.That(root.GetComponentsInChildren<Collider>(), Is.Empty);
+            var building = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            building.transform.SetParent(root.transform);
+            building.transform.position = new Vector3(2, .5f, 4);
+            Assert.That(controller.ConfirmEndpoint(new Vector2Int(3, 4)), Is.False);
+            Assert.That(line.sharedMaterial.color.r, Is.GreaterThan(line.sharedMaterial.color.g));
+            Assert.That(store.Wood, Is.EqualTo(1000));
+            controller.SetConstructionMode(false);
+            Assert.That(line.positionCount, Is.Zero);
+            foreach (var filter in root.GetComponentsInChildren<MeshFilter>())
+                Assert.That(filter.name, Is.Not.EqualTo("Wall Ghost"));
+        }
+
+        [Test]
+        public void ResourceLossTurnsActualPreviewMaterialRedWithoutBuilding()
+        {
+            controller.HandleNodeClick(new Vector2Int(1, 4));
+            controller.RefreshPreview(new Vector2Int(3, 4));
+            store.Available = false;
+            controller.RefreshPreview(new Vector2Int(3, 4));
+            Assert.That(controller.ConfirmHoveredPreview(), Is.False);
+            var color = root.GetComponentInChildren<LineRenderer>().sharedMaterial.color;
+            Assert.That(color.r, Is.GreaterThan(color.g));
+            Assert.That(controller.Walls.Count, Is.Zero);
+        }
+
+        [Test]
+        public void ArtFitsPlacementEnvelopeAndHasThreeDistinctPalettes()
+        {
+            using var art = new WallArt();
+            foreach (WallTier tier in new[] { WallTier.Timber, WallTier.Stone, WallTier.Reinforced })
+            {
+                var mesh = art.Panel(tier, .117f);
+                Assert.That(mesh.vertexCount, Is.GreaterThan(100));
+                foreach (var vertex in mesh.vertices)
+                {
+                    Assert.That(Mathf.Abs(vertex.x), Is.LessThanOrEqualTo(.501f));
+                    Assert.That(Mathf.Abs(vertex.y), Is.LessThanOrEqualTo(.501f));
+                    Assert.That(Mathf.Abs(vertex.z), Is.LessThanOrEqualTo(.384f));
+                }
+            }
+            Assert.That(art.Palette(WallTier.Stone)[0].color, Is.Not.EqualTo(art.Palette(WallTier.Timber)[0].color));
+        }
+
+        int CountJoints()
+        {
+            int result = 0;
+            foreach (Transform child in root.transform) if (child.name == "Wall Joint") result++;
+            return result;
+        }
+
+        sealed class Store : IWallResourceStore
+        {
+            public int Wood { get; private set; } = 1000;
+            public int Stone { get; private set; } = 1000;
+            public bool Available = true;
+            public bool CanAfford(int wood, int stone) => Available && Wood >= wood && Stone >= stone;
+            public bool TrySpend(int wood, int stone)
+            {
+                if (!CanAfford(wood, stone)) return false;
+                Wood -= wood; Stone -= stone; return true;
+            }
+        }
+    }
+}

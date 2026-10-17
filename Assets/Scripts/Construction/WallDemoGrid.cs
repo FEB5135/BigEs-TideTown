@@ -22,7 +22,7 @@ namespace IdleTown.Construction
             var horizontalCount = world.Height + 1;
             var vertices = new Vector3[(verticalCount + horizontalCount) * 2];
             var index = 0;
-            var y = 0.012f;
+            var y = 0.035f;
 
             for (var x = 0; x <= world.Width; x++)
             {
