@@ -7,9 +7,9 @@ namespace Tsunami
     /// <summary>
     /// Storm that announces the tsunami. Broken low-poly clouds wait far out at sea on the side the wave will come
     /// from and drift slowly towards the coast as <see cref="TsunamiController.StormProgress"/> rises; on the way
-    /// they grow, turn from white to near black, the sun and ambient light dim and lightning starts to strike,
-    /// more often the closer the release. While a tsunami is running the storm stays at full strength.
-    /// Everything is built at runtime; lighting is restored when the component is disabled.
+    /// they grow and turn from white to dark grey, the sea under and beyond them darkens (the island keeps its
+    /// light), and lightning starts to flash in the clouds, more often the closer the release. While a tsunami is
+    /// running the storm stays at full strength. Everything is built at runtime.
     /// </summary>
     public class TsunamiStorm : MonoBehaviour
     {
@@ -18,8 +18,8 @@ namespace Tsunami
         [SerializeField] Material cloudMaterial;
         [Tooltip("Lightning bolts (unlit).")]
         [SerializeField] Material lightningMaterial;
-        [Tooltip("Optional; defaults to RenderSettings.sun or the brightest directional light.")]
-        [SerializeField] Light sun;
+        [Tooltip("Shadow over the stormy sea: a transparent shader that uses vertex colours (e.g. Sprites/Default).")]
+        [SerializeField] Material seaShadeMaterial;
 
         [Header("Clouds")]
         [SerializeField, Range(1, 60)] int cloudCount = 18;
@@ -36,26 +36,29 @@ namespace Tsunami
         [SerializeField] float endBeyondCoast = 80f;
         [SerializeField] Vector2 cloudScale = new Vector2(0.75f, 1.35f);
         [SerializeField] Color calmColor = new Color(0.96f, 0.97f, 0.99f);
-        [SerializeField] Color stormColor = new Color(0.2f, 0.22f, 0.26f);
+        [SerializeField] Color stormColor = new Color(0.24f, 0.26f, 0.3f);
         [Tooltip("Share of the cloud colour that glows by itself, so shaded sides don't turn black.")]
         [SerializeField, Range(0f, 1f)] float selfLight = 0.4f;
         [Tooltip("Storm progress at which the clouds start to darken and where they are fully dark.")]
-        [SerializeField] Vector2 darkenRange = new Vector2(0.2f, 0.85f);
-        [Tooltip("How fast the shown storm catches up with a jump (e.g. Release now or Reset), progress per second.")]
-        [SerializeField, Min(0.01f)] float catchUpRate = 0.3f;
+        [SerializeField] Vector2 darkenRange = new Vector2(0.4f, 0.95f);
+        [Tooltip("How fast the shown storm follows a jump (Release now, Reset), progress per second. " +
+                 "0.1 = the clouds take about 10 s to come in, the length of the warning.")]
+        [SerializeField, Min(0.01f)] float catchUpRate = 0.1f;
 
-        [Header("Light")]
-        [SerializeField, Range(0f, 1f)] float stormSunIntensity = 0.4f;
-        [SerializeField] Color stormSunColor = new Color(0.62f, 0.68f, 0.8f);
-        [SerializeField, Range(0f, 1f)] float stormAmbient = 0.55f;
+        [Header("Stormy sea")]
+        [Tooltip("Darkness of the sea under and behind the clouds at full storm (0..1).")]
+        [SerializeField, Range(0f, 1f)] float seaShade = 0.5f;
+        [Tooltip("How far beyond the bank the dark sea reaches (m).")]
+        [SerializeField, Min(50f)] float shadeReach = 900f;
 
         [Header("Lightning")]
-        [Tooltip("Storm progress from which lightning strikes.")]
+        [Tooltip("Storm progress from which lightning flashes.")]
         [SerializeField, Range(0f, 1f)] float lightningFrom = 0.55f;
-        [Tooltip("Seconds between strikes when lightning begins / at the release and while the tsunami runs.")]
-        [SerializeField] Vector2 lightningInterval = new Vector2(7f, 1.2f);
+        [Tooltip("Seconds between flashes when lightning begins / at the release and while the tsunami runs.")]
+        [SerializeField] Vector2 lightningInterval = new Vector2(6f, 1f);
+        [Tooltip("Share of the flashes that also send a bolt down to the sea (the rest light up inside the cloud).")]
+        [SerializeField, Range(0f, 1f)] float boltChance = 0.45f;
         [SerializeField, Min(0.05f)] float boltDuration = 0.3f;
-        [SerializeField, Min(0f)] float flashSunBoost = 1.6f;
 
         sealed class Cloud
         {
@@ -75,12 +78,17 @@ namespace Tsunami
         Mesh puffMesh;
         float shown;                // displayed storm progress (follows the controller smoothly)
         float nextStrike;
-        float flash;                // global flash 0..1
-        float originalSunIntensity, originalAmbient;
-        Color originalSunColor, originalAmbientColor;
-        Material skyCopy, originalSky;
-        float originalSkyExposure;
-        bool lightingCaptured;
+        // Bank frame, updated every frame by PlaceClouds.
+        Vector3 bankCentre, outward, across;
+        float seaY;
+
+        MeshRenderer shadeRenderer;
+        Mesh shadeMesh;
+        Material shadeMaterial;
+        Color[] shadeColors;
+        float[] shadeWeights;
+        float shownShade = -1f;
+        const int ShadeAlong = 24, ShadeAcross = 16;
 
         public float ShownProgress => shown;
 
@@ -93,19 +101,17 @@ namespace Tsunami
                 enabled = false;
                 return;
             }
-            if (sun == null) sun = FindSun();
-            CaptureLighting();
             BuildClouds();
+            BuildSeaShade();
             shown = controller.StormProgress;
             nextStrike = Random.Range(1f, 3f);
         }
 
-        void OnDisable() => RestoreLighting();
-
         void OnDestroy()
         {
-            RestoreLighting();
             if (puffMesh != null) Destroy(puffMesh);
+            if (shadeMesh != null) Destroy(shadeMesh);
+            if (shadeMaterial != null) Destroy(shadeMaterial);
             foreach (Cloud c in clouds) if (c.material != null) Destroy(c.material);
         }
 
@@ -118,8 +124,8 @@ namespace Tsunami
 
             float darkness = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(darkenRange.x, darkenRange.y, shown));
             PlaceClouds(darkness);
-            UpdateLightning(darkness);
-            ApplyLighting(darkness);
+            UpdateSeaShade(darkness);
+            UpdateLightning();
         }
 
         // ---------------------------------------------------------------------------------------- clouds
@@ -178,31 +184,34 @@ namespace Tsunami
             Vector3 target = controller.MapAdapter != null ? controller.MapAdapter.ApproachTarget : Vector3.zero;
             Vector2 toLand = controller.TravelDirection;
             if (toLand.sqrMagnitude < 1e-4f) toLand = Vector2.up;
-            Vector3 outward = new Vector3(-toLand.x, 0f, -toLand.y).normalized;
-            Vector3 across = new Vector3(-outward.z, 0f, outward.x);
+            outward = new Vector3(-toLand.x, 0f, -toLand.y).normalized;
+            across = new Vector3(-outward.z, 0f, outward.x);
             float groundY = controller.MapAdapter != null && controller.MapAdapter.World != null
                 ? controller.MapAdapter.World.transform.position.y : 0f;
+            seaY = groundY + (controller.Simulation != null ? controller.Simulation.SeaLevel : 0f);
             float coast = CoastDistance(target, outward);
-            float eased = shown * shown * (3f - 2f * shown);
-            float centre = coast + Mathf.Lerp(startBeyondCoast, endBeyondCoast, eased);
-            float scale = Mathf.Lerp(cloudScale.x, cloudScale.y, eased);
+            // Steady drift towards the coast from the first second, slowing a little only at the very end.
+            float travel = shown * (1.3f - 0.3f * shown);
+            float centre = coast + Mathf.Lerp(startBeyondCoast, endBeyondCoast, travel);
+            bankCentre = target + outward * centre;
+            bankCentre.y = groundY;
+            float scale = Mathf.Lerp(cloudScale.x, cloudScale.y, shown);
             Color baseColor = Color.Lerp(calmColor, stormColor, darkness);
             Quaternion facing = Quaternion.LookRotation(across, Vector3.up);
             float t = Time.time;
 
             foreach (Cloud c in clouds)
             {
-                float along = centre + c.offset.x;
                 float side = c.offset.y + Mathf.Sin(t * 0.05f + c.drift) * 6f;
-                c.transform.position = target + outward * along + across * side +
-                                       Vector3.up * (groundY + c.height + Mathf.Sin(t * 0.13f + c.drift) * 0.6f);
+                c.transform.position = bankCentre + outward * c.offset.x + across * side +
+                                       Vector3.up * (c.height + Mathf.Sin(t * 0.13f + c.drift) * 0.6f);
                 c.transform.rotation = facing;
                 c.transform.localScale = Vector3.one * (c.scale * scale);
-                c.flash = Mathf.MoveTowards(c.flash, 0f, Time.deltaTime * 5f);
-                Color col = Color.Lerp(baseColor, new Color(0.85f, 0.88f, 1f), c.flash * 0.8f);
+                c.flash = Mathf.MoveTowards(c.flash, 0f, Time.deltaTime * 4f);
+                Color col = Color.Lerp(baseColor, new Color(0.88f, 0.9f, 1f), c.flash);
                 c.material.SetColor(BaseColor, col);
                 if (c.material.HasProperty(ColorId)) c.material.SetColor(ColorId, col);
-                c.material.SetColor(EmissionId, col * (selfLight + c.flash * 0.8f));
+                c.material.SetColor(EmissionId, col * (selfLight + c.flash * 1.2f));
             }
         }
 
@@ -219,9 +228,91 @@ namespace Tsunami
             return t == float.MaxValue ? 130f : Mathf.Max(0f, t);
         }
 
+        // ------------------------------------------------------------------------------------- stormy sea
+
+        // A flat, transparent dark sheet just above the sea under the bank and out to the horizon behind it. It
+        // fades out towards the coast and at the sides. The island is higher than the sheet, so the depth test
+        // keeps it off the land: only the sea darkens.
+        void BuildSeaShade()
+        {
+            if (seaShadeMaterial == null) return;
+            var go = new GameObject("Stormy Sea", typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(transform, false);
+            shadeRenderer = go.GetComponent<MeshRenderer>();
+            shadeMaterial = new Material(seaShadeMaterial) { name = seaShadeMaterial.name + " (Storm)" };
+            // After the ocean (transparent, no depth write), before the incoming swell.
+            shadeMaterial.renderQueue = Mathf.Max(seaShadeMaterial.renderQueue, (int)RenderQueue.Transparent) + 1;
+            shadeRenderer.sharedMaterial = shadeMaterial;
+            shadeRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            shadeRenderer.receiveShadows = false;
+            shadeRenderer.lightProbeUsage = LightProbeUsage.Off;
+            shadeRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+
+            int count = ShadeAlong * ShadeAcross;
+            var verts = new Vector3[count];
+            shadeColors = new Color[count];
+            shadeWeights = new float[count];
+            float near = bankDepth * 1.1f, halfWidth = bankWidth * 0.7f;
+            for (int a = 0; a < ShadeAlong; a++)
+            {
+                // Denser near the bank, sparse out to the horizon.
+                float f = a / (ShadeAlong - 1f);
+                float along = f < 0.5f ? Mathf.Lerp(-near, bankDepth * 0.6f, f * 2f)
+                                       : Mathf.Lerp(bankDepth * 0.6f, shadeReach, (f - 0.5f) * 2f);
+                float towardCoast = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-near, -near * 0.15f, along));
+                // The dark area widens a little behind the bank.
+                float width = halfWidth * Mathf.Lerp(0.75f, 1f, Mathf.InverseLerp(0f, shadeReach, along));
+                for (int b = 0; b < ShadeAcross; b++)
+                {
+                    float side = (b / (ShadeAcross - 1f) * 2f - 1f) * halfWidth;
+                    float sides = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(width * 0.55f, width, Mathf.Abs(side)));
+                    int i = a * ShadeAcross + b;
+                    verts[i] = new Vector3(side, 0f, along);
+                    shadeWeights[i] = towardCoast * sides;
+                }
+            }
+            var tris = new List<int>();
+            for (int a = 0; a < ShadeAlong - 1; a++)
+            {
+                for (int b = 0; b < ShadeAcross - 1; b++)
+                {
+                    int i = a * ShadeAcross + b;
+                    tris.Add(i); tris.Add(i + ShadeAcross); tris.Add(i + 1);
+                    tris.Add(i + 1); tris.Add(i + ShadeAcross); tris.Add(i + ShadeAcross + 1);
+                }
+            }
+            shadeMesh = new Mesh { name = "Stormy Sea (generated)" };
+            shadeMesh.MarkDynamic();
+            shadeMesh.vertices = verts;
+            shadeMesh.SetTriangles(tris, 0);
+            shadeMesh.colors = shadeColors;
+            shadeMesh.RecalculateNormals();
+            shadeMesh.RecalculateBounds();
+            go.GetComponent<MeshFilter>().sharedMesh = shadeMesh;
+        }
+
+        void UpdateSeaShade(float darkness)
+        {
+            if (shadeRenderer == null) return;
+            float strength = seaShade * darkness;
+            shadeRenderer.enabled = strength > 0.005f;
+            // Local +Z points out to sea, so the sheet trails out behind the bank.
+            shadeRenderer.transform.SetPositionAndRotation(new Vector3(bankCentre.x, seaY + 0.15f, bankCentre.z),
+                Quaternion.LookRotation(outward, Vector3.up));
+            if (Mathf.Abs(strength - shownShade) < 0.002f) return;
+            shownShade = strength;
+            var tint = new Color(0.03f, 0.05f, 0.09f, 0f);
+            for (int i = 0; i < shadeColors.Length; i++)
+            {
+                tint.a = strength * shadeWeights[i];
+                shadeColors[i] = tint;
+            }
+            shadeMesh.colors = shadeColors;
+        }
+
         // ------------------------------------------------------------------------------------- lightning
 
-        void UpdateLightning(float darkness)
+        void UpdateLightning()
         {
             for (int i = bolts.Count - 1; i >= 0; i--)
             {
@@ -231,29 +322,30 @@ namespace Tsunami
                 bool on = age < 1f && (age < 0.3f || (age > 0.45f && age < 0.75f));
                 bolts[i].enabled = on;
             }
-            flash = Mathf.MoveTowards(flash, 0f, Time.deltaTime * 6f);
 
-            float strength = Mathf.InverseLerp(lightningFrom, 1f, shown);
             if (shown < lightningFrom || clouds.Count == 0) return;
             nextStrike -= Time.deltaTime;
             if (nextStrike > 0f) return;
+            float strength = Mathf.InverseLerp(lightningFrom, 1f, shown);
             float interval = Mathf.Lerp(lightningInterval.x, lightningInterval.y, strength);
             nextStrike = interval * Random.Range(0.5f, 1.5f);
-            Strike(darkness);
+            Strike();
         }
 
-        void Strike(float darkness)
+        // Lightning lives in the clouds: the struck cloud (and a little its neighbours) lights up from inside; some
+        // flashes also drop a bolt from its base to the sea. Bolts are only drawn under clouds the camera can see,
+        // so no line cuts across the screen from a cloud out of view. Nothing else on screen flashes.
+        void Strike()
         {
             Cloud cloud = clouds[Random.Range(0, clouds.Count)];
             cloud.flash = 1f;
-            flash = Mathf.Max(flash, Mathf.Lerp(0.5f, 1f, darkness));
-            if (lightningMaterial == null) return;
+            foreach (Cloud other in clouds)
+                if (other != cloud && (other.transform.position - cloud.transform.position).sqrMagnitude < 45f * 45f)
+                    other.flash = Mathf.Max(other.flash, 0.45f);
+            if (lightningMaterial == null || Random.value > boltChance || !CloudInView(cloud)) return;
 
             LineRenderer bolt = GetBolt();
-            Vector3 top = cloud.transform.position + Vector3.down * 1.5f;
-            float seaY = controller.Simulation != null ? controller.Simulation.SeaLevel : top.y - 40f;
-            if (controller.MapAdapter != null && controller.MapAdapter.World != null)
-                seaY += controller.MapAdapter.World.transform.position.y;
+            Vector3 top = cloud.transform.position + Vector3.down * 0.5f;
             Vector3 bottom = new Vector3(top.x + Random.Range(-8f, 8f), seaY, top.z + Random.Range(-8f, 8f));
             const int segments = 14;
             bolt.positionCount = segments + 1;
@@ -273,6 +365,16 @@ namespace Tsunami
             bolt.endWidth = width * 0.35f;
             bolt.enabled = true;
             boltAges[bolts.IndexOf(bolt)] = 0f;
+        }
+
+        static bool CloudInView(Cloud cloud)
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+            Vector3 top = cam.WorldToViewportPoint(cloud.transform.position);
+            Vector3 bottom = cam.WorldToViewportPoint(cloud.transform.position + Vector3.down * 40f);
+            return top.z > 0f && top.x > 0.02f && top.x < 0.98f && top.y > 0.02f && top.y < 0.98f &&
+                   bottom.z > 0f && bottom.y > 0.02f;
         }
 
         LineRenderer GetBolt()
@@ -295,75 +397,9 @@ namespace Tsunami
             return lr;
         }
 
-        // -------------------------------------------------------------------------------------- lighting
-
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
-        static readonly int ExposureId = Shader.PropertyToID("_Exposure");
-
-        void CaptureLighting()
-        {
-            if (sun != null)
-            {
-                originalSunIntensity = sun.intensity;
-                originalSunColor = sun.color;
-            }
-            originalAmbient = RenderSettings.ambientIntensity;
-            originalAmbientColor = RenderSettings.ambientLight;
-            originalSky = RenderSettings.skybox;
-            if (originalSky != null && originalSky.HasProperty(ExposureId))
-            {
-                // Work on a copy so the skybox asset is never changed.
-                skyCopy = new Material(originalSky) { name = originalSky.name + " (Storm)" };
-                originalSkyExposure = originalSky.GetFloat(ExposureId);
-                RenderSettings.skybox = skyCopy;
-            }
-            lightingCaptured = true;
-        }
-
-        void ApplyLighting(float darkness)
-        {
-            if (!lightingCaptured) return;
-            if (sun != null)
-            {
-                sun.intensity = originalSunIntensity * Mathf.Lerp(1f, stormSunIntensity, darkness) + flash * flashSunBoost;
-                sun.color = Color.Lerp(Color.Lerp(originalSunColor, stormSunColor, darkness), new Color(0.85f, 0.9f, 1f), flash);
-            }
-            float ambient = Mathf.Lerp(1f, stormAmbient, darkness) + flash * 0.6f;
-            RenderSettings.ambientIntensity = originalAmbient * ambient;
-            RenderSettings.ambientLight = originalAmbientColor * ambient;
-            if (skyCopy != null) skyCopy.SetFloat(ExposureId, originalSkyExposure * (Mathf.Lerp(1f, 0.35f, darkness) + flash * 0.8f));
-        }
-
-        void RestoreLighting()
-        {
-            if (!lightingCaptured) return;
-            if (sun != null)
-            {
-                sun.intensity = originalSunIntensity;
-                sun.color = originalSunColor;
-            }
-            RenderSettings.ambientIntensity = originalAmbient;
-            RenderSettings.ambientLight = originalAmbientColor;
-            if (skyCopy != null)
-            {
-                RenderSettings.skybox = originalSky;
-                Destroy(skyCopy);
-                skyCopy = null;
-            }
-            lightingCaptured = false;
-        }
-
-        static Light FindSun()
-        {
-            if (RenderSettings.sun != null) return RenderSettings.sun;
-            Light best = null;
-            foreach (Light l in FindObjectsByType<Light>())
-                if (l.type == LightType.Directional && l.isActiveAndEnabled && (best == null || l.intensity > best.intensity))
-                    best = l;
-            return best;
-        }
 
         // ------------------------------------------------------------------------------------------ mesh
 

@@ -34,7 +34,7 @@ namespace Tsunami.EditorTools
 
         internal struct Materials
         {
-            public Material terrain, flood, ocean, wall, roof, flooded, destroyed, trunk, leaves, cursor, spray, cloud, lightning;
+            public Material terrain, flood, ocean, wall, roof, flooded, destroyed, trunk, leaves, cursor, spray, cloud, lightning, seaShade;
         }
 
         [MenuItem("Tsunami/Build Demo Scene")]
@@ -491,7 +491,8 @@ namespace Tsunami.EditorTools
                 cursor = GetOrCreate("Brush_Cursor", cursor, null),
                 spray = GetOrCreate("Water_Spray", Shader.Find("Tsunami/Spray"), null),
                 cloud = GetOrCreate("Storm_Cloud", lit, new Color(0.96f, 0.97f, 0.99f)),
-                lightning = GetOrCreate("Storm_Lightning", Shader.Find("Universal Render Pipeline/Unlit"), new Color(0.88f, 0.92f, 1f))
+                lightning = GetOrCreate("Storm_Lightning", Shader.Find("Universal Render Pipeline/Unlit"), new Color(0.88f, 0.92f, 1f)),
+                seaShade = GetOrCreate("Storm_SeaShade", cursor, null)
             };
             AssetDatabase.SaveAssets();
             return m;

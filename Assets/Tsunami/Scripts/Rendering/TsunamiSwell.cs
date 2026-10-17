@@ -37,11 +37,11 @@ namespace Tsunami
             meshRenderer = GetComponent<MeshRenderer>();
             meshRenderer.enabled = false;
             // The water is transparent and doesn't write depth: drawn in the same queue, the far bigger ocean ring
-            // (sorted as closer) would paint over the swell. Draw it right after the ocean instead.
+            // (sorted as closer) would paint over the swell. Draw it after the ocean and the stormy-sea shade.
             if (meshRenderer.sharedMaterial != null)
             {
                 material = new Material(meshRenderer.sharedMaterial) { name = meshRenderer.sharedMaterial.name + " (Swell)" };
-                material.renderQueue = meshRenderer.sharedMaterial.renderQueue + 1;
+                material.renderQueue = meshRenderer.sharedMaterial.renderQueue + 2;
                 meshRenderer.sharedMaterial = material;
             }
             if (controller == null) controller = FindAnyObjectByType<TsunamiController>();
