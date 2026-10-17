@@ -20,6 +20,10 @@ public class Gatherer : MonoBehaviour
     [Tooltip("Odun toplarken ağaca kaç saniyede bir vurur. 0 = vurmaz.")]
     [SerializeField] float hitInterval = 0.5f;
     [SerializeField] float moveSpeed = 3f;
+    [Tooltip("İşteyken (vagon, işteki köylü) yürüme hızı çarpanı; yükseltme çarpanıyla çarpılır. Boşta dolaşan köylüye uygulanmaz.")]
+    [SerializeField] float workSpeedMultiplier = 1.5f;
+    [Tooltip("İşteyken toplama süresi ve vuruş aralığı çarpanı (küçük = hızlı); yükseltme çarpanıyla çarpılır.")]
+    [SerializeField] float workTimeMultiplier = 0.6f;
     [Tooltip("Saniyede en fazla kaç derece döner (köşelerde yumuşak dönüş).")]
     [SerializeField] float turnSpeed = 360f;
     [Tooltip("Kaynağa bu mesafeye gelince durur.")]
@@ -70,9 +74,59 @@ public class Gatherer : MonoBehaviour
     public bool IsReserved => reservedBy != null;
     // Ağaca son vuruşun zamanı ve vuruş aralığı (balta animasyonu vuruşa denk gelsin diye).
     public float LastHitTime { get; private set; } = -100f;
-    public float HitInterval => hitInterval;
+    public float HitInterval => hitInterval * WorkTimeFactor;
 
     public void SetHome(ResourceNode node) => home = node;
+
+    // Bağlı yükseltme: vagon kendi ocağınınkine, işteki oduncu ormanınkine bağlıdır.
+    UpgradeLevel Upgrade
+    {
+        get
+        {
+            if (home != null)
+                return home.Upgrade;
+            if (resourceType == ResourceType.Wood && pushedCart == null && (!villager || HasJob))
+                return UpgradeLevel.Forest;
+            return null;
+        }
+    }
+
+    // İşte: vagon, işe konmuş köylü (oduncu ya da vagon iten) ve köylü olmayan toplayıcı.
+    bool Working => home != null || HasJob || !villager;
+
+    float SpeedFactor => Working ? workSpeedMultiplier * (Upgrade != null ? Upgrade.SpeedMultiplier : 1f) : 1f;
+    float WorkTimeFactor => Working ? workTimeMultiplier * (Upgrade != null ? Upgrade.WorkTimeMultiplier : 1f) : 1f;
+
+    // Prefab'tan yeni üretilen işçiyi sahnedeki bir köylünün ayarlarıyla köylü yapar (Start'tan önce çağrılır).
+    public void BecomeVillagerLike(Gatherer template)
+    {
+        if (template != null)
+        {
+            carryCapacity = template.carryCapacity;
+            harvestDuration = template.harvestDuration;
+            hitInterval = template.hitInterval;
+            moveSpeed = template.moveSpeed;
+            workSpeedMultiplier = template.workSpeedMultiplier;
+            workTimeMultiplier = template.workTimeMultiplier;
+            stopDistance = template.stopDistance;
+            wellStopDistance = template.wellStopDistance;
+            wanderRadius = template.wanderRadius;
+            wanderPause = template.wanderPause;
+            pushGap = template.pushGap;
+            // Aynı boy ve zeminden aynı yükseklik (Start yüksekliği bulunduğu yerden ölçer).
+            transform.localScale = template.transform.localScale;
+            var position = transform.position;
+            if (TryGetGroundHeight(position, out float groundY))
+                transform.position = new Vector3(position.x, groundY + template.heightOffset, position.z);
+        }
+        villager = true;
+        resourceType = ResourceType.Wood;
+        home = null;
+        needsPusher = false;
+        EnsurePickCollider();
+        if (isActiveAndEnabled && !villagers.Contains(this))
+            villagers.Add(this);
+    }
 
     void Awake()
     {
@@ -319,15 +373,18 @@ public class Gatherer : MonoBehaviour
                 continue;
             Activity = GathererActivity.Harvesting;
             // Odun toplarken ağaca aralıklarla vurur (ağaç sallanır). Ocaklarda vurulmaz.
-            for (float t = 0f; t < harvestDuration; t += hitInterval)
+            // Yükseltme toplama süresini ve vuruş aralığını aynı oranda kısaltır.
+            float duration = harvestDuration * WorkTimeFactor;
+            float interval = HitInterval;
+            for (float t = 0f; t < duration; t += interval)
             {
-                if (node != null && resourceType == ResourceType.Wood && hitInterval > 0f)
+                if (node != null && resourceType == ResourceType.Wood && interval > 0f)
                 {
                     LastHitTime = Time.time;
                     node.PlayHitFeedback();
                 }
-                yield return new WaitForSeconds(hitInterval > 0f ? Mathf.Min(hitInterval, harvestDuration - t) : harvestDuration);
-                if (hitInterval <= 0f)
+                yield return new WaitForSeconds(interval > 0f ? Mathf.Min(interval, duration - t) : duration);
+                if (interval <= 0f)
                     break;
             }
             Activity = GathererActivity.Idle;
@@ -400,7 +457,7 @@ public class Gatherer : MonoBehaviour
             }
 
             Activity = GathererActivity.Walking;
-            var step = Vector3.ClampMagnitude(toTarget, moveSpeed * Time.deltaTime);
+            var step = Vector3.ClampMagnitude(toTarget, moveSpeed * SpeedFactor * Time.deltaTime);
             var next = transform.position + step;
             if (TryGetGroundHeight(next, out float groundY))
                 next.y = groundY + heightOffset;

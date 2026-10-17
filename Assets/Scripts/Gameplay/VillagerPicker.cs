@@ -1,6 +1,7 @@
 using IdleTown.Construction;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 // Köylüleri elle işe koyma (Tomodachi Life tarzı): imleç bir köylünün üzerine gelince açık ele döner, sol tıkla
@@ -69,6 +70,14 @@ public class VillagerPicker : MonoBehaviour
                 Drop();
             SetCursor(closedHand);
             Busy = true;
+            return;
+        }
+
+        // İmleç bir butonun (örn. ocağın yükseltme butonu) üzerindeyse tıklama onundur.
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        {
+            SetCursor(null);
+            Busy = false;
             return;
         }
 

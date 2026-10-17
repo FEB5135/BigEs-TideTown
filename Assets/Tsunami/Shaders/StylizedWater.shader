@@ -1,5 +1,6 @@
 // Stylised, low-cost URP water used by both the surrounding ocean and the simulated flood mesh.
-// Visual detail only: depth tint, wave-face foam, backlit crest glow, ripples, fresnel and specular.
+// Visual detail only: depth tint, wave-face and crest foam, backlit crest glow, ripples, fresnel, specular and
+// the darker stormy sea (TsunamiStorm).
 // All water movement comes from the simulation (vertex positions); UV0 = (water depth m, flow speed m/s)
 // written by WaterMeshRenderer / OceanRing. No textures, refraction or screen-space effects: one pass.
 Shader "Tsunami/StylizedWater"
@@ -18,6 +19,8 @@ Shader "Tsunami/StylizedWater"
         _CrestHeight ("Height For Full Crest Glow (m)", Float) = 8
         _FaceFoamStart ("Wave-Face Foam Start (1 - normal.y)", Range(0, 1)) = 0.35
         _FaceFoamEnd ("Wave-Face Foam Full", Range(0, 1)) = 0.75
+        _CrestFoamStart ("Sea Crest Foam Start (m above the still sea)", Float) = 1.5
+        _CrestFoamFull ("Sea Crest Foam Full (m above the still sea)", Float) = 6
 
         [Header(Surface)]
         _SkyColor ("Fresnel Sky Colour", Color) = (0.72, 0.88, 0.96, 1)
@@ -39,6 +42,13 @@ Shader "Tsunami/StylizedWater"
         _ShoreFoamDepth ("Shoreline Foam Depth (m)", Float) = 0.25
         _EdgeFade ("Soft Water Edge (m of depth)", Float) = 0.15
         _FoamNoiseScale ("Foam Noise Scale", Float) = 0.4
+
+        [Header(Storm)]
+        _StormSeaColor ("Stormy Sea Colour", Color) = (0.03, 0.05, 0.09, 1)
+
+        [Header(Clip Box)]
+        _ClipBox ("Clip Box (centre XZ, half size, W = on)", Vector) = (0, 0, 0, 0)
+        _ClipBand ("Clip Band (fade from X to Y m inside the box)", Vector) = (0, 1, 0, 0)
     }
 
     SubShader
@@ -79,6 +89,8 @@ Shader "Tsunami/StylizedWater"
                 float _CrestHeight;
                 half _FaceFoamStart;
                 half _FaceFoamEnd;
+                float _CrestFoamStart;
+                float _CrestFoamFull;
                 half4 _SkyColor;
                 half _FresnelPower;
                 half _FresnelStrength;
@@ -96,6 +108,9 @@ Shader "Tsunami/StylizedWater"
                 float _ShoreFoamDepth;
                 float _EdgeFade;
                 float _FoamNoiseScale;
+                half4 _StormSeaColor;
+                float4 _ClipBox;
+                float4 _ClipBand;
             CBUFFER_END
 
             struct Attributes
@@ -169,7 +184,10 @@ Shader "Tsunami/StylizedWater"
                 float speed = i.data.y;
                 float steep = 1.0 - saturate(meshNormal.y);                         // 0 flat .. 1 vertical
                 float seaY = TsunamiSeaLevel(_SeaLevel);
-                float rise = saturate((i.positionWS.y - seaY) / max(_CrestHeight, 0.01)); // height above sea
+                float eta = i.positionWS.y - seaY;                                     // height above the still sea
+                float rise = saturate(eta / max(_CrestHeight, 0.01));
+                // 1 over the sea (the bed is below the still sea: depth - eta = still depth), 0 for water on land.
+                float overSea = saturate((depth - eta) * 0.5);
 
                 half4 col = lerp(_WaterShallow, _WaterDeep, saturate(depth / max(_DeepAt, 0.01)));
 
@@ -187,13 +205,19 @@ Shader "Tsunami/StylizedWater"
                 col.rgb = lerp(col.rgb, _SkyColor.rgb, fresnel);
                 col.a = saturate(col.a + fresnel * 0.3);
 
+                // Stormy sea: darker water under and behind the storm clouds (the foam on top stays bright).
+                col.rgb = lerp(col.rgb, _StormSeaColor.rgb, TsunamiStormShade(i.positionWS) * overSea);
+
                 // Foam where water breaks: flow fast relative to its depth (Froude number u / sqrt(g h)),
                 // steep wave faces and the thin shoreline edge. The foam texture is carried along by the simulated
                 // velocity (two-phase flow map), so it streams with the water instead of sitting still and speckling.
                 float froude = speed / sqrt(9.81 * max(depth, 0.3));
                 float foamSource = smoothstep(_BreakFroudeStart, _BreakFroudeFull, froude)
                                  + saturate(1.0 - depth / max(_ShoreFoamDepth, 0.01))
-                                 + smoothstep(_FaceFoamStart, _FaceFoamEnd, steep);
+                                 + smoothstep(_FaceFoamStart, _FaceFoamEnd, steep)
+                                 // A raised sea reads as an incoming wave: whitecaps on the crest, even where the long
+                                 // wave is still smooth and slow in deep water (same look far out and at the coast).
+                                 + smoothstep(_CrestFoamStart, _CrestFoamFull, eta) * overSea;
                 foamSource = saturate(foamSource) * (1.0 - saturate(_TsunamiNoFoam));
                 float cycle = max(_FoamCycle, 0.05);
                 float ph0 = frac(TsunamiAnimTime() / cycle), ph1 = frac(ph0 + 0.5);
@@ -223,6 +247,15 @@ Shader "Tsunami/StylizedWater"
 
                 // Thin water fades out where it meets the ground, so the waterline is soft instead of hard-edged.
                 col.a *= saturate(depth / max(_EdgeFade, 0.001));
+
+                // Clip box (the incoming swell): fade out inside the simulated area, over the same edge band where
+                // the simulated water blends into the open sea, so the simulation carries the wave on from there.
+                if (_ClipBox.w > 0.5)
+                {
+                    float2 d = abs(i.positionWS.xz - _ClipBox.xy);
+                    float inside = _ClipBox.z - max(d.x, d.y);
+                    col.a *= 1.0 - smoothstep(0.0, 1.0, saturate((inside - _ClipBand.x) / max(_ClipBand.y - _ClipBand.x, 0.01)));
+                }
 
                 col.rgb = MixFog(col.rgb, i.fogFactor);
                 return col;

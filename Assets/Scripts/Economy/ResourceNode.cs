@@ -39,9 +39,12 @@ public class ResourceNode : MonoBehaviour
     public int Remaining => remaining;
     public bool IsAvailable => remaining > 0 && claimants.Count < maxGatherers;
     public Transform[] ApproachPath => approachPath;
+    // Ocağın seviyesi (yoksa null); ocağın vagonları buna göre hızlanır.
+    public UpgradeLevel Upgrade { get; private set; }
 
     void Awake()
     {
+        Upgrade = GetComponent<UpgradeLevel>();
         remaining = capacity;
         restRotation = transform.localRotation;
         EnsureCollider();

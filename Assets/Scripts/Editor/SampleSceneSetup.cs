@@ -24,6 +24,7 @@ public static class SampleSceneSetup
             EnsureGridForest(scene);
             EnsureVillagerJobs(scene);
             EnsureAudio(scene);
+            EnsureUpgrades(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -77,6 +78,7 @@ public static class SampleSceneSetup
         EnsureGridForest(scene);
         EnsureVillagerJobs(scene);
         EnsureAudio(scene);
+        EnsureUpgrades(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -271,6 +273,80 @@ public static class SampleSceneSetup
                 workerSettings.FindProperty("stopDistance").floatValue = 1.1f;
                 workerSettings.ApplyModifiedPropertiesWithoutUndo();
             }
+        return true;
+    }
+
+    // Yükseltmeler: her taş ocağı (vagon üreten kaynak) ayrı, orman tek yükseltilir; 3 seviye, odun ve taşla.
+    // Butonları ve taş butonunun yanındaki işçi butonunu HUD'daki UpgradeHUD çizer.
+    [MenuItem("Tools/BigEs/Yukseltmeleri Kur")]
+    public static void SetupUpgrades()
+    {
+        var scene = EditorSceneManager.GetActiveScene();
+        if (!EnsureUpgrades(scene))
+        {
+            Debug.LogWarning("Yükseltmeler kurulamadı: sahnede HUD (ResourceHUD) ya da taş butonu yok.");
+            return;
+        }
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("Yükseltmeler kuruldu: taş ocakları, orman ve işçi butonu.");
+    }
+
+    // Play modunda yükseltme/işçi denemek için kuyuya kaynak ekler (HUD ve butonlar güncellenir).
+    [MenuItem("Tools/BigEs/Test: Kuyuya 100 Odun 100 Tas")]
+    public static void AddTestResources()
+    {
+        var well = Well.Instance;
+        if (!Application.isPlaying || well == null)
+        {
+            Debug.LogWarning("Önce Play moduna girip oyunu başlatın.");
+            return;
+        }
+        well.Deposit(ResourceType.Wood, 100);
+        well.Deposit(ResourceType.Stone, 100);
+    }
+
+    public static bool EnsureUpgrades(Scene scene)
+    {
+        var hud = Find<ResourceHUD>(scene);
+        var stoneButton = hud != null ? hud.transform.Find("Resource Panel/Stone Button") as RectTransform : null;
+        if (stoneButton == null)
+            return false;
+
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (var spawner in root.GetComponentsInChildren<GathererSpawner>(true))
+                if (spawner.GetComponent<UpgradeLevel>() == null)
+                    spawner.gameObject.AddComponent<UpgradeLevel>();
+
+        var forest = Find<GridForest>(scene);
+        if (forest != null)
+        {
+            var upgrade = forest.GetComponent<UpgradeLevel>();
+            if (upgrade == null)
+                upgrade = forest.gameObject.AddComponent<UpgradeLevel>();
+            var anchor = forest.transform.Find("Forest Upgrade Anchor");
+            if (anchor == null)
+            {
+                anchor = new GameObject("Forest Upgrade Anchor").transform;
+                anchor.SetParent(forest.transform, false);
+            }
+            anchor.position = forest.ForestCenter + Vector3.up * 4f;
+            var settings = new SerializedObject(upgrade);
+            settings.FindProperty("displayName").stringValue = "Orman";
+            settings.FindProperty("forest").boolValue = true;
+            settings.FindProperty("anchor").objectReferenceValue = anchor;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        var upgrades = hud.GetComponent<UpgradeHUD>();
+        if (upgrades == null)
+            upgrades = hud.gameObject.AddComponent<UpgradeHUD>();
+        var ui = new SerializedObject(upgrades);
+        ui.FindProperty("template").objectReferenceValue = stoneButton;
+        ui.FindProperty("woodIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/Wood.png");
+        ui.FindProperty("stoneIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/Stone.png");
+        ui.FindProperty("workerPrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Gatherer>("Assets/Prefabs/Economy/Woodcutter.prefab");
+        ui.ApplyModifiedPropertiesWithoutUndo();
         return true;
     }
 

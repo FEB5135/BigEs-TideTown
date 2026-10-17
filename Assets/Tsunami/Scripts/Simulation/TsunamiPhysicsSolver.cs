@@ -40,6 +40,65 @@ namespace Tsunami
     }
 
     /// <summary>
+    /// A long wave coming in from the open sea beyond the domain (grid-local metres, solver time): a Gaussian ridge
+    /// travelling at constant speed, its crest growing from <see cref="startShare"/> of the amplitude to the full
+    /// amplitude over <see cref="growTime"/> (the far approach). The solver drives the sponge band on the side it
+    /// comes from towards this wave instead of the still sea, so the wave flows into the domain as it is; the same
+    /// function draws it beyond the domain, so outside and inside are one wave.
+    /// </summary>
+    [Serializable]
+    public struct IncomingWave
+    {
+        public bool active;
+        /// <summary>Crest centre at Time = 0 (grid-local XZ, m).</summary>
+        public float startX, startZ;
+        /// <summary>Unit travel direction (XZ).</summary>
+        public float dirX, dirZ;
+        /// <summary>Travel speed (m/s).</summary>
+        public float speed;
+        /// <summary>Full crest height above the still sea (m).</summary>
+        public float amplitude;
+        /// <summary>Crest height at Time = 0 as a share of the amplitude.</summary>
+        public float startShare;
+        /// <summary>Seconds until the crest reaches the full amplitude.</summary>
+        public float growTime;
+        /// <summary>Gaussian radii along / across the travel direction (m).</summary>
+        public float lengthRadius, widthRadius;
+
+        public float CrestHeight(double time)
+        {
+            float t = growTime > 0f ? (float)Math.Min(1.0, Math.Max(0.0, time / growTime)) : 1f;
+            return amplitude * (startShare + (1f - startShare) * t * t);
+        }
+
+        public void CrestCentre(double time, out float x, out float z)
+        {
+            float d = speed * (float)time;
+            x = startX + dirX * d;
+            z = startZ + dirZ * d;
+        }
+
+        /// <summary>Surface elevation above the still sea at a grid-local point (m).</summary>
+        public float Elevation(float x, float z, double time)
+        {
+            if (!active) return 0f;
+            CrestCentre(time, out float cx, out float cz);
+            float px = x - cx, pz = z - cz;
+            float a = (px * dirX + pz * dirZ) / Math.Max(1f, lengthRadius);
+            float b = (-px * dirZ + pz * dirX) / Math.Max(1f, widthRadius);
+            float e = 0.5f * (a * a + b * b);
+            return e > 30f ? 0f : CrestHeight(time) * MathF.Exp(-e);
+        }
+
+        /// <summary>Depth-averaged flow speed of the wave over still depth <paramref name="depth"/> (exact simple wave).</summary>
+        public static float FlowSpeed(float eta, float depth, float gravity)
+        {
+            if (depth <= 0f) return 0f;
+            return 2f * (MathF.Sqrt(gravity * Math.Max(0f, depth + eta)) - MathF.Sqrt(gravity * depth));
+        }
+    }
+
+    /// <summary>
     /// Depth-averaged 2D shallow-water solver (Saint-Venant equations):
     ///   dh/dt + div(h u) = 0
     ///   d(h u)/dt + div(h u (x) u + g h^2 / 2 I) = -g h grad(z_b) - friction
@@ -96,6 +155,13 @@ namespace Tsunami
         /// <summary>Relaxation rate (1/s) towards the still sea inside the sponge band at the domain edge.</summary>
         public float SpongeStrength = 1.5f;
         public int SpongeCells = 6;
+        /// <summary>
+        /// Extra relaxation rate (1/s) towards <see cref="Incoming"/> in the sponge band on the side the wave comes
+        /// from: strong enough to carry the wave into the domain at its full height.
+        /// </summary>
+        public float IncomingRelaxation = 30f;
+        /// <summary>Wave coming in from beyond the domain (inactive after a reset).</summary>
+        public IncomingWave Incoming;
         public bool UseThreads = true;
 
         public double Time { get; private set; }
@@ -208,6 +274,7 @@ namespace Tsunami
                 if (z < n - 1 && (BarrierMask[i] & 8) == 0) Seed(x, z + 1);
             }
             Array.Copy(Depth, stillDepth, c);
+            Incoming = default;
             Time = 0;
             SourceVolume = 0;
             MaxDepthChange = 1f; // force one render update
@@ -447,6 +514,7 @@ namespace Tsunami
             Stage(dt);
             Stage(dt);
             stageDt = dt;
+            forceTime = Time + dt;
             For(0, n, AverageAndFinishRows);
 
             float m = 0f;
@@ -458,6 +526,7 @@ namespace Tsunami
         }
 
         float stageDt;
+        double forceTime; // solver time at the end of the current step (the incoming wave is imposed there)
 
         void Stage(float dt)
         {
@@ -732,6 +801,9 @@ namespace Tsunami
             float n2Sea = SeaManning * SeaManning, n2Land = LandManning * LandManning;
             bool sponge = OpenBoundaries && SpongeStrength > 0f;
             float k = SpongeStrength * dt;
+            bool incoming = OpenBoundaries && Incoming.active;
+            float kIn = (SpongeStrength + IncomingRelaxation) * dt;
+            float half = (n - 1) * 0.5f;
             for (int z = z0; z < z1; z++)
             {
                 int row = z * n;
@@ -761,15 +833,31 @@ namespace Tsunami
                         float qm = MathF.Sqrt(qx * qx + qz * qz);
                         if (qm > cap) { float r = cap / qm; qx *= r; qz *= r; }
                     }
-                    if (sponge)
+                    if (sponge || incoming)
                     {
                         float wgt = spongeWeight[i];
                         if (wgt > 0f && InitiallyWet[i])
                         {
-                            float f = 1f / (1f + k * wgt);
                             float rest = stillDepth[i];
-                            h = rest + (h - rest) * f;
-                            qx *= f; qz *= f;
+                            float px = (x - half) * CellSize, pz = (z - half) * CellSize;
+                            // On the side the wave comes from (upstream half), the band relaxes towards the incoming
+                            // wave: its height and its own flow, so it enters the domain travelling as it is.
+                            if (incoming && rest > 0.5f && px * Incoming.dirX + pz * Incoming.dirZ < 0f)
+                            {
+                                float eta = Incoming.Elevation(px, pz, forceTime);
+                                float target = rest + eta;
+                                float u = IncomingWave.FlowSpeed(eta, rest, g);
+                                float f = 1f / (1f + kIn * wgt);
+                                h = target + (h - target) * f;
+                                qx = target * u * Incoming.dirX + (qx - target * u * Incoming.dirX) * f;
+                                qz = target * u * Incoming.dirZ + (qz - target * u * Incoming.dirZ) * f;
+                            }
+                            else if (sponge)
+                            {
+                                float f = 1f / (1f + k * wgt);
+                                h = rest + (h - rest) * f;
+                                qx *= f; qz *= f;
+                            }
                         }
                     }
                     float d = h - h0[i];

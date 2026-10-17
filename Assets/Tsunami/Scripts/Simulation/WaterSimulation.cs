@@ -306,12 +306,94 @@ namespace Tsunami
             return seaLevel;
         }
 
-        /// <summary>Open-ocean surface at integer grid coords (-1..Resolution), shared by the flood mesh edge and OceanRing.</summary>
+        /// <summary>
+        /// Open-ocean surface at integer grid coords (-1..Resolution), shared by the flood mesh edge and OceanRing:
+        /// the still sea plus, on the side it comes from, the incoming wave (so the edge band of the flood mesh
+        /// blends into the same wave the swell draws beyond the domain).
+        /// </summary>
         public float OceanAt(int x, int z, out float speed)
         {
             speed = 0f;
-            return seaLevel;
+            if (solver == null || !solver.Incoming.active) return seaLevel;
+            float half = (terrain.Resolution - 1) * 0.5f;
+            float px = (x - half) * terrain.CellSize, pz = (z - half) * terrain.CellSize;
+            IncomingWave w = solver.Incoming;
+            if (px * w.dirX + pz * w.dirZ >= 0f) return seaLevel;
+            float eta = w.Elevation(px, pz, solver.Time);
+            speed = IncomingWave.FlowSpeed(eta, OpenOceanShaderDepth, gravity);
+            return seaLevel + eta;
         }
+
+        // ------------------------------------------------------------------ incoming wave
+
+        /// <summary>
+        /// Sends a long wave in from the open sea: a Gaussian ridge (radii along / across the travel direction)
+        /// whose crest is at <paramref name="crestWorldAtStart"/> now and travels at <paramref name="speed"/>; its
+        /// height grows from <paramref name="startShare"/> of <paramref name="amplitude"/> to the full amplitude
+        /// over <paramref name="growTime"/> seconds. It flows into the domain through the sponge band on its side.
+        /// Call right after ResetWater (simulation time 0); ResetWater clears it.
+        /// </summary>
+        public void StartIncomingWave(Vector3 crestWorldAtStart, Vector2 travelDirection, float speed, float amplitude,
+            float startShare, float growTime, float lengthRadius, float widthRadius)
+        {
+            EnsureInitialized();
+            Vector3 local = crestWorldAtStart - terrain.transform.position;
+            Vector2 d = travelDirection.sqrMagnitude > 1e-6f ? travelDirection.normalized : Vector2.right;
+            solver.Incoming = new IncomingWave
+            {
+                active = true,
+                startX = local.x, startZ = local.z,
+                dirX = d.x, dirZ = d.y, speed = speed, amplitude = amplitude,
+                startShare = Mathf.Clamp01(startShare), growTime = Mathf.Max(0f, growTime),
+                lengthRadius = lengthRadius, widthRadius = widthRadius
+            };
+            StepCount++;
+        }
+
+        public bool IncomingWaveActive => solver != null && solver.Incoming.active;
+        /// <summary>The incoming wave (grid-local metres; evaluate it at <see cref="SimTime"/>).</summary>
+        public IncomingWave Incoming => solver != null ? solver.Incoming : default;
+
+        /// <summary>Incoming wave's surface elevation above the still sea at a world position, at the current simulation time.</summary>
+        public float IncomingElevation(Vector3 world)
+        {
+            if (solver == null || !solver.Incoming.active) return 0f;
+            Vector3 local = world - terrain.transform.position;
+            return solver.Incoming.Elevation(local.x, local.z, solver.Time);
+        }
+
+        /// <summary>World position of the incoming wave's crest centre at the current simulation time.</summary>
+        public Vector3 IncomingCrestWorld
+        {
+            get
+            {
+                if (solver == null) return terrain.transform.position;
+                solver.Incoming.CrestCentre(solver.Time, out float x, out float z);
+                return terrain.transform.position + new Vector3(x, seaLevel, z);
+            }
+        }
+
+        /// <summary>
+        /// Distance (m) from a world point to the domain's outer edge going along <paramref name="direction"/>
+        /// (XZ). 0 when the point is outside the domain.
+        /// </summary>
+        public float DistanceToEdge(Vector3 world, Vector2 direction)
+        {
+            EnsureInitialized();
+            Vector3 c = terrain.transform.position;
+            float hx = terrain.HalfExtent;
+            float px = world.x - c.x, pz = world.z - c.z;
+            if (Mathf.Abs(px) > hx || Mathf.Abs(pz) > hx) return 0f;
+            float t = float.MaxValue;
+            if (direction.x > 1e-4f) t = Mathf.Min(t, (hx - px) / direction.x);
+            if (direction.x < -1e-4f) t = Mathf.Min(t, (-hx - px) / direction.x);
+            if (direction.y > 1e-4f) t = Mathf.Min(t, (hx - pz) / direction.y);
+            if (direction.y < -1e-4f) t = Mathf.Min(t, (-hx - pz) / direction.y);
+            return t == float.MaxValue ? 0f : t;
+        }
+
+        /// <summary>Width (m) of the edge band where the flood mesh fades into the open-ocean surface.</summary>
+        public float EdgeFadeWidth => edgeFadeCells * (terrain != null ? terrain.CellSize : 1f);
 
         /// <summary>
         /// Per-cell blend (row-major, n*n): 1 on the two outermost rows (pure open ocean), fading smoothly

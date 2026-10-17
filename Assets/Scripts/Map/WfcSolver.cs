@@ -56,6 +56,9 @@ public class WfcSolver : MonoBehaviour
         Solve();
     }
 
+    /// <summary>False when the pins could not fit the initial cells and the map was solved without them.</summary>
+    public bool PinsKept { get; private set; } = true;
+
     public void Pin(int x, int y, int id, int rotation = 0)
     {
         pins.Add(new FixedCell { X = x, Y = y, Id = id, Rotation = rotation });
@@ -72,6 +75,26 @@ public class WfcSolver : MonoBehaviour
         if (!BuildTiles())
             return;
 
+        PinsKept = true;
+        if (TrySolve(true))
+            return;
+
+        // Pins come from code and are laid in world space (GridForest's forest area), so they can land on
+        // the painted initial cells when the cell size changes. The painted map wins.
+        if (pins.Count == 0)
+        {
+            Debug.LogError($"WFC failed to fill the map (seed {usedSeed}).", this);
+            return;
+        }
+
+        Debug.LogWarning($"WFC could not fit the {pins.Count} pinned cells with the initial cells (seed {usedSeed}). Solving without the pins.", this);
+        PinsKept = false;
+        if (!TrySolve(false))
+            Debug.LogError($"WFC failed to fill the map (seed {usedSeed}).", this);
+    }
+
+    bool TrySolve(bool usePins)
+    {
         width = world.Width;
         height = world.Height;
         var cellCount = width * height;
@@ -95,8 +118,8 @@ public class WfcSolver : MonoBehaviour
                 possible[i * tileCount + tile] = true;
         }
 
-        if (!ApplyFixed(initialCells) || !ApplyFixed(pins))
-            return;
+        if (!ApplyFixed(initialCells) || (usePins && !ApplyFixed(pins)))
+            return false;
 
         usedSeed = seed != 0 ? seed : Environment.TickCount;
         random = new System.Random(usedSeed);
@@ -113,10 +136,7 @@ public class WfcSolver : MonoBehaviour
         }
 
         if (!PropagateInitial(origins) || !Search(origins))
-        {
-            Debug.LogError($"WFC failed to fill the map (seed {usedSeed}).", this);
-            return;
-        }
+            return false;
 
         for (var y = 0; y < height; y++)
         {
@@ -126,6 +146,8 @@ public class WfcSolver : MonoBehaviour
                 world.Set(x, y, tiles[tile].Id, tiles[tile].Rotation);
             }
         }
+
+        return true;
     }
 
     bool BuildTiles()

@@ -12,10 +12,28 @@ float _TsunamiNoFoam;      // 1 = foam off
 float _TsunamiTime;        // simulation-driven animation time (frozen while paused)
 float _TsunamiTimeSet;     // 1 when _TsunamiTime is driven by the manager
 float _TsunamiBathyVis;    // 1 = colour the sea floor by depth below the still sea
+float4 _TsunamiStormShade;       // xy = storm bank centre (world XZ), zw = unit direction out to sea (XZ)
+float4 _TsunamiStormShadeParams; // x = darkness 0..1 (0 = off), y = reach towards the coast, z = half width, w = reach out to sea (m)
 
 float TsunamiAnimTime()
 {
     return lerp(_Time.y, _TsunamiTime, saturate(_TsunamiTimeSet));
+}
+
+// Darkness of the stormy sea at a world position (0..1): full under and behind the storm bank, fading towards
+// the coast and at the sides (set by TsunamiStorm).
+half TsunamiStormShade(float3 positionWS)
+{
+    float4 p = _TsunamiStormShadeParams;
+    if (p.x <= 0.0) return 0.0;
+    float2 rel = positionWS.xz - _TsunamiStormShade.xy;
+    float2 outward = _TsunamiStormShade.zw;
+    float along = dot(rel, outward);
+    float side = abs(rel.x * outward.y - rel.y * outward.x);
+    float towardCoast = smoothstep(0.0, 1.0, saturate((along + p.y) / max(p.y * 0.85, 0.01)));
+    float width = p.z * lerp(0.75, 1.0, saturate(along / max(p.w, 0.01)));
+    float sides = 1.0 - smoothstep(0.0, 1.0, saturate((side - width * 0.55) / max(width * 0.45, 0.01)));
+    return p.x * towardCoast * sides;
 }
 
 float TsunamiSeaLevel(float fallback)

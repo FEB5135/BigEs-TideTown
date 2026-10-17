@@ -1,10 +1,11 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Tsunami
 {
     /// <summary>
-    /// In-game tsunami panel: wave height slider, Start / Pause-Resume / Reset, status and countdown.
+    /// In-game tsunami panel: wave height slider, Start / Pause-Resume / Reset / Release now, status and countdown.
     /// The wave height is an initial condition: it is used the next time the tsunami is started or restarted.
     /// Labels and interactability refresh only when something changes.
     /// </summary>
@@ -16,6 +17,8 @@ namespace Tsunami
         [Tooltip("Pause / Resume.")]
         [SerializeField] Button stopButton;
         [SerializeField] Button resetButton;
+        [Tooltip("Releases the tsunami at once, skipping the storm countdown (testing). Optional.")]
+        [SerializeField] Button releaseNowButton;
         [Tooltip("Height (m) of the initial sea-surface bulge out at sea.")]
         [SerializeField] Slider waveHeightSlider;
         [SerializeField] Text waveHeightText;
@@ -24,13 +27,46 @@ namespace Tsunami
         [SerializeField] Text countdownText;
 
         int shownKey = int.MinValue;
+        int shownReleaseSecond = int.MinValue;
         bool shownPending;
         Text startLabel, stopLabel;
+        CanvasGroup visibility;
 
         void Awake()
         {
             if (startButton != null) startLabel = startButton.GetComponentInChildren<Text>();
             if (stopButton != null) stopLabel = stopButton.GetComponentInChildren<Text>();
+            visibility = GetComponent<CanvasGroup>();
+            MainMenu.GameStarted += Reveal;
+        }
+
+        void OnDestroy() => MainMenu.GameStarted -= Reveal;
+
+        // The panel is hidden (CanvasGroup alpha 0) while the main menu is open. It reveals itself when the game
+        // starts instead of relying only on the menu's gameplayUI list, which can lose the entry when the menu is
+        // rebuilt. Without a menu in the scene it is shown at once.
+        void Start()
+        {
+            if (visibility != null && visibility.alpha < 1f && FindAnyObjectByType<MainMenu>() == null) Reveal();
+        }
+
+        void Reveal()
+        {
+            if (visibility == null || !isActiveAndEnabled) return;
+            StartCoroutine(FadeIn());
+        }
+
+        IEnumerator FadeIn()
+        {
+            const float duration = 0.4f;
+            float from = visibility.alpha;
+            for (float t = 0f; t < duration && visibility.alpha < 1f; t += Time.unscaledDeltaTime)
+            {
+                visibility.alpha = Mathf.Max(visibility.alpha, Mathf.Lerp(from, 1f, t / duration));
+                yield return null;
+            }
+            visibility.alpha = 1f;
+            visibility.interactable = visibility.blocksRaycasts = true;
         }
 
         void OnEnable()
@@ -43,6 +79,7 @@ namespace Tsunami
             if (startButton != null) startButton.onClick.AddListener(OnStart);
             if (stopButton != null) stopButton.onClick.AddListener(controller.TogglePause);
             if (resetButton != null) resetButton.onClick.AddListener(controller.ResetSimulation);
+            if (releaseNowButton != null) releaseNowButton.onClick.AddListener(controller.ReleaseNow);
             if (waveHeightSlider != null)
             {
                 waveHeightSlider.minValue = TsunamiController.MinWaveHeight;
@@ -61,6 +98,7 @@ namespace Tsunami
             if (startButton != null) startButton.onClick.RemoveListener(OnStart);
             if (stopButton != null) stopButton.onClick.RemoveListener(controller.TogglePause);
             if (resetButton != null) resetButton.onClick.RemoveListener(controller.ResetSimulation);
+            if (releaseNowButton != null) releaseNowButton.onClick.RemoveListener(controller.ReleaseNow);
             if (waveHeightSlider != null) waveHeightSlider.onValueChanged.RemoveListener(OnWaveHeight);
             controller.StateChanged -= OnStateChanged;
         }
@@ -89,6 +127,8 @@ namespace Tsunami
         {
             if (controller == null) return;
             if (controller.HasPendingChanges != shownPending) RefreshWaveHeight();
+            int releaseSecond = controller.ReleaseScheduled ? Mathf.CeilToInt(controller.ReleaseRemaining) : -1;
+            if (releaseSecond != shownReleaseSecond) RefreshStatus();
             if (countdownText == null) return;
             int key = -1;
             if (controller.State == TsunamiState.Warning) key = Mathf.CeilToInt(controller.WarningRemaining);
@@ -106,9 +146,18 @@ namespace Tsunami
             if (startLabel != null) startLabel.text = started ? "Yeniden Başlat" : "Tsunamiyi Başlat";
             if (stopButton != null) stopButton.interactable = state == TsunamiState.Running || state == TsunamiState.Paused || state == TsunamiState.Warning;
             if (stopLabel != null) stopLabel.text = state == TsunamiState.Paused ? "Devam" : "Duraklat";
-            if (statusText != null) statusText.text = "Durum: " + Describe(state);
+            RefreshStatus();
             shownKey = int.MinValue;
             RefreshWaveHeight();
+        }
+
+        void RefreshStatus()
+        {
+            shownReleaseSecond = controller.ReleaseScheduled ? Mathf.CeilToInt(controller.ReleaseRemaining) : -1;
+            if (statusText == null) return;
+            statusText.text = shownReleaseSecond >= 0
+                ? $"Durum: Fırtına yaklaşıyor - tsunamiye {shownReleaseSecond / 60}:{shownReleaseSecond % 60:00}"
+                : "Durum: " + Describe(controller.State);
         }
 
         public static string Describe(TsunamiState state)
