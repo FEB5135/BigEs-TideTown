@@ -25,6 +25,12 @@ public class GridForest : MonoBehaviour
     [Tooltip("Toplama noktasının tıklama alanı (hücre boyuna oranla genişlik ve yükseklik).")]
     [SerializeField] float colliderWidth = 0.7f;
     [SerializeField] float colliderHeight = 1.2f;
+    [Tooltip("Ağaç karolarının hücreye göre büyütmesi (karo prefab'ında; burada tıklama alanı için).")]
+    [SerializeField] float treeScale = 1f;
+    [Tooltip("WFC'nin koyduğu bir ağacın kalma olasılığı (büyük ağaçlar seyrek olsun).")]
+    [SerializeField, Range(0f, 1f)] float treeKeep = 1f;
+    [Tooltip("İki ağaç arasında en az bu kadar boş hücre olur.")]
+    [SerializeField] int treeSpacing;
 
     [Header("Devrilme")]
     [SerializeField] float fallSeconds = 1.1f;
@@ -68,6 +74,15 @@ public class GridForest : MonoBehaviour
                         solver.Pin(x, y, groundId, -1);
     }
 
+    bool HasTreeNear(Vector2Int cell)
+    {
+        for (int dy = -treeSpacing; dy <= treeSpacing; dy++)
+            for (int dx = -treeSpacing; dx <= treeSpacing; dx++)
+                if ((dx != 0 || dy != 0) && trees.Contains(cell + new Vector2Int(dx, dy)))
+                    return true;
+        return false;
+    }
+
     bool HasForestArea => forestSize.x > 0f && forestSize.y > 0f;
 
     public bool InForest(int x, int y)
@@ -95,8 +110,18 @@ public class GridForest : MonoBehaviour
             map.Set(x, y, groundId, rotation);
             return;
         }
-        if (id == treeId && trees.Add(new Vector2Int(x, y)))
-            AddNode(x, y, rotation);
+        if (id != treeId)
+            return;
+        var cell = new Vector2Int(x, y);
+        if (trees.Contains(cell))
+            return; // yeniden çıkan ağaç
+        if (Random.value > treeKeep || HasTreeNear(cell))
+        {
+            map.Set(x, y, groundId, rotation);
+            return;
+        }
+        trees.Add(cell);
+        AddNode(x, y, rotation);
     }
 
     void AddNode(int x, int y, int rotation)
@@ -105,8 +130,8 @@ public class GridForest : MonoBehaviour
         node.transform.SetParent(nodes, false);
         node.transform.SetPositionAndRotation(map.CellCenter(x, y), map.transform.rotation);
         var box = node.AddComponent<BoxCollider>();
-        float width = map.CellSize * colliderWidth;
-        float height = map.CellSize * colliderHeight;
+        float width = map.CellSize * colliderWidth * treeScale;
+        float height = map.CellSize * colliderHeight * treeScale;
         box.size = new Vector3(width, height, width);
         box.center = new Vector3(0f, height * 0.5f, 0f);
         var resource = node.AddComponent<ResourceNode>();

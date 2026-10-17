@@ -97,6 +97,9 @@ public static class SampleSceneSetup
     // ResourceTest ormanı: kasabanın (yarıçap 36.5 m) 6 m dışında, ekranın solunda 30 x 55 m.
     static readonly Vector3 ForestCenter = Quaternion.Euler(0f, ForestYaw, 0f) * new Vector3(-(36.5f + 6f) - 15f, 0f, 0f);
     static readonly Vector2 ForestSize = new(30f, 55f);
+    // ResourceTest'teki ağaçlar 5 m hücreyle çiziliyordu; burada hücre 2 m, ağaçlar aynı boyda olsun.
+    const float TreeScale = 2.5f;
+    const string BigTreeDir = "Assets/Prefabs/Map";
 
     public static bool EnsureGridForest(Scene scene)
     {
@@ -130,6 +133,14 @@ public static class SampleSceneSetup
         settings.FindProperty("treeId").intValue = TreeId;
         settings.FindProperty("groundId").intValue = 0;
         var modules = viewSettings.FindProperty("modules");
+        for (int i = 0; i < modules.arraySize; i++)
+        {
+            var module = modules.GetArrayElementAtIndex(i);
+            var prefab = module.FindPropertyRelative("Prefab");
+            if (module.FindPropertyRelative("Id").intValue == TreeId && prefab.objectReferenceValue is GameObject tile)
+                prefab.objectReferenceValue = BigTreeTile(tile);
+        }
+        viewSettings.ApplyModifiedPropertiesWithoutUndo();
         var tiles = settings.FindProperty("treeTiles");
         var weights = settings.FindProperty("treeWeights");
         tiles.arraySize = weights.arraySize = 0;
@@ -144,6 +155,9 @@ public static class SampleSceneSetup
             tiles.GetArrayElementAtIndex(index).objectReferenceValue = prefab;
             weights.GetArrayElementAtIndex(index).intValue = module.FindPropertyRelative("Weight").intValue;
         }
+        settings.FindProperty("treeScale").floatValue = TreeScale;
+        settings.FindProperty("treeKeep").floatValue = 0.45f;
+        settings.FindProperty("treeSpacing").intValue = 1;
         settings.FindProperty("treeMaterial").objectReferenceValue = palette;
         settings.FindProperty("fadeMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/FlatFade.mat");
         settings.ApplyModifiedPropertiesWithoutUndo();
@@ -164,6 +178,62 @@ public static class SampleSceneSetup
             if (grid.GetComponent<ConstructionGridToggle>() == null)
                 grid.gameObject.AddComponent<ConstructionGridToggle>().Configure(controller);
         return true;
+    }
+
+    // Ekibin ağaç karosunun büyütülmüş kopyası: zemin plakası çıkarılır (yoksa büyüyünce komşu karoların
+    // üstüne biner), ağaçlar karonun ortası etrafında TreeScale kadar büyür, böylece hücrenin ortasında kalır.
+    // Ekibin modeline dokunulmaz; mesh ve prefab Assets/Prefabs/Map'e yazılır.
+    static GameObject BigTreeTile(GameObject tile)
+    {
+        if (tile.name.EndsWith("_big"))
+            return tile;
+        var prefabPath = $"{BigTreeDir}/{tile.name}_big.prefab";
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        if (existing != null)
+            return existing;
+
+        var filter = tile.GetComponentInChildren<MeshFilter>();
+        var source = filter != null ? filter.sharedMesh : null;
+        if (source == null)
+            return tile;
+        var vertices = source.vertices;
+        var kept = new List<int>();
+        for (int s = 0; s < source.subMeshCount; s++)
+        {
+            var triangles = source.GetTriangles(s);
+            for (int t = 0; t < triangles.Length; t += 3)
+            {
+                // Tamamı yerde olan üçgenler zemin plakası (ve gövdelerin görünmeyen alt yüzü).
+                if (vertices[triangles[t]].y < 0.001f && vertices[triangles[t + 1]].y < 0.001f && vertices[triangles[t + 2]].y < 0.001f)
+                    continue;
+                kept.Add(triangles[t]);
+                kept.Add(triangles[t + 1]);
+                kept.Add(triangles[t + 2]);
+            }
+        }
+        var mesh = Object.Instantiate(source);
+        mesh.name = tile.name + "_big";
+        mesh.subMeshCount = 1;
+        mesh.SetTriangles(kept, 0);
+        mesh.RecalculateBounds();
+        if (!AssetDatabase.IsValidFolder(BigTreeDir))
+            AssetDatabase.CreateFolder("Assets/Prefabs", "Map");
+        AssetDatabase.CreateAsset(mesh, $"{BigTreeDir}/{tile.name}_big.asset");
+
+        // Karo merkezi (plakanın ortası) büyütmede yerinde kalsın: kök TreeScale, çocuk merkez × (1/ölçek − 1).
+        var center = source.bounds.center;
+        center.y = 0f;
+        var root = new GameObject(tile.name + "_big");
+        root.transform.localScale = Vector3.one * TreeScale;
+        var child = new GameObject("Mesh", typeof(MeshFilter), typeof(MeshRenderer));
+        child.transform.SetParent(root.transform, false);
+        child.transform.localPosition = filter.transform.localPosition + center * (1f / TreeScale - 1f);
+        child.transform.localRotation = filter.transform.localRotation;
+        child.GetComponent<MeshFilter>().sharedMesh = mesh;
+        child.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
+        var prefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        Object.DestroyImmediate(root);
+        return prefab;
     }
 
     public static void RestoreTerrainColor()

@@ -39755,10 +39755,10 @@ MonoBehaviour:
     Prefab: {fileID: 919132149155446097, guid: 50328d8d2096f8045aaccb8727bd0f24, type: 3}
     Weight: 1
   - Id: 5
-    Prefab: {fileID: 919132149155446097, guid: c9745f3cc34d6144dacbe816aafce88a, type: 3}
+    Prefab: {fileID: 400149784378440872, guid: dd2c28f0e12a65c49a11a754bbbf7ce7, type: 3}
     Weight: 1
   - Id: 5
-    Prefab: {fileID: 919132149155446097, guid: e31a73e541af0194b84eb5e649c07d53, type: 3}
+    Prefab: {fileID: 3844087261099621296, guid: 7e0fe447f2e8eb54981e5ce50b592ea4, type: 3}
     Weight: 1
 --- !u!114 &1602157105
 MonoBehaviour:
@@ -60725,11 +60725,14 @@ MonoBehaviour:
   treeId: 5
   groundId: 0
   treeTiles:
-  - {fileID: 919132149155446097, guid: c9745f3cc34d6144dacbe816aafce88a, type: 3}
-  - {fileID: 919132149155446097, guid: e31a73e541af0194b84eb5e649c07d53, type: 3}
+  - {fileID: 400149784378440872, guid: dd2c28f0e12a65c49a11a754bbbf7ce7, type: 3}
+  - {fileID: 3844087261099621296, guid: 7e0fe447f2e8eb54981e5ce50b592ea4, type: 3}
   treeWeights: 0100000001000000i
   colliderWidth: 0.7
   colliderHeight: 1.2
+  treeScale: 2.5
+  treeKeep: 0.45
+  treeSpacing: 1
   fallSeconds: 1.1
   lieSeconds: 2
   fadeSeconds: 1.5
