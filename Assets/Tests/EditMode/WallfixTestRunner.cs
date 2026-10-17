@@ -9,6 +9,18 @@ namespace IdleTown.Tests
     {
         static TestRunnerApi runner;
 
+        [MenuItem("Tools/Idle Town/Wallfix/Run Integration Tests")]
+        public static void RunIntegration()
+        {
+            runner = ScriptableObject.CreateInstance<TestRunnerApi>();
+            runner.RegisterCallbacks(new Results());
+            runner.Execute(new ExecutionSettings(new Filter
+            {
+                testMode = TestMode.EditMode,
+                assemblyNames = new[] { "IdleTown.EditModeTests" }
+            }));
+        }
+
         [MenuItem("Tools/Idle Town/Wallfix/Run Wall Tests")]
         public static void Run()
         {

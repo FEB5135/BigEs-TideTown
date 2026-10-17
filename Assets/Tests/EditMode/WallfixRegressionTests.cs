@@ -10,10 +10,16 @@ namespace IdleTown.Tests
         WallConstructionController controller;
         Store store;
         Mesh terrainMesh;
+        readonly System.Collections.Generic.List<Collider> sceneColliders = new();
 
         [SetUp]
         public void SetUp()
         {
+            // Integration tests may leave the team map loaded. Keep its physics out of this fixture.
+            sceneColliders.Clear();
+            foreach (var collider in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+                if (collider.enabled)
+                { sceneColliders.Add(collider); collider.enabled = false; }
             root = new GameObject("Wallfix test world");
             var world = root.AddComponent<World>();
             controller = root.AddComponent<WallConstructionController>();
@@ -26,6 +32,9 @@ namespace IdleTown.Tests
         {
             Object.DestroyImmediate(root);
             if (terrainMesh != null) Object.DestroyImmediate(terrainMesh);
+            foreach (var collider in sceneColliders)
+                if (collider != null) collider.enabled = true;
+            sceneColliders.Clear();
         }
 
         WallTerrainSurface CreateSlope()
@@ -50,6 +59,8 @@ namespace IdleTown.Tests
         public void SlopedWallColliderMeetsTerrainAtBothEndsAndSupportsTenFloors()
         {
             var terrain = CreateSlope();
+            controller.ConfigureTerrain(terrain, 100);
+            Assert.That(controller.MaxFloors, Is.EqualTo(10), "The 20 metre cap must also clamp configuration overrides.");
             var a = new Vector2Int(2, 2); var b = new Vector2Int(3, 2);
             for (int floor = 0; floor < 10; floor++)
                 Assert.That(controller.TryBuild(a, b, floor, WallTier.Timber, out var reason), Is.True, reason);
