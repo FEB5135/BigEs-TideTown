@@ -12,7 +12,6 @@ public sealed class WelcomeParty : MonoBehaviour
     static readonly Color Ink = new(0.29f, 0.196f, 0.125f);
     static readonly Color Wood = new(0.37f, 0.247f, 0.141f);
     static readonly Color Red = new(0.91f, 0.32f, 0.29f);
-    static readonly Color Gold = new(1f, 0.89f, 0.54f);
 
     static readonly string[] Titles = {
         "Köyün sana emanet",
@@ -37,7 +36,9 @@ public sealed class WelcomeParty : MonoBehaviour
     readonly List<(IsometricCamera camera, bool input)> blockedCameras = new();
     GameObject uiRoot, modal;
     Button help, back, next;
-    Text title, description, tip, counter, nextLabel;
+    Text title, description, tip, tipHeading, counter, nextLabel;
+    readonly Image[] steps = new Image[4];
+    Sprite roundedSprite;
     Image progress;
     Font font;
     float previousTimeScale;
@@ -164,13 +165,22 @@ public sealed class WelcomeParty : MonoBehaviour
     {
         if (uiRoot != null)
             Destroy(uiRoot);
+        if (roundedSprite != null)
+        {
+            Destroy(roundedSprite.texture);
+            Destroy(roundedSprite);
+        }
     }
 
     void RefreshPage()
     {
         title.text = Titles[PageIndex];
         description.text = Descriptions[PageIndex];
-        tip.text = Tips[PageIndex];
+        var hint = Tips[PageIndex].Split(new[] { '\n' }, 2);
+        tipHeading.text = hint[0];
+        tip.text = hint[1];
+        for (int i = 0; i < steps.Length; i++)
+            steps[i].color = i <= PageIndex ? Red : new Color(0.85f, 0.80f, 0.71f);
         counter.text = $"KÖY REHBERİ   /   {PageIndex + 1} — {PageCount}";
         back.interactable = PageIndex > 0;
         nextLabel.text = PageIndex == PageCount - 1 ? "Köyü korumaya başla" : "Devam et  →";
@@ -185,6 +195,7 @@ public sealed class WelcomeParty : MonoBehaviour
             return;
         if (font == null)
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        CreateRoundedSprite();
         uiRoot = new GameObject("Welcome Party", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         // Menü canvas'ı kapanınca da rehber erişilebilir kalır.
         UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(uiRoot, gameObject.scene);
@@ -203,23 +214,35 @@ public sealed class WelcomeParty : MonoBehaviour
         helpRect.anchoredPosition = new Vector2(-24, -24);
         help.gameObject.SetActive(false);
 
-        var backdrop = Panel(uiRoot.transform, "Guide Modal", new Color(0.06f, 0.10f, 0.12f, 0.82f), Vector2.zero, Vector2.zero);
+        var backdrop = Panel(uiRoot.transform, "Guide Modal", new Color(0.06f, 0.08f, 0.10f, 0.78f), Vector2.zero, Vector2.zero, 0);
         Stretch(backdrop);
         modal = backdrop.gameObject;
-        Panel(backdrop, "Shadow", new Color(0, 0, 0, 0.25f), new Vector2(1160, 756), new Vector2(0, -12));
-        var card = Panel(backdrop, "Guide Card", Cream, new Vector2(1140, 736), Vector2.zero);
-        Panel(card, "Accent", Red, new Vector2(1140, 12), new Vector2(0, 362));
-        counter = Label(card, "Step", "", 24, Wood, new Vector2(996, 44), new Vector2(0, 287));
-        title = Label(card, "Title", "", 52, Ink, new Vector2(996, 90), new Vector2(0, 210));
-        description = Label(card, "Description", "", 31, Ink, new Vector2(996, 156), new Vector2(0, 86));
-        var tipPanel = Panel(card, "Tip Panel", Gold, new Vector2(996, 176), new Vector2(0, -99));
-        tip = Label(tipPanel, "Tip", "", 27, Ink, new Vector2(936, 146), Vector2.zero);
-        back = MakeButton(card, "Previous", "Geri", Wood, new Vector2(180, 66), new Vector2(-408, -253), PreviousPage);
-        MakeButton(card, "Skip", "Rehberi geç", Wood, new Vector2(240, 66), new Vector2(-145, -253), Complete);
-        next = MakeButton(card, "Next", "", Red, new Vector2(398, 66), new Vector2(299, -253), NextPage);
+        // Katmanlı, düşük opaklıklı gölge kartı zeminden ayırır.
+        Panel(backdrop, "Soft Shadow", new Color(0, 0, 0, 0.10f), new Vector2(1172, 792), new Vector2(0, -15), 42);
+        Panel(backdrop, "Near Shadow", new Color(0, 0, 0, 0.15f), new Vector2(1152, 772), new Vector2(0, -8), 36);
+        Panel(backdrop, "Card Border", new Color(0.66f, 0.52f, 0.36f), new Vector2(1144, 764), Vector2.zero, 34);
+        var card = Panel(backdrop, "Guide Card", Cream, new Vector2(1140, 760), Vector2.zero, 32);
+        counter = Label(card, "Step", "", 23, Wood, new Vector2(800, 44), new Vector2(-98, 301));
+        for (int i = 0; i < steps.Length; i++)
+            steps[i] = Panel(card, $"Step {i + 1}", Red, new Vector2(14, 14), new Vector2(406 + i * 28, 301), 7).GetComponent<Image>();
+        title = Label(card, "Title", "", 52, Ink, new Vector2(996, 104), new Vector2(0, 207));
+        description = Label(card, "Description", "", 31, new Color(0.39f, 0.30f, 0.22f), new Vector2(996, 150), new Vector2(0, 83));
+        var tipPanel = Panel(card, "Tip Panel", new Color(0.98f, 0.89f, 0.68f), new Vector2(996, 184), new Vector2(0, -105), 22);
+        tipHeading = Label(tipPanel, "Tip Heading", "", 25, Wood, new Vector2(916, 42), new Vector2(0, 48));
+        tip = Label(tipPanel, "Tip", "", 27, Ink, new Vector2(916, 102), new Vector2(0, -22));
+        back = MakeButton(card, "Previous", "←  Geri", Wood, new Vector2(180, 68), new Vector2(-408, -264), PreviousPage);
+        back.GetComponent<Image>().color = new Color(0.91f, 0.86f, 0.77f);
+        back.GetComponentInChildren<Text>().color = Ink;
+        var skip = MakeButton(card, "Skip", "Rehberi geç", Wood, new Vector2(220, 68), new Vector2(-170, -264), Complete);
+        skip.GetComponent<Image>().color = Cream;
+        skip.GetComponentInChildren<Text>().color = Wood;
+        Panel(card, "Next Shadow", new Color(0.67f, 0.20f, 0.18f), new Vector2(398, 68), new Vector2(299, -269), 17);
+        next = MakeButton(card, "Next", "", Red, new Vector2(398, 68), new Vector2(299, -264), NextPage);
         nextLabel = next.GetComponentInChildren<Text>();
-        Panel(card, "Progress Track", new Color(0.85f, 0.80f, 0.69f), new Vector2(996, 6), new Vector2(0, -322));
-        progress = Panel(card, "Progress", Red, new Vector2(996, 6), new Vector2(0, -322)).GetComponent<Image>();
+        Panel(card, "Progress Track", new Color(0.88f, 0.83f, 0.74f), new Vector2(996, 6), new Vector2(0, -322), 3);
+        progress = Panel(card, "Progress", Red, new Vector2(996, 6), new Vector2(0, -322), 3).GetComponent<Image>();
+        var keyboardHint = Label(card, "Keyboard Hint", "← →  adımlar arasında       Esc  rehberi kapatır", 18, new Color(0.56f, 0.46f, 0.35f), new Vector2(996, 40), new Vector2(0, -350));
+        keyboardHint.alignment = TextAnchor.MiddleCenter;
         if (modal != null)
             modal.SetActive(false);
     }
@@ -241,7 +264,7 @@ public sealed class WelcomeParty : MonoBehaviour
 
     Button MakeButton(Transform parent, string name, string label, Color color, Vector2 size, Vector2 position, UnityEngine.Events.UnityAction action)
     {
-        var rect = Panel(parent, name, color, size, position);
+        var rect = Panel(parent, name, color, size, position, 17);
         var button = rect.gameObject.AddComponent<Button>();
         button.targetGraphic = rect.GetComponent<Image>();
         var colors = button.colors;
@@ -255,11 +278,43 @@ public sealed class WelcomeParty : MonoBehaviour
         return button;
     }
 
-    static RectTransform Panel(Transform parent, string name, Color color, Vector2 size, Vector2 position)
+    RectTransform Panel(Transform parent, string name, Color color, Vector2 size, Vector2 position, float radius = 24)
     {
         var rect = Rect(parent, name, size, position);
-        rect.gameObject.AddComponent<Image>().color = color;
+        var image = rect.gameObject.AddComponent<Image>();
+        image.color = color;
+        if (radius > 0)
+        {
+            image.sprite = roundedSprite;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 32f / radius;
+        }
         return rect;
+    }
+
+    // Tek küçük doku tüm yuvarlak kart/düğmelerde 9-slice ile paylaşılır.
+    // Kenar alfa geçişi farklı çözünürlüklerde köşeleri yumuşak tutar.
+    void CreateRoundedSprite()
+    {
+        const int size = 128;
+        const float radius = 32f;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = "Welcome Rounded Surface";
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+        var pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                var q = new Vector2(Mathf.Abs(x + 0.5f - size / 2f), Mathf.Abs(y + 0.5f - size / 2f)) - Vector2.one * (size / 2f - radius);
+                float distance = Vector2.Max(q, Vector2.zero).magnitude + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - radius;
+                byte alpha = (byte)Mathf.RoundToInt(Mathf.Clamp01(0.5f - distance) * 255f);
+                pixels[y * size + x] = new Color32(255, 255, 255, alpha);
+            }
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+        roundedSprite = Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100f, 0, SpriteMeshType.FullRect, Vector4.one * radius);
+        roundedSprite.name = "Welcome Rounded Surface";
     }
 
     static RectTransform Rect(Transform parent, string name, Vector2 size, Vector2 position)
