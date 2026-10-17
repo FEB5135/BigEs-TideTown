@@ -13,7 +13,9 @@ public static class EconomyPrefabs
     public const string MineCartPrefabPath = Folder + "/MineCart.prefab";
     const string QuarryModelPath = "Assets/Meshes/Quarry.fbx";
     const string MineCartModelPath = "Assets/Meshes/MineCart.fbx";
-    const string PaletteMaterialPath = "Assets/Materials/Flat.mat";
+    // Ocak ve vagon kendi paletini kullanır (ekibin palette.png'sinin 2026-10-17 öğlen hali; ahşap/sarı/kırmızı
+    // 57/59/61. sütunlarda). Ekip palette.png'yi değiştirdikçe bizim modellerin renkleri bozulmasın diye ayrı.
+    const string PaletteMaterialPath = "Assets/Materials/EconomyFlat.mat";
 
     [MenuItem("Tools/BigEs/Ekonomi Prefab'larını Kur")]
     public static void Build()

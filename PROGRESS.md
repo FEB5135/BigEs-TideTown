@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (tsunami simülasyonu)
+Son güncelleme: 2026-10-17 (main, collision-main-merge dalına birleştirildi)
 
 ## Bağlam
 
@@ -14,29 +14,29 @@ Son güncelleme: 2026-10-17 (tsunami simülasyonu)
 
 ## Branch'ler
 
-- `main`: Ekibin ortak branch'i. `feature/main-menu` main'e merge edildi (2026-10-17, ana menü + ContructionMechanics + palet düzeltmesi). Son çekilen commit: `7afe46b Wave Collapse Function` (WFC ile grid harita: `Assets/Scripts/Map/WfcSolver.cs`, `MapView`, yeni zemin/yokuş modelleri, `villager.obj`; `SampleScene`'de). `feature/main-menu`'ye merge edildi (2026-10-17), çakışma yok; `Flat.mat`'te iki tarafın değişikliği birleşti. `testground*` modelleri main'de silindi, bizim sahne onları kullanmıyordu.
-- `feature/resource-gathering`: Bizim çalışmamız (kaynak toplama). Push etmeden önce kullanıcıya sor.
-- `feature/main-menu`: `feature/resource-gathering`'den açıldı. Ana menü burada. GitHub'a push edildi (2026-10-17).
-- `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
-
-## ⚠ Yarım kalan iş (önce bunu bitir)
-
-**Maden ocakları + taş toplayan vagonlar** kodlandı, derlendi (hata yok), sahne kuruldu (3 ocak + 3 vagon) ve commit edildi. **Play'de henüz test edilmedi.**
-- İlgili dosyalar: `Assets/Scripts/Economy/ResourceNode.cs` (`maxGatherers`: bir kaynakta birden fazla toplayıcı), `Assets/Scripts/Editor/ResourceTestSetup.cs` (`BuildQuarries`, `BuildMineCarts`, köyde ocak yönüne ±24° yol boşluğu).
-- Tasarım: Ekranın sağında, kasabanın dışında (TownRadius+9) 3 ocak, girişleri kasabaya bakıyor. Her ocak bir Stone `ResourceNode` (kapasite 200, yenilenme 15 sn, en fazla 3 vagon); tıklayınca taş kuyuya atılır. 3 vagon (`Gatherer`, Stone, 8 taş, hız 4, girişin 5 m önünde durur) taşı kuyuya götürüp atar.
-- Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
+- `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi.
+- `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
+- `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
+- `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
+- `feature/wfc-forest`: Eski ResourceTest tabanlı orman çalışması; main'e alınmadı, yerine SampleScene'e yalnız ağaç kısmı taşındı. Arşiv.
+- `feature/main-menu`, `feature/resource-gathering`: Eski dallar; işleri main'de.
+- `backup/resource-gathering-before-rewrite`: Yalnız yerelde, Asset Store ağaç paketi içerir, **asla push etme**. `backup/single-scene-setup`: yalnız yerelde. İkisi de silinebilir.
 
 ## Aktif çalışma
 
+- Dal: `main` (yeni iş için ondan dal açılır). Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
+- `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
+- ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
+- Kullanıcı dağ/tepe düzeni için "tam böyle olmayacak, şimdilik beklesin" dedi; odun kesme animasyonu için "hâlâ garip ama şimdilik kalsın".
+- `collision-main-merge` dalı: collision + tsunami çalışmasının üstüne güncel main birleştirildi (2026-10-17). SampleScene main'den alındı; tsunami nesnesi kurulum komutuyla yeniden eklendi.
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
-- Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
-- Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
 
 - **Collision + katlı inşa (17 Ekim 2026):** `origin/ContructionMechanics` birleştirildi. Ahşap/taş/güçlendirilmiş ve üç kat, `(edge,floor)` hasar/su kayıtlarıyla bağlandı. %15/%40/%70 hasarda çatlaklı parça görünümü, en az 3 simülasyon saniyesine yayılan yüksek yük hasarı, kırılmada 12 fiziksel parça (küresel limit 20, ömür 8 s) eklendi. Üst kata ulaşmayan su üst katı etkilemez; alt kat kırılınca desteksiz üst katlar çöker; komşu korunur. Unity EditMode 52/52, çarpışma saf testleri 10/10, tier saf testleri 5/5 ve gerçek haritada kontrollü Play Mode geçti. Güncel kurulum, reset ve sınırlar `COLLISION_HANDOFF.md` içinde.
 
 - **Collision Unity entegrasyonu (17 Ekim 2026):** `eed4ee5` alındı; mevcut SampleScene bağlantıları ve yeni hasar/enkaz/köpük ayarları kaydedildi. `CollisionIntegrationSetup` editör aracı ve gerçek harita üzerinde kontrollü Play Mode kontrolü eklendi; inşa → su kaydı → yük → kırılma → enkaz → bariyer kaldırma → yeniden inşa geçti. Saf C# 10/10, Unity EditMode 40/40 geçti. FinottiGames bağımlılığı yerel önbellekten kuruldu, Git'e eklenmedi. Tam dalga yayılımı/görsel kalite/düşük-yüksek dalga dengesi hâlâ ayrı oynanış kontrolü gerektirir. Ayrıntılar `COLLISION_HANDOFF.md` içinde.
+
 - **Collision görsel kontrolü:** Menüde tsunami paneli CanvasGroup ile gizlendi, kamera girişinden sonra açılması doğrulandı. Grafik açık Play'de 10 m tsunami kasabaya ulaştı; su, sıçrama ve köyün su basma/yıkılma durumu ekranda çalıştı. Dalga/duvar dengesi henüz kapsamlı sınanmadı. Test sıfırlandı, Unity SampleScene Play modunda hazır bırakıldı.
 
 - **Tsunami–duvar çarpışması (2026-10-17, `collision`):** Mevcut sığ su çözücüsünün bariyer yüzleri gerçek inşa segmentleriyle handle üzerinden eşlendi. Owner-aware bariyer bileşimi statik/external crest'i ve örtüşen diğer segmentleri kaldırma sırasından bağımsız koruyor. Her owner ortak yüzlerde bile kendi yönlü metadata'sını alıyor; görsel yüz dedup'u yalnız emitter'da uygulanıyor. Hasar dinamik girişlerin toplamı ve iki taraflı hidrostatik net farkla segment/solver-adımı başına yalnız bir kez ilerliyor. Sustained-only kırılma gerçek segment merkezi ve hidrostatik yönüyle enkaz üretir; stale/default impact kullanılmaz. Yalnız ıslak normal akış damla/köpük/hafif sis üretiyor; emitter yüz gate'i ve genel tarama ayrımı çift efekti önlüyor. Renderer tepe yüksekliği, yatay/dikey ve iki yüzlü çapraz merdiven temsili ile taşma korunuyor. Pause hasar vermiyor. Tek kırılan kenar model/visual/collider/sayısal owner'dan birlikte çıkarılıyor, komşular kalıyor, normal maliyetle yeniden yapılabiliyor ve iade yok. Disable/re-enable ve solver recreation model-authoritative reconcile ediliyor; subscriber yoksa orphan görsel controller tarafından siliniyor. Enkaz 20/8 sn, parçacıklar 900/320/160 ile sınırlı. Su reseti hasarı koruyor; tam reset/restart yaşayan duvar hasarını ve efekt/enkazı temizliyor, yıkıkları diriltmiyor. Dış bağımlılıksız saf .NET testleri 10/10 geçti; Unity kurulmadığı için Play/EditMode bekliyor. Ayrıntı: `COLLISION_HANDOFF.md`.
@@ -51,7 +51,33 @@ Son güncelleme: 2026-10-17 (tsunami simülasyonu)
   - **Kurulum:** Tsunami > Add Tsunami To Open Scene (Team Map). Sahneye yalnız bir `Tsunami` nesnesi eklenir.
   - **Doğrulama:** Unity dışında sayısal testler yapıldı (durgun göl, √(g·h) dalga hızı, kütle korunumu, baraj yıkılması, zaman adımı ve ızgara yakınsaması, ekip haritası düzeni). Ayrıntılar `Assets/Tsunami/README.md`'de. Derleme `dotnet build` ile 0 hata. **Unity'de Play testi ve FPS ölçümü henüz yapılmadı.**
 
-- **WFC ağaçları ve zemin main'e (2026-10-17, `feature/wfc-forest`'tan yalnız ağaç/zemin görünümü):** Kullanıcı isteği: main'in SampleScene'i ve World'ü (128×128, 2 m) kullanılacak; ResourceTest ve inşa değişikliklerimiz alınmadı. `SampleSceneSetup.EnsureGridForest` (SampleScene kurulum menüsü de çağırır): MapView malzemesi TerrainGround yerine `Flat.mat` (çimenli karolar görünür), World'e `GridForest` eklenir, eski tek tek ağaçlı `Gameplay/Forest` kapatılır (silinmez), WFC'nin köy için ayırdığı başlangıç hücrelerinden orman alanına düşenler silinir, inşa grid'ine `ConstructionGridToggle` eklenir (çizgiler yalnız inşa modunda). `GridForest`: orman alanı (45° dönük, merkez kasabanın 6 m dışında solda, 30×55 m) dışını WFC'de zemine sabitler; alan içinde yalnız ağaç ve düz zemin kalır (yokuş/tepe karoları zemine çevrilir). Ağaçlar toplanabilir; kesilince zemin plakası olmadan, her ağaç ayrı, 8 yönden rastgele devrilir, 2 sn sonra `FlatFade.mat` ile saydamlaşıp kaybolur; tıklanınca ve oduncu vurunca (`Gatherer.hitInterval` 0.5 sn, yalnız odun) sallanır. `ResourceNode`'a `VisibilityChanged` ve `Hit` olayları eklendi. Play'de doğrulandı: orman köyün solunda, zemin çimenli ve grid'siz, oduncular odun getiriyor, konsol temiz. Ağaçlar ResourceTest'teki boyda: kurulum ekibin ağaç karolarından zemin plakasız, karo merkezi etrafında 2.5 kat büyütülmüş kopyalar üretir (`Assets/Prefabs/Map/tree_0_*_big.prefab` + `.asset` mesh; ekibin modeline dokunulmaz) ve MapView'daki id 5 modüllerini bunlarla değiştirir. Büyük ağaçlar üst üste binmesin diye GridForest ormanı seyreltir (`treeKeep` 0.45, ağaçlar arası en az 1 boş hücre); tıklama alanı `treeScale` ile büyür. Play'de doğrulandı: boy ve yoğunluk ResourceTest'e benziyor, devrilme çalışıyor.
+- **Oyun sesleri (2026-10-17, `feature/villager-jobs`):** Kullanıcı izniyle Kenney RPG Audio ve Impact Sounds (CC0) indirildi; yalnız kullanılan .ogg'lar ve lisansları `Assets/Audio/SFX/`'e kondu (zip'ler repoda değil). Vagon yuvarlanma sesi bizim: `Art/Audio/make_cart_roll.py` → `CartRoll.wav` (2 sn döngü). `Assets/Scripts/Gameplay/GameAudio.cs` (sahnede "Game Audio"): sesler 2B, kameranın baktığı noktaya uzaklıkla ve uzaklaştırınca kısılır, çeşitlerden rastgele biri hafif farklı perdeyle çalınır. Bağlantılar: `ResourceNode.PlayHitFeedback` (ağaçta balta, ocakta tok taş; tıklama ve oduncu vuruşu), `GridForest.Fell` (çatırdama) ve düşüş sonu (yere çakılma), `CartSound` (vagon hızına göre yuvarlanma sesi, kalkış/duruşta metal tıkırtı; `GathererSpawner` ekler). Kurulum: `SampleSceneSetup.EnsureAudio`. Play'de hata yok; sesler dinlenerek doğrulanmadı (kullanıcı dinlemeli). Ses düzeyleri: `GameAudio.volume` 0.8, `CartSound.rollVolume` 0.55. Kullanıcı geri bildirimiyle: sesler kameranın olaya uzaklığına göre (30 m tam, 60 m sessiz; oyun başındaki 80 m görünümde duyulmaz, yakınlaştırınca gelir); ağaca vurmada tek, tok ses (`impactWood_medium_000`; cırt sesli `chop` ve diğer çeşitler çıkarıldı). Ocak taş sesi: kullanıcının Pixabay "Heavy Rock Rolling" (Dragon Studio) kaydından Audacity ile kestiği `RockBreak.mp3` (~0.6 sn); Kenney `impactMining` sesleri kaldırıldı. Pixabay lisansı ses dosyasının tek başına dağıtılmasını yasaklıyor; repo public olunca dikkate alınmalı (THIRD_PARTY.md'de yazılı). Bekleyen: vagon yuvarlanma sesi (sentez "fena kötü", gerçek tekerlek kaydı aranacak).
+
+- **Menü geçişinde renk sıçraması (2026-10-17, `feature/villager-jobs`):** Oyun kamerasında post-processing kapalı; `CameraIntro` menü bulanıklığı için onu geçici açınca sahnenin Global Volume'undaki Bloom/Vignette/Tonemapping/MotionBlur da devreye girip renkleri soldurıyordu, bulanıklık bitince renk birden canlanıyordu. Artık post-processing yalnız bulanıklık için açıldığında, sahnedeki her efekt türü varsayılan (etkisiz) değerlerle ezilir ("Menu Neutral" Volume, öncelik 99). Menü, geçiş ve oyun aynı renkte; Play'de doğrulandı. Oyunda post-processing açılırsa bu katman kurulmaz. Not: odun kesme animasyonunu kullanıcı "hâlâ garip ama şimdilik kalsın" dedi.
+
+- **Köylü animasyonları (2026-10-17, `feature/villager-jobs`):** Kullanıcı: "vagonlar uzaktan itiliyor, ağaçları garip kesiyorlar". Vagon itme: köylü artık vagonun merkezinden değil arka ucundan 0.35 m geride durur (`Gatherer.pushGap`; vagon boyu modelden hesaplanır), kollar -72°, gövde 12° öne eğik; Play'de köylünün elleri kasada vagonu ittiği görüldü. Odun kesme: kollar artık sinüsle sallanmıyor, vuruş anına bağlı (`Gatherer.LastHitTime`, `HitInterval`): vuruşta öne iner, kısa durur, yavaşça baş üstüne kalkar, hızlanarak bir sonraki vuruşa iner; gövde kaldırırken geriye, vururken öne eğilir; balta sırasında kollar hızlı izlenir. Oduncular ağaca 1.1 m'ye kadar yaklaşır (`stopDistance`, kurulum ayarlar; 5 m hücrelik eski haritadan kalma 1.5–2.5 m idi). Yürürken gövde sallanması ±15°'den ±3°'ye indi (`bodyRock`). Odun kesme ağacın yanında kolu kalkmış halde görüldü ama vuruş döngüsü yakından kare kare doğrulanamadı.
+
+- **Dağlar ve tepeler ekibin grid'inden (2026-10-17, `feature/villager-jobs`):** Kullanıcı isteği: arkadaşın SampleScene2'de WFC ile kurduğu dağ/tepe (karlı kayalık, yokuş, köşe; karo id 6–9) bizim sahnede de rastgele olsun, tasarımcının dosyalarına dokunulmasın. `SampleSceneSetup.EnsureTerrain` (EnsureGridForest çağırır): SampleScene2'yi yalnız okur, WfcSolver kurallarını ve MapView karo listesini bizim World'e kopyalar (SampleScene2 kaydedilmez). Elle konmuş eski dağlar (`Gameplay/Mountains`) kapatıldı. Köy, ocaklar ve kuyu main kurulumunun başlangıç hücreleriyle düz; dışı her oyunda rastgele. `GridForest.pinOutsideForest` kapalı; orman alanının her hücresi WFC'den önce ağaç (%50, `treeChance`) ya da düz zemine sabitlenir, böylece ormanda yokuş çıkmaz ve sonradan karo değiştirmek gerekmez. Hücre 2 m olduğu için kayalıklar SampleScene2'dekinin (1 m) iki katı. Play'de doğrulandı, konsol temiz. Not: tsunaminin geleceği vadi (eski dağ sırası) artık yok; dalga tasarımı bunu dikkate almalı.
+
+- **Köylüleri elle işe koyma (2026-10-17, `feature/villager-jobs`, `fix/tree-cell-ground` + güncel main'den; push edilmedi):** Tomodachi Life tarzı.
+  - SampleScene'deki 5 oduncu artık işsiz köylü (`Gatherer.villager`): başta bulunduğu yerin 5 m çevresinde dolaşır.
+  - `Assets/Scripts/Gameplay/VillagerPicker.cs` (Main Camera'da): imleç köylünün üzerine (ya da ekranda ~32 px yakınına; uzaktan küçük göründükleri için) gelince açık el, sol tıkla tutunca kapalı el (`Assets/UI/Cursor/HandOpen/HandClosed.png`, yazılımsal imleç). Tutulan köylü imleci 3 m yukarıda takip eder, sallanır. Bırakınca: bir maden ocağının (kaya ya da ray başı) 12 m yakınındaysa ve ocağın boşta vagonu varsa vagonu iter; bir ağacın 6 m yakınındaysa oduncu olur; yoksa orada dolaşır. Menü açıkken ve inşa modunda kapalı; köylü üzerindeyken tıklayarak toplama çalışmaz (`VillagerPicker.Busy`).
+  - Vagonlar (`GathererSpawner.needsPusher`, varsayılan açık) iten köylü olmadan bekler; köylü vagonun arkasına yürür, vagonla birlikte hareket eder (kollar önde, `GathererActivity.Pushing`), vagon madene girip taşla kuyuya döner, sürekli. Köylü tutulursa vagon olduğu yerde durur. Bir vagonu aynı anda tek köylü sahiplenir.
+  - Gatherer döngüsü yeniden başlatılabilir oldu: `Wander`, `WorkInForest`, `PushCart`, `Stop`.
+  - Play'de doğrulandı: köylü tutulup bırakıldı, ormana bırakılan odun getirdi (5), ocağa bırakılan vagonu itti (8 taş), diğer vagonlar bekledi, konsol temiz. Vagon itme sahnesi yakından gözle incelenmedi.
+
+- **Ocak/vagon renkleri (2026-10-17):** Ekip `29cf5f4 Mountains` ile `palette.png`'nin 5–7 ve bizim 57/59/61. sütunlarımızı (ahşap/sarı/kırmızı) beyaza boyadı; ocak ve vagonlar renksiz kaldı. Bizim modeller artık ekip paletinden bağımsız: `Assets/Textures/EconomyPalette.png` (paletin o sabahki hali) + `Assets/Materials/EconomyFlat.mat`; `Quarry.prefab`, `MineCart.prefab` ve `EconomyPrefabs.cs` bunu kullanır. Ekip paleti değiştirse de bozulmaz. (Not: Blender scriptleri `Art/Blender/shapes.py` hâlâ aynı sütun düzenini kullanıyor; EconomyPalette ile uyumlu.)
+
+- **Ana menü yeniden tasarımı (2026-10-17, `feature/menu-redesign`, main'den; push edilmedi):** Kullanıcıyla konuşulan UI rehberine göre (Crossy Road tarzı). Yalnız `MainMenuSetup` ve sprite'lar değişti, `MainMenu`/`PressableButton` davranışı aynı. SampleScene'de menü yeniden kuruldu.
+  - Renkler: Oyna mercan `#F2542D` (alt `#B83A1B`), ikincil (Ayarlar, Geri, ayar okları) okyanus `#1F5F8B` (alt `#154566`), Çıkış hayalet (yarı saydam beyaz, çerçeveli), panel lacivert `#0B2A3D`, vurgu su `#2EC4D6`, skor altın `#FFD23F`. Kahverengi/krem kalktı.
+  - Butonlar: düz yüz, 8 px sert alt kalınlık, kesik (pah kırılmış) köşeler; `Art/UI/make_menu_sprites.py` çiziyor (`Button{Coral,Ocean,Ghost}`, `Square*`, `Panel`, `Bar`, `Handle`, `Scrim`). Kenney menü sprite'ları SampleScene'de artık kullanılmıyor.
+  - Yerleşim (1920×1080): logo üst ortada (y 262), Oyna 440×112 (y -34), Ayarlar 360×80 (y -170), Çıkış 360×72 (y -266); boşluklar 88/40/20. Skor ortadan sağ üst köşeye, kenarlardan 64 px içeride bir çip. Alt yazı 16 px, %60.
+  - İkon/yazı: ikon buton yüksekliğinin %42'si; Oyna'da ikon+yazı ortada grup, ikincillerde ikon soldan 32 px sabit sütunda. Dış çizgi yok, sert aşağı gölge var.
+  - Okunabilirlik: lacivert vinyet (%55) + buton sütununun arkasında yumuşak koyuluk (%35) + mevcut bokeh. Logo: kalın çift dış çizgi yerine 3 px lacivert çizgi + 9 px sert aşağı gölge.
+  - Yazı tipi Rubik (kullanıcı izniyle Google Fonts CSS API'den sabit dosyalar: `Rubik-Bold.ttf` yazılar, `Rubik-Black.ttf` logo; `Rubik-OFL.txt`). Ç, Ğ, İ, Ö, Ş, Ü, ı Pillow ve fontTools ile kontrol edildi. Ayarlar sayfası Rubik ile gözle kontrol edilmedi (aynı yazı tipi).
+  - Play'de doğrulandı: ana sayfa, Ayarlar sayfası, Geri, Oyna → oyun başlıyor; konsol temiz.
+
+- **WFC ağaçları ve zemin main'e (2026-10-17, `feature/wfc-forest`'tan yalnız ağaç/zemin görünümü):** Kullanıcı isteği: main'in SampleScene'i ve World'ü (128×128, 2 m) kullanılacak; ResourceTest ve inşa değişikliklerimiz alınmadı. `SampleSceneSetup.EnsureGridForest` (SampleScene kurulum menüsü de çağırır): MapView malzemesi TerrainGround yerine `Flat.mat` (çimenli karolar görünür), World'e `GridForest` eklenir, eski tek tek ağaçlı `Gameplay/Forest` kapatılır (silinmez), WFC'nin köy için ayırdığı başlangıç hücrelerinden orman alanına düşenler silinir, inşa grid'ine `ConstructionGridToggle` eklenir (çizgiler yalnız inşa modunda). `GridForest`: orman alanı (45° dönük, merkez kasabanın 6 m dışında solda, 30×55 m) dışını WFC'de zemine sabitler; alan içinde yalnız ağaç ve düz zemin kalır (yokuş/tepe karoları zemine çevrilir). Ağaçlar toplanabilir; kesilince zemin plakası olmadan, her ağaç ayrı, 8 yönden rastgele devrilir, 2 sn sonra `FlatFade.mat` ile saydamlaşıp kaybolur; tıklanınca ve oduncu vurunca (`Gatherer.hitInterval` 0.5 sn, yalnız odun) sallanır. `ResourceNode`'a `VisibilityChanged` ve `Hit` olayları eklendi. Play'de doğrulandı: orman köyün solunda, zemin çimenli ve grid'siz, oduncular odun getiriyor, konsol temiz. Ağaçlar ekibin karolarının kendisi, orijinal boyda ve WFC'nin koyduğu sıklıkta (`treeScale` 1, `treeKeep` 1, `treeSpacing` 0). Bir ara kullanıcı isteğiyle 2.5 kat büyütülmüş kopyalar (`*_big`) kullanıldı; ekip arkadaşı "ağaçlar o kadar büyük değildi" deyince kullanıcı orijinal boya döndürttü, kopyalar silindi (`SampleSceneSetup.TeamTreeTile` eski `*_big` referanslarını ekibin .obj'sine çevirir). Ekibin güncel ağaç modelinde (`29cf5f4 Mountains`) gövde altları kapalı ve karonun kendi zemin plakası var, hücrede delik kalmaz. Play'de doğrulandı (gri delik yok, konsol temiz).
 
 - **Animasyon merge (2026-10-17):** Yürüyüş/odun kesme animasyonları, köylü prefabları ve SampleScene kaynak toplama düzeni main'e çakışmasız birleştirildi. Birleşmiş main sürümünde 37/37 Unity testi başarılı (0 hata); yürüyüş, ağaca yönelme, kol/mesh animasyonu ve odun/taş teslimi doğrulandı. Rapor: Logs/main-villager-merge-tests.xml.
 
@@ -113,33 +139,31 @@ Son güncelleme: 2026-10-17 (tsunami simülasyonu)
 ## Sıradaki işler / açık konular
 
 - [ ] Collision devir kontrolü: `COLLISION_HANDOFF.md` listesindeki düşük/yüksek dalga, bloklama/taşma/kırık boşluk, yatay/dikey/çapraz, pause/reset ve uzun çalışma sınırlarını Unity 6000.6.6f1 Play Mode'da doğrula.
-
 - [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.
 - [ ] Tsunami, main'e birleştirmeden önce: `Terrain-1`'de PC kalite seviyesi hızlı grafik ayarlarına çevrili (`Assets/Tsunami/Settings`), build sahne listesinde ilk sırada `TsunamiDemo` var. İkisi de ekiple konuşulmalı.
-
-- [x] Köylü animasyonlarını ve SampleScene düzenini main'e birleştir.
-- [ ] Yerel main değişikliklerini paylaşmak için push (henüz yapılmadı).
-
-- [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir).
-- [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
-- [ ] Ana menü: eğimli kamera girişi (CameraIntro'da `menuPitch`/`menuYaw` değiştirmek yeterli).
-- [x] Tek sahne kararı: kullanıcı kaynak toplama düzeninin SampleScene içine taşınmasını istedi; animasyonlu köylüler, menü ve kaynak sistemleri burada kuruldu.
-
-- [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
-- [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
-- [x] Duvar sistemini `Well.TrySpend` ile bağlamak; ResourceHUD aynı bakiye olaylarını izliyor.
-- [ ] Toplama hızı ile duvar maliyetini dengelemek.
 - [ ] Unity'de yeni duvar EditMode regresyonlarını ve Play modunda kat/seviye paneli, yükseltilmiş ön izleme ile materyal ayrımını doğrulamak.
-- [ ] Arkadaşa iletilecek: `.obj` modellerin `.mtl` dosyaları repoda yok, modeller beyaz görünüyor. Malzemeleri `Flat.mat`'e eşlemeli.
-- [ ] Teslimden önce: Repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak.
-- [ ] `ProjectSettings/Packages/com.unity.probuilder/Settings.json` Unity tarafından değişti, commit edilmedi.
-- [ ] URP gölge mesafesi (`Assets/Settings/PC_RPAsset.asset`, `m_ShadowDistance: 50`) büyük haritada uzaktan bakınca gölgeleri kesiyor; ekip isterse artırılabilir (ortak ayar, dokunulmadı).
+- [ ] Tsunami: main'de elle konmuş dağlar kapatıldı, dağ/tepeler artık WFC ile rastgele; tsunami adaptörü yalnız `Mountains` grubunu araziye çiziyordu ve vadi hedefi o dağlardan hesaplanıyordu. WFC dağ/tepe karoları simülasyon arazisine eklenmeli, dalga yönü yeni düzene göre seçilmeli.
+
+- [ ] Vagon yuvarlanma sesi: sentez beğenilmedi; kullanıcı gerçek bir tekerlek kaydı seçecek, döngülü yapılıp `GameAudio.cartRoll`'a bağlanacak.
+- [ ] Odun kesme animasyonu hâlâ garip (kullanıcı ertelendi dedi); istenirse elde balta modeli ve daha belirgin vuruş.
+- [ ] Dağ/tepe düzeni değişecek (kullanıcı ayrıntı verecek). Eski elle konmuş dağlar kapalı; tsunaminin geleceği vadi artık yok, dalga tasarımı bunu dikkate almalı.
+- [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek.
+- [ ] Ana menü: skorun tanımı belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
+- [ ] Toplama hızı ile duvar maliyetini dengelemek.
+- [ ] Sol alttaki odun/taş butonlarına işlev vermek (henüz kararlaştırılmadı).
+- [ ] Teslimden önce: repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak. Pixabay sesi (`RockBreak.mp3`) lisansı tek başına dağıtımı yasaklıyor, public repoda durumu değerlendirilmeli.
+- [ ] `ProjectSettings/Packages/com.unity.probuilder/Settings.json` Unity tarafından değişti, commit edilmedi (bilerek).
+- [ ] URP gölge mesafesi (`m_ShadowDistance: 50`) uzaktan bakınca gölgeleri kesiyor; ekip isterse artırılabilir (ortak ayar, dokunulmadı).
 
 ## Çalışma notları (oturumlar arası)
 
-- **Sahneyi değiştirmek:** `ResourceTestSetup.cs` düzenlenir. Mevcut sahneye uygulamak için tek seferlik bir `Assets/Scripts/Editor/RebuildResourceTestOnce.cs` yazılır: `[InitializeOnLoad]` + `delayCall` kökü siler, menüyü çalıştırır, sahneyi kaydeder ve kendini siler.
-- **Derleme:** Unity ancak penceresi öne gelince derler. Play modundayken derlemez. Sonuç `Logs/Editor.log`'dan (`Tundra build success`, `error CS`) okunur.
+- **Sahneyi değiştirmek:** `SampleSceneSetup.cs`'teki `Ensure...` fonksiyonu düzenlenir. Sahneye uygulamak için tek seferlik bir `Assets/Scripts/Editor/Apply...Once.cs` yazılır: `[InitializeOnLoad]` + `delayCall`, `isPlayingOrWillChangePlaymode` ise çıkar; SampleScene açık değilse additive açar, fonksiyonu çağırır, kaydeder, kendini siler. Play modundayken çalışmaz: Play'i durdurup dosyaya bir satır ekleyerek yeniden derletmek gerekir.
+- **Serileştirilmiş alanlar:** Bir bileşenin `[SerializeField]` varsayılanı değişirse sahnedeki eski değer kalır; kurulumda ya da sahne dosyasında ayrıca güncellenmeli.
+- **Mesh asset yazma:** Aynı yola `AssetDatabase.CreateAsset` ile yeniden yazmak bağlı prefab referanslarını "Missing" yapabiliyor ve ağaçlar çizilmeden gri delik bırakmıştı. Var olan mesh `EditorUtility.CopySerialized` ile yerinde güncellenip zorla yeniden içe aktarılır.
+- **Ekip palette.png'yi değiştirebiliyor:** Bizim modeller (ocak, vagon) `EconomyPalette.png` / `EconomyFlat.mat` kullanır, ekibin paletine bağlı değil.
+- **Derleme:** Unity ancak penceresi öne gelince derler; gerekirse boş bir alana tıklayıp Ctrl+R. Play modundayken derlemez. Bu makinede `Logs/Editor.log` kısa; sonuç Unity Console'dan okunur.
+- **Play'de yakından bakmak:** Hiyerarşi aramasıyla objeyi bulup çift tıklayınca Scene görünümü ona odaklanır; arama kutusu temizlenmezse Scene soluk görünür. Köylüler uzaktan birkaç piksel; fareyle test zor, gerekirse geçici bir runtime betiği köylüleri işe koyar (commit edilmez).
 - **Ekran kontrolü:** Kullanıcının Unity düzeni değişebiliyor (Game görünümü üstte küçük). Fare/klavye ile test etmeden önce tam pencere görüntüsü alınmalı. Unity önde değilse kullanıcı bilgisayarı kullanıyordur; dokunulmaz.
 - **İndirme:** Her dosya indirmesi için kullanıcıdan izin alınır. Yalnız CC0 ya da repoya konabilir lisanslar repoya girer; Asset Store paketleri `.gitignore`'a eklenir ve `THIRD_PARTY.md`'ye yazılır.
 - **Model tasarımcısı var:** Görsellerde fazladan iş yapılmaz, placeholder'lar yeterli.

@@ -10,20 +10,24 @@ Bu projede ekip dışından alınan hazır kaynaklar ve yapay zekâ kullanımı 
 | --- | --- | --- | --- | --- |
 | Resources 1 — saint11 | https://opengameart.org/content/resouces-pack-1 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `Wood.png` ve `Stone.png`: sol alttaki kaynak panelinde odun ve taş ikonları (`Assets/UI/Icons/`). Değiştirilmedi. | Evet |
 | UI Pack: RPG Expansion — Kenney | https://kenney.nl/assets/ui-pack-rpg-expansion | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `buttonLong_brown`, `buttonLong_brown_pressed`, `panelInset_beige`: kaynak panelindeki butonların çerçevesi ve ikon yuvası (`Assets/UI/Kenney/`). Değiştirilmedi, 9-slice ile ölçekleniyor. | Evet |
-| UI Pack 2.0 — Kenney | https://kenney.nl/assets/ui-pack | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Ana menüdeki butonlar, panel, kaydırıcı ve ayraç (`Assets/UI/Menu/Kenney/`). Paketin gri parçaları, oyunun renk paletine (ahşap, kırmızı çatı, krem) göre yeniden renklendirildi (`Art/UI/adapt_kenney.py`). | Evet (yalnız değiştirilmiş parçalar) |
+| UI Pack 2.0 — Kenney | https://kenney.nl/assets/ui-pack | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Ana menünün ilk sürümündeki butonlar, panel, kaydırıcı ve ayraç (`Assets/UI/Menu/Kenney/`; artık yalnız `ResourceTest` test sahnesindeki eski menüde). Paketin gri parçaları, oyunun renk paletine (ahşap, kırmızı çatı, krem) göre yeniden renklendirildi (`Art/UI/adapt_kenney.py`). | Evet (yalnız değiştirilmiş parçalar) |
 | LowPoly Trees Game-Ready Free-Asset — FinottiGames | Unity Asset Store | [Unity Asset Store Standard EULA](https://unity.com/legal/as-terms) | Ormandaki ağaç modelleri (`Assets/FinottiGames/`). Oyunda ölçekleniyor ve döndürülüyor. | Hayır, EULA ham dosyaların yeniden dağıtımına izin vermiyor. Kurulum aşağıda. |
 
 ### Yazı tipi
 
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
-| Baloo 2 (ExtraBold) — Ek Type | https://fonts.google.com/specimen/Baloo+2 | [SIL Open Font License 1.1](https://openfontlicense.org) (`Assets/UI/Fonts/Baloo2-OFL.txt`) | Ana menünün yazı tipi (`Assets/UI/Fonts/Baloo2-ExtraBold.ttf`). Değiştirilmedi. | Evet |
+| Rubik (Bold, Black) — The Rubik Project Authors | https://fonts.google.com/specimen/Rubik | [SIL Open Font License 1.1](https://openfontlicense.org) (`Assets/UI/Fonts/Rubik-OFL.txt`) | Ana menünün yazı tipi: yazılar Bold, logo Black (`Assets/UI/Fonts/Rubik-Bold.ttf`, `Rubik-Black.ttf`). Değiştirilmedi. | Evet |
+| Baloo 2 (ExtraBold) — Ek Type | https://fonts.google.com/specimen/Baloo+2 | [SIL Open Font License 1.1](https://openfontlicense.org) (`Assets/UI/Fonts/Baloo2-OFL.txt`) | Ana menünün ilk sürümünün yazı tipi (`Assets/UI/Fonts/Baloo2-ExtraBold.ttf`); artık yalnız `ResourceTest` test sahnesindeki eski menüde. Değiştirilmedi. | Evet |
 
 ### Ses
 
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
 | UI Pack 2.0 — Kenney | https://kenney.nl/assets/ui-pack | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `click-a.ogg`: menü butonlarının tıklama sesi (`Assets/Audio/UI/Click.ogg`). Değiştirilmedi. | Evet |
+| Heavy Rock Rolling — Dragon Studio (Pixabay) | https://pixabay.com/sound-effects/film-special-effects-heavy-rock-rolling-515254/ | [Pixabay Content License](https://pixabay.com/service/license-summary/) (ücretsiz, atıf zorunlu değil; ses dosyasının tek başına yeniden dağıtılması yasak, bir ürünün parçası olarak kullanımı serbest) | Maden ocağına vurunca çıkan taş sesi (`Assets/Audio/SFX/RockBreak.mp3`). Ekip üyesi kaydın yaklaşık 0.6 sn'lik bir bölümünü Audacity ile kesti. | Evet (oyunun parçası olarak) |
+| RPG Audio — Kenney | https://kenney.nl/assets/rpg-audio | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-RPG-Audio-License.txt`) | `creak1-3.ogg` (ağacın kırılması) (`Assets/Audio/SFX/`). Değiştirilmedi; oyunda perdesi rastgele hafifçe değiştirilerek çalınır. | Evet |
+| Impact Sounds — Kenney | https://kenney.nl/assets/impact-sounds | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-Impact-Sounds-License.txt`) | `impactWood_medium_000` (ağaca vurma), `impactWood_heavy_000-002` (ağacın yere düşmesi), `impactMetal_light_000-002` (vagonun kalkış/duruş tıkırtısı) (`Assets/Audio/SFX/`). Değiştirilmedi. | Evet |
 
 ### Kod
 
@@ -49,7 +53,8 @@ Metin ve diğer kategorilerde hazır kaynak kullanılmadı.
 | Kod ve metin | Kullanıldı | OpenCode (OpenAI) | Tsunami ile oyuncu duvarı arasındaki çözücü-yüzü çarpma örneklemesi, zaman adımlı dayanıklılık/kırılma, sınırlı sıçrama-köpük-sis ve enkaz entegrasyonu; saf C# testleri ve devir dokümantasyonu. Yeni dış kaynak veya hazır asset kullanılmadı. |
 | Kod ve metin | Kullanıldı | Codex (OpenAI) | Collision kodunun Unity 6000.6.6f1 entegrasyonu; mevcut SampleScene bağlantılarının ve yeni dayanıklılık/efekt ayarlarının kaydedilmesi; editör kurulum ve çalışma zamanı kontrol aracı, testler ve entegrasyon notları. Daha önce beyan edilen FinottiGames ağaç paketi yerel önbellekten kuruldu; yeni dış kaynak eklenmedi. |
 | Kod ve metin | Kullanıldı | Codex (OpenAI) | Katlı/malzeme seviyeli inşa ile tsunami çarpışmasının birleştirilmesi; aşamalı hasar, stilize çatlak/parça görünümü, sınırlı fiziksel enkaz, kat desteği ve reset uyarlamaları; ilgili Unity ve saf mantık testleri. Parçalar kodla oluşturulan ilkel kutulardır ve mevcut duvar malzemelerini kullanır; yeni dış asset eklenmedi. |
-| Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. Ana menünün ikonları, gölgesi, kenar karartması ve dalga amblemi (`Assets/UI/Menu/`) Claude'un yazdığı Python scriptiyle (`Art/UI/make_menu_sprites.py`) çizildi; Kenney parçalarını yeniden renklendiren script (`Art/UI/adapt_kenney.py`) de Claude'a aittir. |
+| Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. Ana menünün ikonları, gölgesi, kenar karartması, dalga amblemi, butonları (kesik köşeli, alt kalınlıklı), paneli ve kaydırıcı parçaları (`Assets/UI/Menu/`) ile köylü tutma imleçleri (açık/kapalı el, `Assets/UI/Cursor/`) Claude'un yazdığı Python scriptiyle (`Art/UI/make_menu_sprites.py`) çizildi; Kenney parçalarını yeniden renklendiren script (`Art/UI/adapt_kenney.py`) de Claude'a aittir. |
 | Ses | Kullanılmadı | — | — |
+| Ses | Kullanıldı | Claude (Anthropic) | Maden vagonunun ray üstünde yuvarlanma sesi (`Assets/Audio/SFX/CartRoll.wav`): Claude'un yazdığı Python scriptiyle (`Art/Audio/make_cart_roll.py`) gürültü ve sinüs dalgalarından sentezlendi; hazır kayıt kullanılmadı. |
 | Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası, menü metinleri ve kod içi açıklamalar. |
 | Diğer | Kullanılmadı | — | — |

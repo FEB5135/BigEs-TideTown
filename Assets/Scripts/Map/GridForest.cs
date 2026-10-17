@@ -17,6 +17,10 @@ public class GridForest : MonoBehaviour
     [SerializeField] Vector2 forestSize;
     [Tooltip("Orman alanının Y dönüşü (kamera gibi 45°).")]
     [SerializeField] float forestYaw = 45f;
+    [Tooltip("Orman alanının dışı zemine sabitlensin mi. Kapalıysa dışarıda WFC serbest (ekibin dağ/tepe kuralları).")]
+    [SerializeField] bool pinOutsideForest = true;
+    [Tooltip("Orman alanında bir hücrenin ağaç olma olasılığı.")]
+    [SerializeField, Range(0f, 1f)] float treeChance = 0.5f;
     [SerializeField] int treeId = 5;
     [SerializeField] int groundId;
     [Tooltip("MapView'daki ağaç karoları, aynı sıra ve ağırlıkla (devrilen ağaç hücredekiyle aynı görünsün diye).")]
@@ -66,12 +70,18 @@ public class GridForest : MonoBehaviour
         nodes = new GameObject("Tree Nodes").transform;
         nodes.SetParent(transform, false);
 
-        // WfcSolver Start'ta çözer; orman dışını ondan önce zemine sabitle (dönüş serbest, çimen çeşitlensin).
+        // WfcSolver Start'ta çözer; ondan önce orman alanının her hücresi ağaç ya da düz zemine sabitlenir (yokuş/tepe
+        // çıkmaz, çözüm sonrası karo değiştirmek gerekmez; komşulukları WFC'nin kendisi tutarlı kurar). İstenirse orman
+        // dışı da zemine sabitlenir. Dönüş serbest: çimen ve ağaçlar çeşitlensin.
         if (solver != null && HasForestArea)
             for (int y = 0; y < map.Height; y++)
                 for (int x = 0; x < map.Width; x++)
-                    if (!InForest(x, y))
+                {
+                    if (InForest(x, y))
+                        solver.Pin(x, y, Random.value < treeChance ? treeId : groundId, -1);
+                    else if (pinOutsideForest)
                         solver.Pin(x, y, groundId, -1);
+                }
     }
 
     bool HasTreeNear(Vector2Int cell)
@@ -192,6 +202,8 @@ public class GridForest : MonoBehaviour
     void Fell(int x, int y, int rotation)
     {
         EndShake(new Vector2Int(x, y));
+        if (GameAudio.Instance != null)
+            GameAudio.Play(GameAudio.Instance.treeCrack, map.CellCenter(x, y), 0.8f);
         foreach (var tree in SpawnTrees(x, y, rotation, "Falling Tree"))
             StartCoroutine(FallRoutine(tree.transform, tree.GetComponent<Renderer>()));
     }
@@ -231,6 +243,9 @@ public class GridForest : MonoBehaviour
             tree.rotation = Quaternion.AngleAxis(88f * k * k, axis) * start;
             yield return null;
         }
+        // Yere çakıldığı an.
+        if (GameAudio.Instance != null)
+            GameAudio.Play(GameAudio.Instance.treeThud, tree.position);
         const float bounce = 0.25f;
         for (float t = 0f; t < bounce; t += Time.deltaTime)
         {

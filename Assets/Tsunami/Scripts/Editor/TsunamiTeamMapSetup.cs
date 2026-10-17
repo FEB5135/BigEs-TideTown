@@ -20,6 +20,24 @@ namespace Tsunami.EditorTools
         const string RootName = "Tsunami";
         const string TeamScenePath = "Assets/Scenes/SampleScene.unity";
 
+        /// <summary>Batch-mode entry point (no dialogs): opens the team map, adds / replaces the tsunami and saves.</summary>
+        public static void AddToTeamMapBatch()
+        {
+            EditorSceneManager.OpenScene(TeamScenePath, OpenSceneMode.Single);
+            AddToOpenScene();
+        }
+
+        // Dialogs answer "OK / Continue" automatically in batch mode.
+        static bool Ask(string title, string message, string ok, string cancel = null)
+        {
+            if (Application.isBatchMode)
+            {
+                Debug.Log($"[Tsunami] {message.Replace('\n', ' ')}");
+                return true;
+            }
+            return cancel == null ? EditorUtility.DisplayDialog(title, message, ok) : EditorUtility.DisplayDialog(title, message, ok, cancel);
+        }
+
         [MenuItem("Tsunami/Add Tsunami To Open Scene (Team Map)")]
         public static void AddToOpenScene()
         {
@@ -30,26 +48,26 @@ namespace Tsunami.EditorTools
                 // Not the team map (e.g. the TsunamiDemo island is open): offer to open the team's scene.
                 if (AssetDatabase.LoadAssetAtPath<SceneAsset>(TeamScenePath) == null)
                 {
-                    EditorUtility.DisplayDialog("Tsunami", $"No World in '{scene.name}', and {TeamScenePath} was not found.", "OK");
+                    Ask("Tsunami", $"No World in '{scene.name}', and {TeamScenePath} was not found.", "OK");
                     return;
                 }
-                if (!EditorUtility.DisplayDialog("Tsunami",
+                if (!Ask("Tsunami",
                         $"'{scene.name}' is not the team map (it has no World).\n\nOpen the team's map ({TeamScenePath}) and add the tsunami there?",
                         "Open team map", "Cancel"))
                     return;
-                if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
                 scene = EditorSceneManager.OpenScene(TeamScenePath, OpenSceneMode.Single);
                 world = FindActive<World>(scene);
                 if (world == null)
                 {
-                    EditorUtility.DisplayDialog("Tsunami", $"{TeamScenePath} has no active World.", "OK");
+                    Ask("Tsunami", $"{TeamScenePath} has no active World.", "OK");
                     return;
                 }
             }
 
             GameObject existing = FindRoot(scene, RootName);
             string action = existing != null ? "replace the existing \"Tsunami\" object in" : "add a \"Tsunami\" object to";
-            if (!EditorUtility.DisplayDialog("Tsunami",
+            if (!Ask("Tsunami",
                     $"This will {action} '{scene.name}' and save the scene.\n\nNothing else in the scene is changed. " +
                     "To remove the tsunami later, delete the \"Tsunami\" object.", "Continue", "Cancel"))
                 return;

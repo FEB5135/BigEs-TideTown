@@ -22,6 +22,8 @@ public static class SampleSceneSetup
         {
             VillagerPrefabSetup.UpgradeScene(scene);
             EnsureGridForest(scene);
+            EnsureVillagerJobs(scene);
+            EnsureAudio(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -73,6 +75,8 @@ public static class SampleSceneSetup
         grid.AddComponent<NavIgnore>();
         VillagerPrefabSetup.UpgradeScene(scene);
         EnsureGridForest(scene);
+        EnsureVillagerJobs(scene);
+        EnsureAudio(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -97,9 +101,6 @@ public static class SampleSceneSetup
     // ResourceTest ormanı: kasabanın (yarıçap 36.5 m) 6 m dışında, ekranın solunda 30 x 55 m.
     static readonly Vector3 ForestCenter = Quaternion.Euler(0f, ForestYaw, 0f) * new Vector3(-(36.5f + 6f) - 15f, 0f, 0f);
     static readonly Vector2 ForestSize = new(30f, 55f);
-    // ResourceTest'teki ağaçlar 5 m hücreyle çiziliyordu; burada hücre 2 m, ağaçlar aynı boyda olsun.
-    const float TreeScale = 2.5f;
-    const string BigTreeDir = "Assets/Prefabs/Map";
 
     public static bool EnsureGridForest(Scene scene)
     {
@@ -108,6 +109,7 @@ public static class SampleSceneSetup
         var solver = world != null ? world.GetComponent<WfcSolver>() : null;
         if (view == null || solver == null)
             return false;
+        EnsureTerrain(scene, view, solver);
 
         foreach (var root in scene.GetRootGameObjects())
         {
@@ -132,13 +134,15 @@ public static class SampleSceneSetup
         settings.FindProperty("forestYaw").floatValue = ForestYaw;
         settings.FindProperty("treeId").intValue = TreeId;
         settings.FindProperty("groundId").intValue = 0;
+        // Orman dışında WFC serbest: ekibin dağ ve tepeleri çıkar (köy alanı initialCells ile düz).
+        settings.FindProperty("pinOutsideForest").boolValue = false;
         var modules = viewSettings.FindProperty("modules");
         for (int i = 0; i < modules.arraySize; i++)
         {
             var module = modules.GetArrayElementAtIndex(i);
             var prefab = module.FindPropertyRelative("Prefab");
             if (module.FindPropertyRelative("Id").intValue == TreeId && prefab.objectReferenceValue is GameObject tile)
-                prefab.objectReferenceValue = BigTreeTile(tile);
+                prefab.objectReferenceValue = TeamTreeTile(tile);
         }
         viewSettings.ApplyModifiedPropertiesWithoutUndo();
         var tiles = settings.FindProperty("treeTiles");
@@ -155,9 +159,10 @@ public static class SampleSceneSetup
             tiles.GetArrayElementAtIndex(index).objectReferenceValue = prefab;
             weights.GetArrayElementAtIndex(index).intValue = module.FindPropertyRelative("Weight").intValue;
         }
-        settings.FindProperty("treeScale").floatValue = TreeScale;
-        settings.FindProperty("treeKeep").floatValue = 0.45f;
-        settings.FindProperty("treeSpacing").intValue = 1;
+        // Ağaçlar ekibin karosunun kendi boyunda, WFC'nin koyduğu sıklıkta.
+        settings.FindProperty("treeScale").floatValue = 1f;
+        settings.FindProperty("treeKeep").floatValue = 1f;
+        settings.FindProperty("treeSpacing").intValue = 0;
         settings.FindProperty("treeMaterial").objectReferenceValue = palette;
         settings.FindProperty("fadeMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/FlatFade.mat");
         settings.ApplyModifiedPropertiesWithoutUndo();
@@ -180,60 +185,135 @@ public static class SampleSceneSetup
         return true;
     }
 
-    // Ekibin ağaç karosunun büyütülmüş kopyası: zemin plakası çıkarılır (yoksa büyüyünce komşu karoların
-    // üstüne biner), ağaçlar karonun ortası etrafında TreeScale kadar büyür, böylece hücrenin ortasında kalır.
-    // Ekibin modeline dokunulmaz; mesh ve prefab Assets/Prefabs/Map'e yazılır.
-    static GameObject BigTreeTile(GameObject tile)
+    // Dağlar ve tepeler ekibin grid'inden: tasarımcının SampleScene2'deki WFC kuralları ve karo listesi (yokuş, köşe,
+    // düzlük, karlı kayalık...) olduğu gibi bu World'e kopyalanır; SampleScene2'ye ve modellere dokunulmaz. Köy, ocaklar
+    // ve kuyunun alanı main kurulumunun başlangıç hücreleriyle (ReserveGameplayGround) düz kalır, dışı rastgele kurulur.
+    // Elle konmuş eski dağlar (Gameplay/Mountains) kapatılır, silinmez.
+    const string TerrainSourcePath = "Assets/Scenes/SampleScene2.unity";
+
+    static void EnsureTerrain(Scene scene, MapView view, WfcSolver solver)
     {
-        if (tile.name.EndsWith("_big"))
-            return tile;
-        var prefabPath = $"{BigTreeDir}/{tile.name}_big.prefab";
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-        if (existing != null)
-            return existing;
-
-        var filter = tile.GetComponentInChildren<MeshFilter>();
-        var source = filter != null ? filter.sharedMesh : null;
-        if (source == null)
-            return tile;
-        var vertices = source.vertices;
-        var kept = new List<int>();
-        for (int s = 0; s < source.subMeshCount; s++)
+        foreach (var root in scene.GetRootGameObjects())
         {
-            var triangles = source.GetTriangles(s);
-            for (int t = 0; t < triangles.Length; t += 3)
-            {
-                // Tamamı yerde olan üçgenler zemin plakası (ve gövdelerin görünmeyen alt yüzü).
-                if (vertices[triangles[t]].y < 0.001f && vertices[triangles[t + 1]].y < 0.001f && vertices[triangles[t + 2]].y < 0.001f)
-                    continue;
-                kept.Add(triangles[t]);
-                kept.Add(triangles[t + 1]);
-                kept.Add(triangles[t + 2]);
-            }
+            var oldMountains = root.name == "Gameplay" ? root.transform.Find("Mountains") : null;
+            if (oldMountains != null)
+                oldMountains.gameObject.SetActive(false);
         }
-        var mesh = Object.Instantiate(source);
-        mesh.name = tile.name + "_big";
-        mesh.subMeshCount = 1;
-        mesh.SetTriangles(kept, 0);
-        mesh.RecalculateBounds();
-        if (!AssetDatabase.IsValidFolder(BigTreeDir))
-            AssetDatabase.CreateFolder("Assets/Prefabs", "Map");
-        AssetDatabase.CreateAsset(mesh, $"{BigTreeDir}/{tile.name}_big.asset");
 
-        // Karo merkezi (plakanın ortası) büyütmede yerinde kalsın: kök TreeScale, çocuk merkez × (1/ölçek − 1).
-        var center = source.bounds.center;
-        center.y = 0f;
-        var root = new GameObject(tile.name + "_big");
-        root.transform.localScale = Vector3.one * TreeScale;
-        var child = new GameObject("Mesh", typeof(MeshFilter), typeof(MeshRenderer));
-        child.transform.SetParent(root.transform, false);
-        child.transform.localPosition = filter.transform.localPosition + center * (1f / TreeScale - 1f);
-        child.transform.localRotation = filter.transform.localRotation;
-        child.GetComponent<MeshFilter>().sharedMesh = mesh;
-        child.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
-        var prefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-        Object.DestroyImmediate(root);
-        return prefab;
+        if (!System.IO.File.Exists(TerrainSourcePath))
+        {
+            Debug.LogWarning($"{TerrainSourcePath} bulunamadı; dağ/tepe kuralları kopyalanmadı.");
+            return;
+        }
+        var source = SceneManager.GetSceneByPath(TerrainSourcePath);
+        bool wasOpen = source.IsValid() && source.isLoaded;
+        if (!wasOpen)
+            source = EditorSceneManager.OpenScene(TerrainSourcePath, OpenSceneMode.Additive);
+        try
+        {
+            var sourceSolver = Find<WfcSolver>(source);
+            var sourceView = Find<MapView>(source);
+            if (sourceSolver == null || sourceView == null)
+            {
+                Debug.LogWarning($"{TerrainSourcePath} içinde WfcSolver/MapView yok; dağ/tepe kuralları kopyalanmadı.");
+                return;
+            }
+            var solverSettings = new SerializedObject(solver);
+            solverSettings.CopyFromSerializedProperty(new SerializedObject(sourceSolver).FindProperty("rules"));
+            solverSettings.ApplyModifiedPropertiesWithoutUndo();
+            var viewSettings = new SerializedObject(view);
+            viewSettings.CopyFromSerializedProperty(new SerializedObject(sourceView).FindProperty("modules"));
+            viewSettings.ApplyModifiedPropertiesWithoutUndo();
+        }
+        finally
+        {
+            if (!wasOpen)
+                EditorSceneManager.CloseScene(source, true);
+        }
+    }
+
+    // Ağaç karosu ekibin modelinin kendisi. Önceki sürümün 2.5 kat büyütülmüş kopyaları (*_big) ekibin .obj'sine
+    // geri çevrilir.
+    static GameObject TeamTreeTile(GameObject tile)
+    {
+        if (!tile.name.EndsWith("_big"))
+            return tile;
+        var original = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Meshes/WorldMeshes/{tile.name.Substring(0, tile.name.Length - 4)}.obj");
+        return original != null ? original : tile;
+    }
+
+    // Köylüleri elle işe koyma: oduncular işsiz köylü olarak başlar (köyde dolaşır), oyuncu onları imleçle tutup
+    // ormana (oduncu) ya da maden ocağına (vagonu iter) bırakır. Vagonlar iten köylü olmadan beklemede kalır
+    // (GathererSpawner.needsPusher, varsayılan açık). İmleç dokuları Art/UI/make_menu_sprites.py ile çizilir.
+    const string CursorDir = "Assets/UI/Cursor/";
+
+    public static bool EnsureVillagerJobs(Scene scene)
+    {
+        var camera = Find<IsometricCamera>(scene);
+        if (camera == null)
+            return false;
+        var picker = camera.GetComponent<VillagerPicker>();
+        if (picker == null)
+            picker = camera.gameObject.AddComponent<VillagerPicker>();
+        var settings = new SerializedObject(picker);
+        settings.FindProperty("openHand").objectReferenceValue = CursorTexture("HandOpen.png");
+        settings.FindProperty("closedHand").objectReferenceValue = CursorTexture("HandClosed.png");
+        settings.ApplyModifiedPropertiesWithoutUndo();
+
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (var worker in root.GetComponentsInChildren<Gatherer>(true))
+            {
+                if (worker.Type != ResourceType.Wood || worker.GetComponent<VillagerAnimation>() == null)
+                    continue;
+                var workerSettings = new SerializedObject(worker);
+                workerSettings.FindProperty("villager").boolValue = true;
+                // Hücre 2 m, gövde ince: kol boyu kadar yakına gelsin (önceki 5 m hücrelik haritada 2.5 m idi).
+                workerSettings.FindProperty("stopDistance").floatValue = 1.1f;
+                workerSettings.ApplyModifiedPropertiesWithoutUndo();
+            }
+        return true;
+    }
+
+    // Oyun içi kısa sesler (GameAudio): Kenney RPG Audio ve Impact Sounds (CC0) ile bizim ürettiğimiz vagon sesi
+    // (Art/Audio/make_cart_roll.py). Hepsi Assets/Audio/SFX'te.
+    const string SfxDir = "Assets/Audio/SFX/";
+
+    public static bool EnsureAudio(Scene scene)
+    {
+        var audio = Find<GameAudio>(scene);
+        if (audio == null)
+        {
+            var host = new GameObject("Game Audio");
+            SceneManager.MoveGameObjectToScene(host, scene);
+            audio = host.AddComponent<GameAudio>();
+        }
+        // Kullanıcı: ağaca vurmada tek, tok ses olsun (cırt sesli "chop" ve diğer çeşitler çıkarıldı).
+        audio.treeHit = Clips("impactWood_medium_000");
+        audio.treeCrack = Clips("creak1", "creak2", "creak3");
+        audio.treeThud = Clips("impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002");
+        // Kullanıcının Pixabay "heavy rock rolling" kaydından kendi kestiği tok, kıtırtılı taş sesi.
+        audio.stoneHit = new[] { AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "RockBreak.mp3") }.Where(c => c != null).ToArray();
+        audio.cartRoll = AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "CartRoll.wav");
+        audio.cartClank = Clips("impactMetal_light_000", "impactMetal_light_001", "impactMetal_light_002");
+        EditorUtility.SetDirty(audio);
+        return true;
+    }
+
+    static AudioClip[] Clips(params string[] names) =>
+        names.Select(n => AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + n + ".ogg")).Where(c => c != null).ToArray();
+
+    static Texture2D CursorTexture(string file)
+    {
+        var path = CursorDir + file;
+        if (AssetImporter.GetAtPath(path) is TextureImporter importer && importer.textureType != TextureImporterType.Cursor)
+        {
+            importer.textureType = TextureImporterType.Cursor;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     public static void RestoreTerrainColor()

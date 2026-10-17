@@ -35,6 +35,8 @@ public class CameraIntro : MonoBehaviour
     ClickHarvester harvester;
     Volume blurVolume;
     VolumeProfile blurProfile;
+    Volume neutralVolume;
+    VolumeProfile neutralProfile;
     UniversalAdditionalCameraData cameraData;
     bool postProcessingWasOn;
 
@@ -61,6 +63,8 @@ public class CameraIntro : MonoBehaviour
     {
         if (blurProfile != null)
             Destroy(blurProfile);
+        if (neutralProfile != null)
+            Destroy(neutralProfile);
     }
 
     // Kamerayı menü duruşuna koyar ve kontrolleri kapatır.
@@ -169,6 +173,36 @@ public class CameraIntro : MonoBehaviour
         blurVolume.priority = 100f;
         blurVolume.sharedProfile = blurProfile;
         blurVolume.weight = 0f;
+
+        // Oyunda post-processing kapalıysa, bulanıklık için açılınca sahnenin kendi efektleri (bloom, vinyet,
+        // tonemapping...) de devreye girip renkleri değiştiriyordu; bulanıklık bitince renk birden sıçrıyordu.
+        // Bu yüzden sahnedeki her efekt varsayılan (etkisiz) değerlerle ezilir: menüde de oyundaki renkler görünür.
+        if (!postProcessingWasOn)
+            CreateNeutral(go);
+    }
+
+    void CreateNeutral(GameObject host)
+    {
+        neutralProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+        neutralProfile.name = "Menu Neutral (runtime)";
+        foreach (var volume in FindObjectsByType<Volume>())
+        {
+            if (volume == blurVolume || volume.sharedProfile == null)
+                continue;
+            foreach (var component in volume.sharedProfile.components)
+            {
+                if (component == null || component is DepthOfField || neutralProfile.Has(component.GetType()))
+                    continue;
+                var neutral = neutralProfile.Add(component.GetType(), true); // tüm parametreler varsayılan, ezili
+                neutral.active = true;
+            }
+        }
+        neutralVolume = host.AddComponent<Volume>();
+        neutralVolume.isGlobal = true;
+        neutralVolume.priority = 99f;
+        neutralVolume.sharedProfile = neutralProfile;
+        neutralVolume.weight = 1f;
+        neutralVolume.enabled = false;
     }
 
     void SetBlur(float weight)
@@ -177,6 +211,8 @@ public class CameraIntro : MonoBehaviour
             return;
         blurVolume.weight = weight;
         blurVolume.enabled = weight > 0f;
+        if (neutralVolume != null)
+            neutralVolume.enabled = weight > 0f;
         // Post-processing yalnız bulanıklık için açılır; bitince sahnenin kendi ayarına döner.
         if (cameraData != null)
             cameraData.renderPostProcessing = weight > 0f || postProcessingWasOn;
