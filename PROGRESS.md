@@ -16,7 +16,7 @@ Son güncelleme: 2026-10-17 (19:10)
 
 - `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. Bizim main'e giren son işimiz `fbd8b40` (ana menü yeniden tasarımı); GitHub'da main o günden beri ilerledi (son çekilen: `5077d4f`, "Slope half-fix"). Yerel `main` origin'in 2 commit gerisinde.
 - `fix/tree-cell-ground` (GitHub'da): main üstüne ağaç/maden düzeltmeleri: ekibin güncel ağaç meshi, ağaçlar orijinal boyda, ocak ve vagon için ayrı palet (`EconomyPalette.png`). **Main'e birleştirilmedi.**
-- `feature/villager-jobs` (GitHub'da, **aktif dal**): `fix/tree-cell-ground` + güncel main üstüne köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. **Main'e birleştirilmedi.** Son 3 commit (sesler) henüz push edilmedi.
+- `feature/villager-jobs` (GitHub'da, **aktif dal**): `fix/tree-cell-ground` + güncel main üstüne köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. **Main'e birleştirilmedi.**
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
 - `feature/wfc-forest`: Eski ResourceTest tabanlı orman çalışması; main'e alınmadı, yerine SampleScene'e yalnız ağaç kısmı taşındı. Arşiv.
 - `feature/main-menu`, `feature/resource-gathering`: Eski dallar; işleri main'de.
@@ -117,7 +117,6 @@ Son güncelleme: 2026-10-17 (19:10)
 
 ## Sıradaki işler / açık konular
 
-- [ ] `feature/villager-jobs`'ın son 3 commit'ini push etmek (kullanıcıya sor).
 - [ ] `fix/tree-cell-ground` ve `feature/villager-jobs`'ı main'e birleştirmek (kullanıcıya sor; main ilerlediği için önce main çekilmeli).
 - [ ] Vagon yuvarlanma sesi: sentez beğenilmedi; kullanıcı gerçek bir tekerlek kaydı seçecek, döngülü yapılıp `GameAudio.cartRoll`'a bağlanacak.
 - [ ] Odun kesme animasyonu hâlâ garip (kullanıcı ertelendi dedi); istenirse elde balta modeli ve daha belirgin vuruş.
