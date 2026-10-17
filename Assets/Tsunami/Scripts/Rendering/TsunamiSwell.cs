@@ -6,8 +6,10 @@ namespace Tsunami
     /// The tsunami coming in from the open sea, beyond where the camera can go. While the controller is in its
     /// Warning state, a long ridge of water rises far out on the approach axis and travels to the source position;
     /// when it arrives the controller releases the simulated wave there, under it. The ridge has the simulated
-    /// wave's shape and moves at its speed (long-wave speed in the deep sea), and on the last stretch it takes on
-    /// its colours, so after the release it simply carries on with the simulated wave and fades into it.
+    /// wave's shape, moves at its speed (long-wave speed in the deep sea) and is drawn with the same water data
+    /// (real depth and flow speed), so the water shader gives both the same look: whitecaps on the raised crest,
+    /// the same colours and storm darkening. After the release it carries on with the simulated wave and fades
+    /// into it: one wave from the horizon to the coast.
     /// The simulation grid only covers the map and a band of sea, so this part is drawn rather than simulated.
     /// </summary>
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -24,13 +26,6 @@ namespace Tsunami
         [SerializeField, Range(0f, 1f)] float startHeight = 0.35f;
         [Tooltip("Seconds the ridge keeps travelling with the simulated wave while it fades into it after the release.")]
         [SerializeField, Min(0.05f)] float fadeTime = 1.5f;
-        [Tooltip("Share of the trip (0..1) from which the ridge's light, foamy crest turns into the simulated wave's " +
-                 "deep-sea look, so nothing changes at the hand-over.")]
-        [SerializeField, Range(0f, 1f)] float blendToSimFrom = 0.6f;
-        [Tooltip("Ridge height (m) from which the crest is fully light and foamy.")]
-        [SerializeField, Min(0.1f)] float foamHeight = 6f;
-        [Tooltip("Flow speed (m/s) given to the water shader at the crest; higher = more breaking foam.")]
-        [SerializeField, Min(0f)] float crestSpeed = 14f;
         [SerializeField, Range(4, 64)] int crossSegments = 14;
         [SerializeField, Range(8, 128)] int frontSegments = 48;
 
@@ -47,11 +42,11 @@ namespace Tsunami
             meshRenderer = GetComponent<MeshRenderer>();
             meshRenderer.enabled = false;
             // The water is transparent and doesn't write depth: drawn in the same queue, the far bigger ocean ring
-            // (sorted as closer) would paint over the swell. Draw it after the ocean and the stormy-sea shade.
+            // (sorted as closer) would paint over the swell. Draw it after the ocean and the simulated sea.
             if (meshRenderer.sharedMaterial != null)
             {
                 material = new Material(meshRenderer.sharedMaterial) { name = meshRenderer.sharedMaterial.name + " (Swell)" };
-                material.renderQueue = meshRenderer.sharedMaterial.renderQueue + 2;
+                material.renderQueue = meshRenderer.sharedMaterial.renderQueue + 1;
                 meshRenderer.sharedMaterial = material;
             }
             if (controller == null) controller = FindAnyObjectByType<TsunamiController>();
@@ -114,8 +109,7 @@ namespace Tsunami
 
             TsunamiScenario s = controller.Current;
             float height = Mathf.Max(0f, s.amplitude) * Mathf.Lerp(startHeight, 1f, t * t) * heightScale;
-            float simLook = time >= 0f ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(blendToSimFrom, 1f, t));
-            UpdateMesh(height, Mathf.Max(4f, s.lengthRadius), Mathf.Max(4f, s.widthRadius), simLook, SeaDepth);
+            UpdateMesh(height, Mathf.Max(4f, s.lengthRadius), Mathf.Max(4f, s.widthRadius), SeaDepth);
         }
 
         // Local space: +Z = travel direction, X = along the wave front. Vertices on a grid, heights from a
@@ -143,7 +137,7 @@ namespace Tsunami
             GetComponent<MeshFilter>().sharedMesh = mesh;
         }
 
-        void UpdateMesh(float height, float lengthRadius, float widthRadius, float simLook, float seaDepth)
+        void UpdateMesh(float height, float lengthRadius, float widthRadius, float seaDepth)
         {
             int nx = frontSegments + 1, nz = crossSegments + 1;
             float halfFront = widthRadius * 2.5f, halfCross = lengthRadius * 3f;
@@ -160,15 +154,11 @@ namespace Tsunami
                     float y = height * crest - 0.3f;
                     int i = z * nx + x;
                     vertices[i] = new Vector3(u, y, v);
-                    // Water shader: x = depth, y = flow speed. Far out the crest reads as shallow (light teal) and
-                    // fast enough to break into foam, so the ridge stands out from the open sea. Near the source it
-                    // turns into what the simulation shows for the same wave: the real depth under the crest and the
-                    // long-wave flow speed eta * sqrt(g / h), so the hand-over doesn't change the look.
-                    float c = crest * Mathf.Clamp01(height / foamHeight);
-                    var showy = new Vector2(Mathf.Lerp(WaterSimulation.OpenOceanShaderDepth, 2f, c), crestSpeed * c * c);
+                    // Water shader: x = depth, y = flow speed, exactly what the simulation gives the same wave (the
+                    // real depth under the crest, long-wave flow speed eta * sqrt(g / h)). The shader's crest foam
+                    // comes from the height above the still sea, so far out and after the hand-over look the same.
                     float eta = Mathf.Max(0f, y);
-                    var real = new Vector2(seaDepth + eta, eta * Mathf.Sqrt(9.81f / seaDepth));
-                    uvs[i] = Vector2.Lerp(showy, real, simLook);
+                    uvs[i] = new Vector2(seaDepth + eta, eta * Mathf.Sqrt(9.81f / seaDepth));
                 }
             }
             mesh.vertices = vertices;

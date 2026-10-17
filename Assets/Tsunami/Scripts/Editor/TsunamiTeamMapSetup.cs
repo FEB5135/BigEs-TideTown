@@ -310,7 +310,6 @@ namespace Tsunami.EditorTools
             TsunamiSceneBuilder.SetRef(storm, "controller", controller);
             TsunamiSceneBuilder.SetRef(storm, "cloudMaterial", mats.cloud);
             TsunamiSceneBuilder.SetRef(storm, "lightningMaterial", mats.lightning);
-            TsunamiSceneBuilder.SetRef(storm, "seaShadeMaterial", mats.seaShade);
             return storm;
         }
 

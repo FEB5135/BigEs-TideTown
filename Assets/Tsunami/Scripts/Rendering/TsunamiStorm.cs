@@ -18,8 +18,6 @@ namespace Tsunami
         [SerializeField] Material cloudMaterial;
         [Tooltip("Lightning bolts (unlit).")]
         [SerializeField] Material lightningMaterial;
-        [Tooltip("Shadow over the stormy sea: a transparent shader that uses vertex colours (e.g. Sprites/Default).")]
-        [SerializeField] Material seaShadeMaterial;
 
         [Header("Clouds")]
         [SerializeField, Range(1, 60)] int cloudCount = 18;
@@ -82,14 +80,6 @@ namespace Tsunami
         Vector3 bankCentre, outward, across;
         float seaY;
 
-        MeshRenderer shadeRenderer;
-        Mesh shadeMesh;
-        Material shadeMaterial;
-        Color[] shadeColors;
-        float[] shadeWeights;
-        float shownShade = -1f;
-        const int ShadeAlong = 24, ShadeAcross = 16;
-
         public float ShownProgress => shown;
 
         void Start()
@@ -102,7 +92,6 @@ namespace Tsunami
                 return;
             }
             BuildClouds();
-            BuildSeaShade();
             shown = controller.StormProgress;
             nextStrike = Random.Range(1f, 3f);
         }
@@ -110,8 +99,7 @@ namespace Tsunami
         void OnDestroy()
         {
             if (puffMesh != null) Destroy(puffMesh);
-            if (shadeMesh != null) Destroy(shadeMesh);
-            if (shadeMaterial != null) Destroy(shadeMaterial);
+            Shader.SetGlobalVector(StormShadeParamsId, Vector4.zero);
             foreach (Cloud c in clouds) if (c.material != null) Destroy(c.material);
         }
 
@@ -230,84 +218,15 @@ namespace Tsunami
 
         // ------------------------------------------------------------------------------------- stormy sea
 
-        // A flat, transparent dark sheet just above the sea under the bank and out to the horizon behind it. It
-        // fades out towards the coast and at the sides. The island is higher than the sheet, so the depth test
-        // keeps it off the land: only the sea darkens.
-        void BuildSeaShade()
-        {
-            if (seaShadeMaterial == null) return;
-            var go = new GameObject("Stormy Sea", typeof(MeshFilter), typeof(MeshRenderer));
-            go.transform.SetParent(transform, false);
-            shadeRenderer = go.GetComponent<MeshRenderer>();
-            shadeMaterial = new Material(seaShadeMaterial) { name = seaShadeMaterial.name + " (Storm)" };
-            // After the ocean (transparent, no depth write), before the incoming swell.
-            shadeMaterial.renderQueue = Mathf.Max(seaShadeMaterial.renderQueue, (int)RenderQueue.Transparent) + 1;
-            shadeRenderer.sharedMaterial = shadeMaterial;
-            shadeRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            shadeRenderer.receiveShadows = false;
-            shadeRenderer.lightProbeUsage = LightProbeUsage.Off;
-            shadeRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
-
-            int count = ShadeAlong * ShadeAcross;
-            var verts = new Vector3[count];
-            shadeColors = new Color[count];
-            shadeWeights = new float[count];
-            float near = bankDepth * 1.1f, halfWidth = bankWidth * 0.7f;
-            for (int a = 0; a < ShadeAlong; a++)
-            {
-                // Denser near the bank, sparse out to the horizon.
-                float f = a / (ShadeAlong - 1f);
-                float along = f < 0.5f ? Mathf.Lerp(-near, bankDepth * 0.6f, f * 2f)
-                                       : Mathf.Lerp(bankDepth * 0.6f, shadeReach, (f - 0.5f) * 2f);
-                float towardCoast = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-near, -near * 0.15f, along));
-                // The dark area widens a little behind the bank.
-                float width = halfWidth * Mathf.Lerp(0.75f, 1f, Mathf.InverseLerp(0f, shadeReach, along));
-                for (int b = 0; b < ShadeAcross; b++)
-                {
-                    float side = (b / (ShadeAcross - 1f) * 2f - 1f) * halfWidth;
-                    float sides = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(width * 0.55f, width, Mathf.Abs(side)));
-                    int i = a * ShadeAcross + b;
-                    verts[i] = new Vector3(side, 0f, along);
-                    shadeWeights[i] = towardCoast * sides;
-                }
-            }
-            var tris = new List<int>();
-            for (int a = 0; a < ShadeAlong - 1; a++)
-            {
-                for (int b = 0; b < ShadeAcross - 1; b++)
-                {
-                    int i = a * ShadeAcross + b;
-                    tris.Add(i); tris.Add(i + ShadeAcross); tris.Add(i + 1);
-                    tris.Add(i + 1); tris.Add(i + ShadeAcross); tris.Add(i + ShadeAcross + 1);
-                }
-            }
-            shadeMesh = new Mesh { name = "Stormy Sea (generated)" };
-            shadeMesh.MarkDynamic();
-            shadeMesh.vertices = verts;
-            shadeMesh.SetTriangles(tris, 0);
-            shadeMesh.colors = shadeColors;
-            shadeMesh.RecalculateNormals();
-            shadeMesh.RecalculateBounds();
-            go.GetComponent<MeshFilter>().sharedMesh = shadeMesh;
-        }
-
+        // The water shader (StylizedWater) darkens the sea itself under the bank and out to the horizon behind it,
+        // fading towards the coast and at the sides. Being part of the water, the darkening lies under the foam of
+        // an incoming wave instead of over it, and is the same on the open ocean, the simulated sea and the swell.
+        // Water on land is never darkened.
         void UpdateSeaShade(float darkness)
         {
-            if (shadeRenderer == null) return;
-            float strength = seaShade * darkness;
-            shadeRenderer.enabled = strength > 0.005f;
-            // Local +Z points out to sea, so the sheet trails out behind the bank.
-            shadeRenderer.transform.SetPositionAndRotation(new Vector3(bankCentre.x, seaY + 0.15f, bankCentre.z),
-                Quaternion.LookRotation(outward, Vector3.up));
-            if (Mathf.Abs(strength - shownShade) < 0.002f) return;
-            shownShade = strength;
-            var tint = new Color(0.03f, 0.05f, 0.09f, 0f);
-            for (int i = 0; i < shadeColors.Length; i++)
-            {
-                tint.a = strength * shadeWeights[i];
-                shadeColors[i] = tint;
-            }
-            shadeMesh.colors = shadeColors;
+            float near = bankDepth * 1.1f;
+            Shader.SetGlobalVector(StormShadeId, new Vector4(bankCentre.x, bankCentre.z, outward.x, outward.z));
+            Shader.SetGlobalVector(StormShadeParamsId, new Vector4(seaShade * darkness, near, bankWidth * 0.7f, shadeReach));
         }
 
         // ------------------------------------------------------------------------------------- lightning
@@ -400,6 +319,8 @@ namespace Tsunami
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+        static readonly int StormShadeId = Shader.PropertyToID("_TsunamiStormShade");
+        static readonly int StormShadeParamsId = Shader.PropertyToID("_TsunamiStormShadeParams");
 
         // ------------------------------------------------------------------------------------------ mesh
 
