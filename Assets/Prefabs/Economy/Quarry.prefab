@@ -78,7 +78,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 408e1f682c29c224dbcd2614b2b35192, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ResourceNode
+  m_EditorClassIdentifier: IdleTown.Runtime::ResourceNode
   type: 1
   capacity: 200
   regrowSeconds: 15
@@ -100,7 +100,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: acad499ae9f421746aff4934e605ded3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GathererSpawner
+  m_EditorClassIdentifier: IdleTown.Runtime::GathererSpawner
   prefab: {fileID: 7006535793367152146, guid: 82dce24cc8c5d9a49af1b8a298589d69, type: 3}
   count: 1
 --- !u!1 &2828391644131496160
@@ -300,7 +300,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 760621e26650cca41a692b01972f4319, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sway
+  m_EditorClassIdentifier: IdleTown.Runtime::Sway
   angle: 4
   speed: 1.3
 --- !u!1 &1290777704901001273 stripped
@@ -351,7 +351,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 760621e26650cca41a692b01972f4319, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sway
+  m_EditorClassIdentifier: IdleTown.Runtime::Sway
   angle: 4
   speed: 1.3
 --- !u!1 &4767714135674473619 stripped
@@ -402,7 +402,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 760621e26650cca41a692b01972f4319, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sway
+  m_EditorClassIdentifier: IdleTown.Runtime::Sway
   angle: 4
   speed: 1.3
 --- !u!1 &6700299915366778455 stripped
@@ -421,7 +421,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ca30f194a1ed3754593c1825c9309538, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NavIgnore
+  m_EditorClassIdentifier: IdleTown.Runtime::NavIgnore
 --- !u!1 &7798631284397979014 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5485971322445220474, guid: de100f7e611584749bb32c5aff7ca2c6, type: 3}
@@ -438,6 +438,6 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 760621e26650cca41a692b01972f4319, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sway
+  m_EditorClassIdentifier: IdleTown.Runtime::Sway
   angle: 4
   speed: 1.3

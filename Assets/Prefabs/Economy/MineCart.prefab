@@ -45,7 +45,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 13a57f9d323adb54b92e189bad2be483, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RollingWheels
+  m_EditorClassIdentifier: IdleTown.Runtime::RollingWheels
   wheels:
   - {fileID: 2614875638240320688}
   - {fileID: 8918019140346945431}
@@ -61,11 +61,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c6ab9dc84697a8345903b941840cf2b2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gatherer
+  m_EditorClassIdentifier: IdleTown.Runtime::Gatherer
   resourceType: 1
   home: {fileID: 0}
   carryCapacity: 8
   harvestDuration: 3
+  hitInterval: 0.5
   moveSpeed: 4
   turnSpeed: 180
   stopDistance: 1.5
@@ -205,7 +206,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 760621e26650cca41a692b01972f4319, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sway
+  m_EditorClassIdentifier: IdleTown.Runtime::Sway
   angle: 4
   speed: 1.3
 --- !u!4 &8918019140346945431 stripped

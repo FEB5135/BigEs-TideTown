@@ -295,6 +295,7 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
   stopDistance: 1.5
