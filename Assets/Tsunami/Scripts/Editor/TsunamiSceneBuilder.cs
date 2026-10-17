@@ -34,7 +34,7 @@ namespace Tsunami.EditorTools
 
         internal struct Materials
         {
-            public Material terrain, flood, ocean, wall, roof, flooded, destroyed, trunk, leaves, cursor, spray;
+            public Material terrain, flood, ocean, wall, roof, flooded, destroyed, trunk, leaves, cursor, spray, cloud, lightning;
         }
 
         [MenuItem("Tsunami/Build Demo Scene")]
@@ -220,7 +220,7 @@ namespace Tsunami.EditorTools
             // Control panel. Its Image blocks clicks so they never reach the world underneath.
             Vector2 corner = topRight ? new Vector2(1, 1) : new Vector2(0, 1);
             var panel = CreateRect("Control Panel", canvasGO.transform, corner, corner, corner,
-                new Vector2(topRight ? -20 : 20, -20), new Vector2(480, 330));
+                new Vector2(topRight ? -20 : 20, -20), new Vector2(480, 388));
             panel.gameObject.AddComponent<Image>().color = new Color(0.04f, 0.08f, 0.12f, 0.72f);
 
             CreateText("Title", panel, font, "TSUNAMİ", 34, FontStyle.Bold, TextAnchor.UpperLeft, Color.white,
@@ -241,6 +241,7 @@ namespace Tsunami.EditorTools
                 new Vector2(248, -196), new Vector2(212, 60));
             Button reset = CreateButton("Reset Simulation Button", panel, font, "Sıfırla", new Color(0.32f, 0.36f, 0.42f),
                 new Vector2(20, -268), new Vector2(440, 46));
+            Button releaseNow = CreateReleaseNowButton(panel, font);
 
             // Countdown (top-centre).
             var countdownRect = CreateRect("Countdown", canvasGO.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
@@ -263,6 +264,7 @@ namespace Tsunami.EditorTools
             SetRef(ui, "startButton", start);
             SetRef(ui, "stopButton", stop);
             SetRef(ui, "resetButton", reset);
+            SetRef(ui, "releaseNowButton", releaseNow);
             SetRef(ui, "waveHeightSlider", heightSlider);
             SetRef(ui, "waveHeightText", heightLabel);
             SetRef(ui, "statusText", status);
@@ -338,6 +340,13 @@ namespace Tsunami.EditorTools
             slider.minValue = min;
             slider.maxValue = max;
             return slider;
+        }
+
+        /// <summary>"Anında Etkinleştir": releases the tsunami at once, skipping the storm countdown (testing).</summary>
+        internal static Button CreateReleaseNowButton(Transform panel, Font font)
+        {
+            return CreateButton("Release Now Button", panel, font, "Anında Etkinleştir", new Color(0.7f, 0.2f, 0.18f),
+                new Vector2(20, -326), new Vector2(440, 46));
         }
 
         static Button CreateButton(string name, Transform parent, Font font, string label, Color color, Vector2 position, Vector2 size)
@@ -480,8 +489,18 @@ namespace Tsunami.EditorTools
                 trunk = GetOrCreate("Tree_Trunk", lit, new Color(0.45f, 0.32f, 0.2f)),
                 leaves = GetOrCreate("Tree_Leaves", lit, new Color(0.3f, 0.55f, 0.22f)),
                 cursor = GetOrCreate("Brush_Cursor", cursor, null),
-                spray = GetOrCreate("Water_Spray", Shader.Find("Tsunami/Spray"), null)
+                spray = GetOrCreate("Water_Spray", Shader.Find("Tsunami/Spray"), null),
+                cloud = GetOrCreate("Storm_Cloud", lit, new Color(0.96f, 0.97f, 0.99f)),
+                lightning = GetOrCreate("Storm_Lightning", Shader.Find("Universal Render Pipeline/Unlit"), new Color(0.88f, 0.92f, 1f))
             };
+            // Clouds take their colours from the team palette (like the trees and mountains), by face direction.
+            if (m.cloud != null && m.cloud.GetTexture("_BaseMap") == null)
+            {
+                var palette = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/palette.png");
+                m.cloud.SetTexture("_BaseMap", palette);
+                m.cloud.SetFloat("_Smoothness", 0f);
+                EditorUtility.SetDirty(m.cloud);
+            }
             AssetDatabase.SaveAssets();
             return m;
         }

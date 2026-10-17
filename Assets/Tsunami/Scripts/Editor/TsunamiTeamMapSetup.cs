@@ -146,6 +146,7 @@ namespace Tsunami.EditorTools
             controllerSO.FindProperty("village").objectReferenceValue = tracker;
             controllerSO.FindProperty("mapAdapter").objectReferenceValue = adapter;
             controllerSO.ApplyModifiedPropertiesWithoutUndo();
+            ConfigureGameRelease(controller);
             string aim = AimThroughValley(adapter, mountains, houses, world);
 
             GameObject canvas = TsunamiSceneBuilder.BuildUI(controller, tracker, mats, true, null, !hasEventSystem);
@@ -156,6 +157,8 @@ namespace Tsunami.EditorTools
                 new Renderer[] { waterGO.GetComponent<MeshRenderer>(), oceanGO.GetComponent<MeshRenderer>() },
                 sprayGO.GetComponent<WaterSprayEmitter>());
             TsunamiSceneBuilder.BuildImpactSplash(root.transform, sim, tracker, mats);
+            AddStorm(root.transform, controller, mats);
+            AddSwell(root.transform, controller, mats);
 
             adapter.Apply();
             EditorSceneManager.MarkSceneDirty(scene);
@@ -217,6 +220,97 @@ namespace Tsunami.EditorTools
             centre = b.center;
             radius = 0.5f * (b.extents.x + b.extents.z);
             return true;
+        }
+
+        /// <summary>
+        /// Brings a tsunami added before the storm existed up to date: automatic release 2-3 min after the game
+        /// starts, the "Anında Etkinleştir" button and the storm. Leaves everything else as it is.
+        /// </summary>
+        [MenuItem("Tsunami/Add Storm And Release Button To Open Scene")]
+        public static void UpgradeOpenScene()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (!UpgradeStorm(scene)) return;
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        public static bool UpgradeStorm(Scene scene)
+        {
+            GameObject root = FindRoot(scene, RootName);
+            var controller = root != null ? root.GetComponentInChildren<TsunamiController>(true) : null;
+            if (controller == null)
+            {
+                Debug.LogWarning($"[Tsunami] No \"{RootName}\" object with a TsunamiController in '{scene.name}'.");
+                return false;
+            }
+            ConfigureGameRelease(controller);
+
+            var ui = root.GetComponentInChildren<TsunamiUI>(true);
+            if (ui != null)
+            {
+                var uiSO = new SerializedObject(ui);
+                SerializedProperty button = uiSO.FindProperty("releaseNowButton");
+                Transform panel = ui.transform.Find("Control Panel");
+                if (button.objectReferenceValue == null && panel != null)
+                {
+                    var rect = (RectTransform)panel;
+                    rect.sizeDelta = new Vector2(rect.sizeDelta.x, 388f);
+                    button.objectReferenceValue = TsunamiSceneBuilder.CreateReleaseNowButton(panel,
+                        Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+                    uiSO.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+
+            // Rebuilt every time so they pick up the current defaults.
+            foreach (var old in root.GetComponentsInChildren<TsunamiStorm>(true)) Object.DestroyImmediate(old.gameObject);
+            foreach (var old in root.GetComponentsInChildren<TsunamiSwell>(true)) Object.DestroyImmediate(old.gameObject);
+            TsunamiSceneBuilder.Materials mats = TsunamiSceneBuilder.CreateMaterials();
+            AddStorm(root.transform, controller, mats);
+            AddSwell(root.transform, controller, mats);
+            Debug.Log($"[Tsunami] Storm, automatic release and 'Anında Etkinleştir' set up in '{scene.name}'.");
+            return true;
+        }
+
+        /// <summary>
+        /// Game settings: the tsunami sets off by itself 2-3 min after the game starts, its swell travels in from the
+        /// open sea for 16 s, and the game scenario's source sits as far out as the water grid allows.
+        /// </summary>
+        static void ConfigureGameRelease(TsunamiController controller)
+        {
+            var so = new SerializedObject(controller);
+            so.FindProperty("autoRelease").boolValue = true;
+            so.FindProperty("releaseDelayMin").floatValue = 120f;
+            so.FindProperty("releaseDelayMax").floatValue = 180f;
+            so.FindProperty("useWarning").boolValue = true;
+            so.FindProperty("warningDuration").floatValue = 16f;
+            SerializedProperty scenarios = so.FindProperty("scenarios");
+            if (scenarios.arraySize > 0)
+                scenarios.GetArrayElementAtIndex(0).FindPropertyRelative("offshoreDistance").floatValue = 100f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>The wave travelling in from beyond the camera's reach during the warning.</summary>
+        internal static TsunamiSwell AddSwell(Transform root, TsunamiController controller, TsunamiSceneBuilder.Materials mats)
+        {
+            var go = new GameObject("Incoming Swell", typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(root, false);
+            TsunamiSceneBuilder.ConfigureRenderer(go, mats.ocean);
+            var swell = go.AddComponent<TsunamiSwell>();
+            TsunamiSceneBuilder.SetRef(swell, "controller", controller);
+            return swell;
+        }
+
+        /// <summary>Storm clouds and lightning that announce the tsunami (driven by the controller's countdown).</summary>
+        internal static TsunamiStorm AddStorm(Transform root, TsunamiController controller, TsunamiSceneBuilder.Materials mats)
+        {
+            var go = new GameObject("Storm");
+            go.transform.SetParent(root, false);
+            var storm = go.AddComponent<TsunamiStorm>();
+            TsunamiSceneBuilder.SetRef(storm, "controller", controller);
+            TsunamiSceneBuilder.SetRef(storm, "cloudMaterial", mats.cloud);
+            TsunamiSceneBuilder.SetRef(storm, "lightningMaterial", mats.lightning);
+            return storm;
         }
 
         static GameObject Child(GameObject parent, string name, params System.Type[] components)
