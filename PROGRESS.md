@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (11:55)
+Son güncelleme: 2026-10-17 (14:45)
 
 ## Bağlam
 
@@ -26,7 +26,19 @@ Son güncelleme: 2026-10-17 (11:55)
 - Tasarım: Ekranın sağında, kasabanın dışında (TownRadius+9) 3 ocak, girişleri kasabaya bakıyor. Her ocak bir Stone `ResourceNode` (kapasite 200, yenilenme 15 sn, en fazla 3 vagon); tıklayınca taş kuyuya atılır. 3 vagon (`Gatherer`, Stone, 8 taş, hız 4, girişin 5 m önünde durur) taşı kuyuya götürüp atar.
 - Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
 
+## Aktif çalışma
+
+- Dal: `main`. `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
+- Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
+- Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
+
 ## Son durum (yapılanlar)
+
+- **WFC ağaçları ve zemin main'e (2026-10-17, `feature/wfc-forest`'tan yalnız ağaç/zemin görünümü):** Kullanıcı isteği: main'in SampleScene'i ve World'ü (128×128, 2 m) kullanılacak; ResourceTest ve inşa değişikliklerimiz alınmadı. `SampleSceneSetup.EnsureGridForest` (SampleScene kurulum menüsü de çağırır): MapView malzemesi TerrainGround yerine `Flat.mat` (çimenli karolar görünür), World'e `GridForest` eklenir, eski tek tek ağaçlı `Gameplay/Forest` kapatılır (silinmez), WFC'nin köy için ayırdığı başlangıç hücrelerinden orman alanına düşenler silinir, inşa grid'ine `ConstructionGridToggle` eklenir (çizgiler yalnız inşa modunda). `GridForest`: orman alanı (45° dönük, merkez kasabanın 6 m dışında solda, 30×55 m) dışını WFC'de zemine sabitler; alan içinde yalnız ağaç ve düz zemin kalır (yokuş/tepe karoları zemine çevrilir). Ağaçlar toplanabilir; kesilince zemin plakası olmadan, her ağaç ayrı, 8 yönden rastgele devrilir, 2 sn sonra `FlatFade.mat` ile saydamlaşıp kaybolur; tıklanınca ve oduncu vurunca (`Gatherer.hitInterval` 0.5 sn, yalnız odun) sallanır. `ResourceNode`'a `VisibilityChanged` ve `Hit` olayları eklendi. Play'de doğrulandı: orman köyün solunda, zemin çimenli ve grid'siz, oduncular odun getiriyor, konsol temiz. Ağaçlar ResourceTest'teki boyda: kurulum ekibin ağaç karolarından zemin plakasız, karo merkezi etrafında 2.5 kat büyütülmüş kopyalar üretir (`Assets/Prefabs/Map/tree_0_*_big.prefab` + `.asset` mesh; ekibin modeline dokunulmaz) ve MapView'daki id 5 modüllerini bunlarla değiştirir. Büyük ağaçlar üst üste binmesin diye GridForest ormanı seyreltir (`treeKeep` 0.45, ağaçlar arası en az 1 boş hücre); tıklama alanı `treeScale` ile büyür. Play'de doğrulandı: boy ve yoğunluk ResourceTest'e benziyor, devrilme çalışıyor.
+
+- **Animasyon merge (2026-10-17):** Yürüyüş/odun kesme animasyonları, köylü prefabları ve SampleScene kaynak toplama düzeni main'e çakışmasız birleştirildi. Birleşmiş main sürümünde 37/37 Unity testi başarılı (0 hata); yürüyüş, ağaca yönelme, kol/mesh animasyonu ve odun/taş teslimi doğrulandı. Rapor: Logs/main-villager-merge-tests.xml.
+
+- **villageranimations — köylü hareketleri:** Kullanıcının `Assets/Prefabs/villager.prefab` kaynağı iç içe prefab olarak kullanılır; `Woodcutter.prefab` ve `VillagerVisual.prefab` ayrı üretilir. Mevcut köylü Gatherer bileşenleri/tuning korunup görselleri yerinde yükseltilir. Yürüyüşte görsel kök ±15 derece sallanır, kollar/bacaklar hafifçe salınır; ağaca dönüp odun toplarken omuzlar 45–125 derece kaldırılıp indirilir. Pozlar durunca yumuşakça normale döner; animasyon yön bulma kökünü oynatmaz. Scriptler: VillagerAnimation, GathererActivity; kurulum: VillagerPrefabSetup. Son Unity kontrolü: 37/37 test başarılı; Play testinde yürüyüş, ağaç yönüne dönme, omuz/mesh hareketi, odun taşıma ve 20 odun/8 taş teslimi doğrulandı.
 
 - **Uzak construction dalıyla uzlaştırma:** Pull sonrası 232 add/add çakışması çözüldü. 225 paket meta dosyasında Unity 6000.6.6f1 kurulumuyla eşleşen uzak kimlikler, 5 UI meta dosyasında özgün sprite ayarları korundu. ResourceTest sahnesindeki inşa/kuyu entegrasyonu ve main WFC kodu korundu. URP ayarlarındaki eski bir dosya kimliği doğru değere bağlandı. Yinelenen GUID yok; `MergedAssetIntegrationTests` dahil 34/34 EditMode testi geçti. Push yapılmadı.
 
@@ -82,10 +94,13 @@ Son güncelleme: 2026-10-17 (11:55)
 
 ## Sıradaki işler / açık konular
 
+- [x] Köylü animasyonlarını ve SampleScene düzenini main'e birleştir.
+- [ ] Yerel main değişikliklerini paylaşmak için push (henüz yapılmadı).
+
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir).
 - [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Ana menü: eğimli kamera girişi (CameraIntro'da `menuPitch`/`menuYaw` değiştirmek yeterli).
-- [ ] Tek sahne kararı: kullanıcı önce "tek sahne SampleScene" dedi, sonra ContructionMechanics haritasını (ResourceTest) tercih etti. Hangi sahnenin kalacağı ve Build Settings (şu an yalnız `SampleScene`) netleşmeli. ContructionMechanics'ten gelen `WallConstructionDemo*` sahneleri de duruyor.
+- [x] Tek sahne kararı: kullanıcı kaynak toplama düzeninin SampleScene içine taşınmasını istedi; animasyonlu köylüler, menü ve kaynak sistemleri burada kuruldu.
 
 - [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).

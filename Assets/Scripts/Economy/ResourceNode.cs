@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -28,6 +29,11 @@ public class ResourceNode : MonoBehaviour
     readonly List<Gatherer> claimants = new();
     Coroutine shake;
     Quaternion restRotation;
+
+    // Tükenince false, yeniden çıkınca true (örn. grid'deki hücreyi zemine/ağaca çevirmek için).
+    public event Action<bool> VisibilityChanged;
+    // Tıklanınca ya da toplayıcı vurunca (örn. grid'de çizilen ağacı sallamak için).
+    public event Action Hit;
 
     public ResourceType Type => type;
     public int Remaining => remaining;
@@ -108,8 +114,9 @@ public class ResourceNode : MonoBehaviour
 
     public void PlayHitFeedback()
     {
-        if (!isActiveAndEnabled)
+        if (!isActiveAndEnabled || remaining <= 0)
             return;
+        Hit?.Invoke();
         if (shake != null)
             StopCoroutine(shake);
         shake = StartCoroutine(ShakeRoutine());
@@ -152,5 +159,6 @@ public class ResourceNode : MonoBehaviour
                 r.enabled = visible;
         foreach (var c in GetComponentsInChildren<Collider>())
             c.enabled = visible;
+        VisibilityChanged?.Invoke(visible);
     }
 }
