@@ -364,6 +364,8 @@ namespace IdleTown.Construction
 
         internal void RefreshPreview(Vector2Int? hoveredNode)
         {
+            // Editor callers can request a preview before Unity invokes Awake.
+            CreatePreviewLine();
             previewPath.Clear();
             hasPreviewEndpoint = hoveredNode.HasValue;
             if (!hoveredNode.HasValue)
@@ -435,6 +437,9 @@ namespace IdleTown.Construction
 
         void CreatePreviewLine()
         {
+            if (previewLine != null)
+                return;
+
             var previewObject = new GameObject("Wall Preview");
             previewObject.transform.SetParent(transform, false);
             previewLine = previewObject.AddComponent<LineRenderer>();

@@ -75,6 +75,36 @@ namespace IdleTown.Tests
     public sealed class WallConstructionControllerTests
     {
         [Test]
+        public void RefreshPreview_BeforeAwake_CreatesOneRendererAndClearsItOutsideMap()
+        {
+            var root = new GameObject("Preview Initialization Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(new FakeResourceStore(10, 10));
+
+                controller.RefreshPreview(null);
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+
+                var renderers = root.GetComponentsInChildren<LineRenderer>();
+                Assert.That(renderers, Has.Length.EqualTo(1));
+                Assert.That(renderers[0].positionCount, Is.EqualTo(2));
+
+                controller.RefreshPreview(null);
+
+                Assert.That(renderers[0].positionCount, Is.Zero);
+                Assert.That(root.GetComponentsInChildren<LineRenderer>(), Has.Length.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void TryBuild_DefaultGeneratedMultiEdgeWallsRemainVisibleAfterAnotherBuild()
         {
             var root = new GameObject("Default Wall Success Test");
