@@ -20,6 +20,10 @@ public class Gatherer : MonoBehaviour
     [Tooltip("Odun toplarken ağaca kaç saniyede bir vurur. 0 = vurmaz.")]
     [SerializeField] float hitInterval = 0.5f;
     [SerializeField] float moveSpeed = 3f;
+    [Tooltip("İşteyken (vagon, işteki köylü) yürüme hızı çarpanı; yükseltme çarpanıyla çarpılır. Boşta dolaşan köylüye uygulanmaz.")]
+    [SerializeField] float workSpeedMultiplier = 1.5f;
+    [Tooltip("İşteyken toplama süresi ve vuruş aralığı çarpanı (küçük = hızlı); yükseltme çarpanıyla çarpılır.")]
+    [SerializeField] float workTimeMultiplier = 0.6f;
     [Tooltip("Saniyede en fazla kaç derece döner (köşelerde yumuşak dönüş).")]
     [SerializeField] float turnSpeed = 360f;
     [Tooltip("Kaynağa bu mesafeye gelince durur.")]
@@ -87,8 +91,11 @@ public class Gatherer : MonoBehaviour
         }
     }
 
-    float SpeedFactor => Upgrade != null ? Upgrade.SpeedMultiplier : 1f;
-    float WorkTimeFactor => Upgrade != null ? Upgrade.WorkTimeMultiplier : 1f;
+    // İşte: vagon, işe konmuş köylü (oduncu ya da vagon iten) ve köylü olmayan toplayıcı.
+    bool Working => home != null || HasJob || !villager;
+
+    float SpeedFactor => Working ? workSpeedMultiplier * (Upgrade != null ? Upgrade.SpeedMultiplier : 1f) : 1f;
+    float WorkTimeFactor => Working ? workTimeMultiplier * (Upgrade != null ? Upgrade.WorkTimeMultiplier : 1f) : 1f;
 
     // Prefab'tan yeni üretilen işçiyi sahnedeki bir köylünün ayarlarıyla köylü yapar (Start'tan önce çağrılır).
     public void BecomeVillagerLike(Gatherer template)
@@ -99,6 +106,8 @@ public class Gatherer : MonoBehaviour
             harvestDuration = template.harvestDuration;
             hitInterval = template.hitInterval;
             moveSpeed = template.moveSpeed;
+            workSpeedMultiplier = template.workSpeedMultiplier;
+            workTimeMultiplier = template.workTimeMultiplier;
             stopDistance = template.stopDistance;
             wellStopDistance = template.wellStopDistance;
             wanderRadius = template.wanderRadius;

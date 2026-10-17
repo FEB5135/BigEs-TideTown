@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (yükseltmeler ve işçi üretme, `feature/upgrades`)
+Son güncelleme: 2026-10-17 (işçi hızları ve tsunami paneli düzeltmesi, `feature/upgrades`)
 
 ## Bağlam
 
@@ -32,6 +32,8 @@ Son güncelleme: 2026-10-17 (yükseltmeler ve işçi üretme, `feature/upgrades`
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **İşçi hızları ve görünmeyen tsunami paneli (17 Ekim 2026, `feature/upgrades`):** Kullanıcı: "işçi çalışma hızları arttırılmalı; bu branch main'den çekildi ama tsunami kontrol paneli yok". Hız: `Gatherer`'a `workSpeedMultiplier` (1.5) ve `workTimeMultiplier` (0.6) eklendi; yalnız işteyken (vagon, işe konmuş köylü, köylü olmayan toplayıcı) uygulanır, yükseltme çarpanlarıyla çarpılır (Sv 3 ormanda yürüme ×2.55, toplama ×0.27). Boşta dolaşan köylü eski hızında; balta animasyonu `HitInterval` üzerinden senkron kalır. Yeni işçi bu değerleri şablon köylüden alır. Panel: sahnede vardı ama oyun başladıktan sonra da CanvasGroup alfası 0'da kalıyordu (diskteki SampleScene'de `MainMenu.gameplayUI` listesinde kayıtlı; Unity'deki kaydedilmemiş sahnede neden açılmadığı bulunamadı). `TsunamiUI` artık `MainMenu.GameStarted` ile kendini açıyor (menü yoksa hemen), listeye bağlı değil. Play'de doğrulandı: Oyna'dan sonra panel sağ üstte, konsolda hata yok. Not: panel sağ üstteki ocağın "Yükselt" butonunun üstüne denk gelebiliyor (kameraya göre). Hız artışı oyunda ölçülmedi.
 
 - **Yükseltmeler ve işçi üretme (17 Ekim 2026, `feature/upgrades`, origin'e push edildi):** Kullanıcı isteği: taş ocakları ve orman 3 seviyeli (varsayılan 1), odun+taşla yükseltilir, görseller şimdilik değişmez; odun+taşla işçi üretilir, butonu geçici olarak taş butonunun yanında. Kullanıcı ocakların ayrı ayrı yükseltilmesini istedi, nasıl olacağını bize bıraktı; her yapının üstünde ekranda onu takip eden küçük buton seçildi. `UpgradeLevel` (Economy): her ocakta ayrı, ormanda tek (`forest`); seviye 2: 20 odun 10 taş, hız ×1.35, toplama süresi ×0.7; seviye 3: 45 odun 30 taş, ×1.7, ×0.45 (Inspector'dan ayarlanır). `Gatherer`: vagon kendi ocağının, işteki oduncu (`HasJob`, vagon itmiyorken) ormanın çarpanıyla yürür ve toplar; vuruş aralığı da kısalır (balta animasyonu senkron kalır). `UpgradeHUD` (HUD'da): taş butonunu kopyalayıp yapı butonlarını ("Sv 1 Yükselt / 20 odun 10 taş", son seviyede "En yüksek"; para yetmezse soluk) ve "İşçi 15 odun 10 taş" butonunu kurar. Yapı butonları ayrı canvas katmanında (`sortingOrder -2`), Tsunami panelinin ve kaynak panelinin altında; menüde ve inşa modunda gizli. İşçi `Woodcutter.prefab`'tan kuyunun yanında doğar, sahnedeki köylünün ayarlarını, boyunu ve yüksekliğini alır (`Gatherer.BecomeVillagerLike`), dolaşır; elle işe konur. `VillagerPicker` artık imleç bir butonun üstündeyken köylü tutmaz. Kurulum: `Tools/BigEs/Yukseltmeleri Kur` (`SampleSceneSetup.EnsureUpgrades`, Integrate da çağırır). Test: `Tools/BigEs/Test: Kuyuya 100 Odun 100 Tas` (yalnız Play'de). Play'de doğrulandı: orman 1→2, bir ocak 1→2→3 (doğru bedeller düştü, son seviyede tıklama bir şey harcamıyor), işçi üretimi (bedel düştü, köylülerle aynı boy/yükseklikte doğup dolaşıyor), Tsunami butonu ocak butonunun üstünde kalıyor, konsolda hata yok. Doğrulanmayan: yükseltmeden sonra vagon/oduncu hızının oyunda ölçülmesi, yeni işçinin tutulup ormana/ocağa bırakılması. Not: test sırasında ekranın sağ şeridini Claude uygulamasının görünmez bir penceresi kapladığından oradaki tıklamalar Unity'ye gitmiyordu; oyunla ilgisi yok.
 
@@ -157,6 +159,7 @@ Son güncelleme: 2026-10-17 (yükseltmeler ve işçi üretme, `feature/upgrades`
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek.
 - [ ] Ana menü: skorun tanımı belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.
+- [ ] İşçi hızı (`Gatherer.workSpeedMultiplier` 1.5 / `workTimeMultiplier` 0.6) toplama ile duvar maliyeti dengesine göre ayarlanacak; tsunami paneli sağ üstteki ocağın yükseltme butonunu örtebiliyor, yeri düşünülmeli.
 - [ ] Yükseltmeler (`feature/upgrades`): Play'de vagon/oduncu hızlanmasını gözle kontrol etmek, yeni işçiyi ormana/ocağa bırakıp denemek; bedeller ve çarpanlar dengelenecek. Seviye görselleri ve kalıcı işçi butonu yeri sonra (şimdilik geçici). Main'e birleştirmek kullanıcıya sorulacak.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (henüz kararlaştırılmadı).
 - [ ] Teslimden önce: repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak. Pixabay sesi (`RockBreak.mp3`) lisansı tek başına dağıtımı yasaklıyor, public repoda durumu değerlendirilmeli.

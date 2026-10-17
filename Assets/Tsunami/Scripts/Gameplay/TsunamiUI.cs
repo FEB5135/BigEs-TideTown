@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -26,11 +27,43 @@ namespace Tsunami
         int shownKey = int.MinValue;
         bool shownPending;
         Text startLabel, stopLabel;
+        CanvasGroup visibility;
 
         void Awake()
         {
             if (startButton != null) startLabel = startButton.GetComponentInChildren<Text>();
             if (stopButton != null) stopLabel = stopButton.GetComponentInChildren<Text>();
+            visibility = GetComponent<CanvasGroup>();
+            MainMenu.GameStarted += Reveal;
+        }
+
+        void OnDestroy() => MainMenu.GameStarted -= Reveal;
+
+        // The panel is hidden (CanvasGroup alpha 0) while the main menu is open. It reveals itself when the game
+        // starts instead of relying only on the menu's gameplayUI list, which can lose the entry when the menu is
+        // rebuilt. Without a menu in the scene it is shown at once.
+        void Start()
+        {
+            if (visibility != null && visibility.alpha < 1f && FindAnyObjectByType<MainMenu>() == null) Reveal();
+        }
+
+        void Reveal()
+        {
+            if (visibility == null || !isActiveAndEnabled) return;
+            StartCoroutine(FadeIn());
+        }
+
+        IEnumerator FadeIn()
+        {
+            const float duration = 0.4f;
+            float from = visibility.alpha;
+            for (float t = 0f; t < duration && visibility.alpha < 1f; t += Time.unscaledDeltaTime)
+            {
+                visibility.alpha = Mathf.Max(visibility.alpha, Mathf.Lerp(from, 1f, t / duration));
+                yield return null;
+            }
+            visibility.alpha = 1f;
+            visibility.interactable = visibility.blocksRaycasts = true;
         }
 
         void OnEnable()
