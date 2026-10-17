@@ -23,6 +23,7 @@ public static class SampleSceneSetup
             VillagerPrefabSetup.UpgradeScene(scene);
             EnsureGridForest(scene);
             EnsureVillagerJobs(scene);
+            EnsureAudio(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -75,6 +76,7 @@ public static class SampleSceneSetup
         VillagerPrefabSetup.UpgradeScene(scene);
         EnsureGridForest(scene);
         EnsureVillagerJobs(scene);
+        EnsureAudio(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -271,6 +273,32 @@ public static class SampleSceneSetup
             }
         return true;
     }
+
+    // Oyun içi kısa sesler (GameAudio): Kenney RPG Audio ve Impact Sounds (CC0) ile bizim ürettiğimiz vagon sesi
+    // (Art/Audio/make_cart_roll.py). Hepsi Assets/Audio/SFX'te.
+    const string SfxDir = "Assets/Audio/SFX/";
+
+    public static bool EnsureAudio(Scene scene)
+    {
+        var audio = Find<GameAudio>(scene);
+        if (audio == null)
+        {
+            var host = new GameObject("Game Audio");
+            SceneManager.MoveGameObjectToScene(host, scene);
+            audio = host.AddComponent<GameAudio>();
+        }
+        audio.treeHit = Clips("chop", "impactWood_medium_000", "impactWood_medium_001", "impactWood_medium_002");
+        audio.treeCrack = Clips("creak1", "creak2", "creak3");
+        audio.treeThud = Clips("impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002");
+        audio.stoneHit = Clips("impactMining_000", "impactMining_001", "impactMining_002", "impactMining_003", "impactMining_004");
+        audio.cartRoll = AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "CartRoll.wav");
+        audio.cartClank = Clips("impactMetal_light_000", "impactMetal_light_001", "impactMetal_light_002");
+        EditorUtility.SetDirty(audio);
+        return true;
+    }
+
+    static AudioClip[] Clips(params string[] names) =>
+        names.Select(n => AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + n + ".ogg")).Where(c => c != null).ToArray();
 
     static Texture2D CursorTexture(string file)
     {

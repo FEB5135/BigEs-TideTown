@@ -41,6 +41,8 @@ public class GathererSpawner : MonoBehaviour
             gatherer.name = $"{prefab.name} ({name})";
             gatherer.SetHome(node);
             gatherer.NeedsPusher = needsPusher;
+            if (gatherer.GetComponent<CartSound>() == null)
+                gatherer.gameObject.AddComponent<CartSound>();
             spawned.Add(gatherer);
         }
     }

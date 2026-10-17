@@ -25,6 +25,8 @@ Bu projede ekip dışından alınan hazır kaynaklar ve yapay zekâ kullanımı 
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
 | UI Pack 2.0 — Kenney | https://kenney.nl/assets/ui-pack | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `click-a.ogg`: menü butonlarının tıklama sesi (`Assets/Audio/UI/Click.ogg`). Değiştirilmedi. | Evet |
+| RPG Audio — Kenney | https://kenney.nl/assets/rpg-audio | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-RPG-Audio-License.txt`) | `chop.ogg` (baltayla ağaca vurma), `creak1-3.ogg` (ağacın kırılması) (`Assets/Audio/SFX/`). Değiştirilmedi; oyunda perdesi rastgele hafifçe değiştirilerek çalınır. | Evet |
+| Impact Sounds — Kenney | https://kenney.nl/assets/impact-sounds | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-Impact-Sounds-License.txt`) | `impactWood_medium_000-002` (ağaca vurma), `impactWood_heavy_000-002` (ağacın yere düşmesi), `impactMining_000-004` (maden ocağına vurma), `impactMetal_light_000-002` (vagonun kalkış/duruş tıkırtısı) (`Assets/Audio/SFX/`). Değiştirilmedi. | Evet |
 
 ### Kod
 
@@ -48,5 +50,6 @@ Metin ve diğer kategorilerde hazır kaynak kullanılmadı.
 | Kod | Kullanıldı | Codex (OpenAI) | Köylülerin yürüme/odun kesme animasyonu, mevcut ekip modelinin kemik ağırlıkları, animasyonlu oduncu prefab kurulumu, SampleScene aktarımı ve Unity entegrasyon testleri. |
 | Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. Ana menünün ikonları, gölgesi, kenar karartması, dalga amblemi, butonları (kesik köşeli, alt kalınlıklı), paneli ve kaydırıcı parçaları (`Assets/UI/Menu/`) ile köylü tutma imleçleri (açık/kapalı el, `Assets/UI/Cursor/`) Claude'un yazdığı Python scriptiyle (`Art/UI/make_menu_sprites.py`) çizildi; Kenney parçalarını yeniden renklendiren script (`Art/UI/adapt_kenney.py`) de Claude'a aittir. |
 | Ses | Kullanılmadı | — | — |
+| Ses | Kullanıldı | Claude (Anthropic) | Maden vagonunun ray üstünde yuvarlanma sesi (`Assets/Audio/SFX/CartRoll.wav`): Claude'un yazdığı Python scriptiyle (`Art/Audio/make_cart_roll.py`) gürültü ve sinüs dalgalarından sentezlendi; hazır kayıt kullanılmadı. |
 | Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası, menü metinleri ve kod içi açıklamalar. |
 | Diğer | Kullanılmadı | — | — |

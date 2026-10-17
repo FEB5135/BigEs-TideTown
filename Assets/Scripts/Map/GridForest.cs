@@ -202,6 +202,8 @@ public class GridForest : MonoBehaviour
     void Fell(int x, int y, int rotation)
     {
         EndShake(new Vector2Int(x, y));
+        if (GameAudio.Instance != null)
+            GameAudio.Play(GameAudio.Instance.treeCrack, map.CellCenter(x, y), 0.8f);
         foreach (var tree in SpawnTrees(x, y, rotation, "Falling Tree"))
             StartCoroutine(FallRoutine(tree.transform, tree.GetComponent<Renderer>()));
     }
@@ -241,6 +243,9 @@ public class GridForest : MonoBehaviour
             tree.rotation = Quaternion.AngleAxis(88f * k * k, axis) * start;
             yield return null;
         }
+        // Yere çakıldığı an.
+        if (GameAudio.Instance != null)
+            GameAudio.Play(GameAudio.Instance.treeThud, tree.position);
         const float bounce = 0.25f;
         for (float t = 0f; t < bounce; t += Time.deltaTime)
         {

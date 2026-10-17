@@ -11761,6 +11761,78 @@ Material:
     - _SpecColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!1 &501909852
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 501909854}
+  - component: {fileID: 501909853}
+  m_Layer: 0
+  m_Name: Game Audio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &501909853
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 501909852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d18180c26bc525941acbc349d5c1e1eb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleTown.Runtime::GameAudio
+  treeHit:
+  - {fileID: 8300000, guid: 7848f005142a6cc4b9960d745e866f06, type: 3}
+  - {fileID: 8300000, guid: d401d5b427e22d84abf9efc5f579f40a, type: 3}
+  - {fileID: 8300000, guid: 6775d940ee0297746bb5d285727bb15f, type: 3}
+  - {fileID: 8300000, guid: 6dacafea12a807d48a1821b4254a5540, type: 3}
+  treeCrack:
+  - {fileID: 8300000, guid: ca0498f41a190dd4599229bfe53e1d9b, type: 3}
+  - {fileID: 8300000, guid: bed4dafa0afb03d49914dd07a79889d6, type: 3}
+  - {fileID: 8300000, guid: cf7b50c047f1a5d429625c131792f423, type: 3}
+  treeThud:
+  - {fileID: 8300000, guid: d0786ade4d86a2c45807683564977470, type: 3}
+  - {fileID: 8300000, guid: aaf40ab2417217e498f7dcedc1642186, type: 3}
+  - {fileID: 8300000, guid: 618f664878bef54468d2ee72140f50a7, type: 3}
+  stoneHit:
+  - {fileID: 8300000, guid: 72ac5effe6581e54394cc0cbbc3c4740, type: 3}
+  - {fileID: 8300000, guid: 815b28183a9546348bda93114204cb84, type: 3}
+  - {fileID: 8300000, guid: d21e8c9bfb7859440888680f16e195f2, type: 3}
+  - {fileID: 8300000, guid: e914b2f2b54b431419a2b382a5744f0b, type: 3}
+  - {fileID: 8300000, guid: 900f727c5607dd94db50c307305e1084, type: 3}
+  cartRoll: {fileID: 8300000, guid: 8112d4ad3ea07004a98c40d20a2db4d6, type: 3}
+  cartClank:
+  - {fileID: 8300000, guid: 26288bf1ce7e89044abfc5fad5a2a522, type: 3}
+  - {fileID: 8300000, guid: 99094dec5e51bbd47b49fbc2c45f5f9a, type: 3}
+  - {fileID: 8300000, guid: 179039b7c5a9d9a44a707fd2821edfd0, type: 3}
+  volume: 0.8
+  fullVolumeDistance: 35
+  silentDistance: 160
+  voices: 12
+--- !u!4 &501909854
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 501909852}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &508313769
 GameObject:
   m_ObjectHideFlags: 0
@@ -70789,3 +70861,4 @@ SceneRoots:
   - {fileID: 1229569883}
   - {fileID: 5663022}
   - {fileID: 970497801}
+  - {fileID: 501909854}
