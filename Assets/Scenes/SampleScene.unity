@@ -430,9 +430,9 @@ RectTransform:
   - {fileID: 138727462}
   m_Father: {fileID: 1649012981}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 120, y: -44}
   m_SizeDelta: {x: 240, y: 88}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &58438534
@@ -14765,9 +14765,9 @@ RectTransform:
   - {fileID: 1693718455}
   m_Father: {fileID: 1649012981}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 374, y: -44}
   m_SizeDelta: {x: 240, y: 88}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1288251311
@@ -18095,7 +18095,7 @@ MonoBehaviour:
     Weight: 1
   - Id: 4
     Prefab: {fileID: 919132149155446097, guid: 50328d8d2096f8045aaccb8727bd0f24, type: 3}
-    Weight: 6
+    Weight: 1
   - Id: 5
     Prefab: {fileID: 919132149155446097, guid: c9745f3cc34d6144dacbe816aafce88a, type: 3}
     Weight: 1
@@ -18143,12 +18143,6 @@ MonoBehaviour:
     Weight: 1
   - Id: 17
     Prefab: {fileID: 919132149155446097, guid: bf1bf830a28d3cf4583217a13a9f5dde, type: 3}
-    Weight: 1
-  - Id: 4
-    Prefab: {fileID: 4472582978562513778, guid: 45404b24bf36a1344887ba0799e88544, type: 3}
-    Weight: 1
-  - Id: 4
-    Prefab: {fileID: 7409020475606413931, guid: d3b68611be1df2847bdf9d99251d94b4, type: 3}
     Weight: 1
 --- !u!114 &1602157105
 MonoBehaviour:
@@ -18257,7 +18251,7 @@ MonoBehaviour:
     FrontFit: []
     BackFit: []
   - Id: 5
-    Weight: 1
+    Weight: 0.3
     Left: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
     Right: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
     Front: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
@@ -22475,10 +22469,13 @@ MonoBehaviour:
     Rotation: 0
   coastIds: 0e0000000f0000001000000011000000i
   coastWidth: 3
+  pitFillId: 0
   coastBand: 2
   villageIds: 0a0000000b0000000c0000000d000000i
   villageRadius: 12
+  villageReach: 20
   villageWeight: 4
+  villagePatch: 5
   hillIds: 01000000020000000300000004000000i
   flatShare: 0.4
   flatPatch: 14

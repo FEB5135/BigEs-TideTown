@@ -30,6 +30,8 @@ public class WfcSolver : MonoBehaviour
     int[] coastIds = { 14, 15, 16, 17 };
     [SerializeField, Tooltip("How many cells the beach may reach inland from the painted coast.")]
     float coastWidth = 3f;
+    [SerializeField, Tooltip("Sand pits that do not reach the map edge are turned into this id (flat ground).")]
+    int pitFillId;
     [SerializeField, Tooltip("Cells this much nearer to the painted coast than to other painted cells must be coast. Past Coast Width the same many cells stay free, so the shore has room for its slopes.")]
     float coastBand = 2f;
     [SerializeField, Tooltip("Ids that only appear near painted cells of the same ids (the houses). Empty turns this off.")]
@@ -171,11 +173,16 @@ public class WfcSolver : MonoBehaviour
         if (!PropagateInitial(origins) || !Search(origins))
             return false;
 
+        var chosen = new int[cellCount];
+        for (var i = 0; i < cellCount; i++)
+            chosen[i] = ChosenTile(i);
+        FillPits(chosen);
+
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
             {
-                var tile = ChosenTile(y * width + x);
+                var tile = chosen[y * width + x];
                 world.Set(x, y, tiles[tile].Id, tiles[tile].Rotation);
             }
         }
@@ -435,7 +442,9 @@ public class WfcSolver : MonoBehaviour
                 var ground = Nearest(i, land, out var toLandSquared);
                 toLand = Math.Sqrt(toLandSquared);
                 // The painted coast lies between this cell and the land: the cell is past the shore line.
-                outside = (sand % width - i % width) * (ground % width - i % width)
+                // Just inside the painted land both lie the same way too, but the land is nearer there.
+                outside = toCoast < toLand
+                    && (sand % width - i % width) * (ground % width - i % width)
                     + (sand / width - i / width) * (ground / width - i / width) > 0;
             }
 
@@ -475,6 +484,64 @@ public class WfcSolver : MonoBehaviour
         }
 
         return false;
+    }
+
+    // The free band between beach and land still leaves room for small sand pits. A patch of coast tiles that does
+    // not reach the map edge is a pit: it and its slopes become flat ground. Every slope faces ground on its outer
+    // side, so the cells around the pit already fit ground.
+    void FillPits(int[] chosen)
+    {
+        if (coastIds == null || coastIds.Length == 0)
+            return;
+
+        var fill = -1;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (tiles[tile].Id == pitFillId && tiles[tile].Rotation == 0)
+                fill = tile;
+        }
+
+        if (fill < 0)
+            return;
+
+        var isCoast = IdMask(coastIds);
+        var seen = new bool[chosen.Length];
+        var patch = new List<int>();
+        for (var start = 0; start < chosen.Length; start++)
+        {
+            if (seen[start] || !isCoast[chosen[start]])
+                continue;
+
+            patch.Clear();
+            patch.Add(start);
+            seen[start] = true;
+            var reachesEdge = false;
+            for (var k = 0; k < patch.Count; k++)
+            {
+                var cell = patch[k];
+                var x = cell % width;
+                var y = cell / width;
+                if (x == 0 || y == 0 || x == width - 1 || y == height - 1)
+                    reachesEdge = true;
+                for (var dir = 0; dir < 4; dir++)
+                {
+                    var nx = x + DX[dir];
+                    var ny = y + DY[dir];
+                    if ((uint)nx >= (uint)width || (uint)ny >= (uint)height)
+                        continue;
+                    var next = ny * width + nx;
+                    if (seen[next] || !isCoast[chosen[next]])
+                        continue;
+                    seen[next] = true;
+                    patch.Add(next);
+                }
+            }
+
+            if (reachesEdge)
+                continue;
+            foreach (var cell in patch)
+                chosen[cell] = fill;
+        }
     }
 
     // Houses stay around the painted village instead of dotting the whole island. They thin out toward the edge
