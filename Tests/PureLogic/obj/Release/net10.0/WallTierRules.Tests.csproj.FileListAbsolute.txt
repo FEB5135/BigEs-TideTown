@@ -1,0 +1,15 @@
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\bin\Release\net10.0\WallTierRules.Tests.exe
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\bin\Release\net10.0\WallTierRules.Tests.deps.json
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\bin\Release\net10.0\WallTierRules.Tests.runtimeconfig.json
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\bin\Release\net10.0\WallTierRules.Tests.dll
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\bin\Release\net10.0\WallTierRules.Tests.pdb
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.AssemblyInfoInputs.cache
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.AssemblyInfo.cs
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.csproj.CoreCompileInputs.cache
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.sourcelink.json
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.dll
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\refint\WallTierRules.Tests.dll
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.pdb
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\WallTierRules.Tests.genruntimeconfig.cache
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\PureLogic\obj\Release\net10.0\ref\WallTierRules.Tests.dll

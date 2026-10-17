@@ -1,0 +1,15 @@
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\bin\Release\net8.0\TsunamiCollisionPure.exe
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\bin\Release\net8.0\TsunamiCollisionPure.deps.json
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\bin\Release\net8.0\TsunamiCollisionPure.runtimeconfig.json
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\bin\Release\net8.0\TsunamiCollisionPure.dll
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\bin\Release\net8.0\TsunamiCollisionPure.pdb
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.AssemblyInfoInputs.cache
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.AssemblyInfo.cs
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.csproj.CoreCompileInputs.cache
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.sourcelink.json
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.dll
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\refint\TsunamiCollisionPure.dll
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.pdb
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\TsunamiCollisionPure.genruntimeconfig.cache
+C:\Users\W10\OneDrive\Desktop\projects\polotownproject\BigEs\Tests\TsunamiCollisionPure\obj\Release\net8.0\ref\TsunamiCollisionPure.dll
