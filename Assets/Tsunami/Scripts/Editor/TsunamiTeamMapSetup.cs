@@ -274,7 +274,7 @@ namespace Tsunami.EditorTools
 
         /// <summary>
         /// Game settings: the tsunami sets off by itself 2-3 min after the game starts, its swell travels in from the
-        /// open sea for 12 s, and the game scenario's source sits as far out as the water grid allows.
+        /// open sea for 16 s, and the game scenario's source sits as far out as the water grid allows.
         /// </summary>
         static void ConfigureGameRelease(TsunamiController controller)
         {
@@ -283,7 +283,7 @@ namespace Tsunami.EditorTools
             so.FindProperty("releaseDelayMin").floatValue = 120f;
             so.FindProperty("releaseDelayMax").floatValue = 180f;
             so.FindProperty("useWarning").boolValue = true;
-            so.FindProperty("warningDuration").floatValue = 12f;
+            so.FindProperty("warningDuration").floatValue = 16f;
             SerializedProperty scenarios = so.FindProperty("scenarios");
             if (scenarios.arraySize > 0)
                 scenarios.GetArrayElementAtIndex(0).FindPropertyRelative("offshoreDistance").floatValue = 100f;
