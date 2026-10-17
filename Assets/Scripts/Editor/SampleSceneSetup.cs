@@ -291,7 +291,8 @@ public static class SampleSceneSetup
         audio.treeHit = Clips("impactWood_medium_000");
         audio.treeCrack = Clips("creak1", "creak2", "creak3");
         audio.treeThud = Clips("impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002");
-        audio.stoneHit = Clips("impactMining_000", "impactMining_001", "impactMining_002", "impactMining_003", "impactMining_004");
+        // Kullanıcının Pixabay "heavy rock rolling" kaydından kendi kestiği tok, kıtırtılı taş sesi.
+        audio.stoneHit = new[] { AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "RockBreak.mp3") }.Where(c => c != null).ToArray();
         audio.cartRoll = AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "CartRoll.wav");
         audio.cartClank = Clips("impactMetal_light_000", "impactMetal_light_001", "impactMetal_light_002");
         EditorUtility.SetDirty(audio);

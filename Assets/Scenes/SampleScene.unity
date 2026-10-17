@@ -11801,11 +11801,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: aaf40ab2417217e498f7dcedc1642186, type: 3}
   - {fileID: 8300000, guid: 618f664878bef54468d2ee72140f50a7, type: 3}
   stoneHit:
-  - {fileID: 8300000, guid: 72ac5effe6581e54394cc0cbbc3c4740, type: 3}
-  - {fileID: 8300000, guid: 815b28183a9546348bda93114204cb84, type: 3}
-  - {fileID: 8300000, guid: d21e8c9bfb7859440888680f16e195f2, type: 3}
-  - {fileID: 8300000, guid: e914b2f2b54b431419a2b382a5744f0b, type: 3}
-  - {fileID: 8300000, guid: 900f727c5607dd94db50c307305e1084, type: 3}
+  - {fileID: 8300000, guid: 2c821ce41aaaf5b4790c63becd767d1d, type: 3}
   cartRoll: {fileID: 8300000, guid: 8112d4ad3ea07004a98c40d20a2db4d6, type: 3}
   cartClank:
   - {fileID: 8300000, guid: 26288bf1ce7e89044abfc5fad5a2a522, type: 3}

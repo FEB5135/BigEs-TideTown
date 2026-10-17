@@ -25,8 +25,9 @@ Bu projede ekip dışından alınan hazır kaynaklar ve yapay zekâ kullanımı 
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
 | UI Pack 2.0 — Kenney | https://kenney.nl/assets/ui-pack | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `click-a.ogg`: menü butonlarının tıklama sesi (`Assets/Audio/UI/Click.ogg`). Değiştirilmedi. | Evet |
+| Heavy Rock Rolling — Dragon Studio (Pixabay) | https://pixabay.com/sound-effects/film-special-effects-heavy-rock-rolling-515254/ | [Pixabay Content License](https://pixabay.com/service/license-summary/) (ücretsiz, atıf zorunlu değil; ses dosyasının tek başına yeniden dağıtılması yasak, bir ürünün parçası olarak kullanımı serbest) | Maden ocağına vurunca çıkan taş sesi (`Assets/Audio/SFX/RockBreak.mp3`). Ekip üyesi kaydın yaklaşık 0.6 sn'lik bir bölümünü Audacity ile kesti. | Evet (oyunun parçası olarak) |
 | RPG Audio — Kenney | https://kenney.nl/assets/rpg-audio | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-RPG-Audio-License.txt`) | `creak1-3.ogg` (ağacın kırılması) (`Assets/Audio/SFX/`). Değiştirilmedi; oyunda perdesi rastgele hafifçe değiştirilerek çalınır. | Evet |
-| Impact Sounds — Kenney | https://kenney.nl/assets/impact-sounds | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-Impact-Sounds-License.txt`) | `impactWood_medium_000` (ağaca vurma), `impactWood_heavy_000-002` (ağacın yere düşmesi), `impactMining_000-004` (maden ocağına vurma), `impactMetal_light_000-002` (vagonun kalkış/duruş tıkırtısı) (`Assets/Audio/SFX/`). Değiştirilmedi. | Evet |
+| Impact Sounds — Kenney | https://kenney.nl/assets/impact-sounds | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (`Assets/Audio/SFX/Kenney-Impact-Sounds-License.txt`) | `impactWood_medium_000` (ağaca vurma), `impactWood_heavy_000-002` (ağacın yere düşmesi), `impactMetal_light_000-002` (vagonun kalkış/duruş tıkırtısı) (`Assets/Audio/SFX/`). Değiştirilmedi. | Evet |
 
 ### Kod
 
