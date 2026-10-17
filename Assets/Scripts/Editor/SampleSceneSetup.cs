@@ -287,7 +287,8 @@ public static class SampleSceneSetup
             SceneManager.MoveGameObjectToScene(host, scene);
             audio = host.AddComponent<GameAudio>();
         }
-        audio.treeHit = Clips("chop", "impactWood_medium_000", "impactWood_medium_001", "impactWood_medium_002");
+        // Kullanıcı: ağaca vurmada tek, tok ses olsun (cırt sesli "chop" ve diğer çeşitler çıkarıldı).
+        audio.treeHit = Clips("impactWood_medium_000");
         audio.treeCrack = Clips("creak1", "creak2", "creak3");
         audio.treeThud = Clips("impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002");
         audio.stoneHit = Clips("impactMining_000", "impactMining_001", "impactMining_002", "impactMining_003", "impactMining_004");

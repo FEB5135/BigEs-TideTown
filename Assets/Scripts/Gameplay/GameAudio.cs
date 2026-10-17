@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Oyun içi kısa sesler (ağaca vurma, ağacın kırılması ve yere düşmesi, ocağa vurma, vagon). Sahnede bir tane olur.
-// Kamera uzakta ve açısı değiştiği için sesler 2B çalınır; ses yüksekliği olayın ekrandaki görüş noktasına uzaklığıyla
-// azalır. Aynı ses peş peşe tekdüze olmasın diye çeşitlerden rastgele biri ve hafif farklı perdeyle çalınır.
+// Sesler 2B çalınır; ses yüksekliği kameranın olaya uzaklığıyla azalır: oyun başındaki uzak görünümde (80 m) sessiz,
+// oyuncu yakınlaştırınca duyulur. Aynı ses peş peşe tekdüze olmasın diye çeşitlerden rastgele biri ve hafif farklı perdeyle çalınır.
 public class GameAudio : MonoBehaviour
 {
     public static GameAudio Instance { get; private set; }
@@ -20,10 +20,10 @@ public class GameAudio : MonoBehaviour
 
     [Header("Ses düzeyi")]
     [Range(0f, 1f)] public float volume = 0.8f;
-    [Tooltip("Bu uzaklığa (m, kameranın baktığı noktadan) kadar tam ses, sonra azalır.")]
-    [SerializeField] float fullVolumeDistance = 35f;
-    [Tooltip("Bu uzaklıkta ses tamamen kaybolur.")]
-    [SerializeField] float silentDistance = 160f;
+    [Tooltip("Kamera olaya bu uzaklıktaysa (m) tam ses, uzaklaştıkça azalır.")]
+    [SerializeField] float fullVolumeDistance = 30f;
+    [Tooltip("Kamera olaya bu uzaklıktan uzaksa ses duyulmaz.")]
+    [SerializeField] float silentDistance = 60f;
     [SerializeField] int voices = 12;
 
     readonly List<AudioSource> pool = new();
@@ -66,20 +66,15 @@ public class GameAudio : MonoBehaviour
         source.PlayOneShot(clip, level);
     }
 
-    // Olayın, kameranın baktığı yere (ekranın ortasındaki zemin) uzaklığına göre 1 → 0.
+    // Kameranın olaya uzaklığına göre 1 (yakın) → 0 (uzak).
     public float Attenuation(Vector3 position)
     {
         if (cam == null)
             cam = Camera.main;
         if (cam == null)
             return 1f;
-        var ray = new Ray(cam.transform.position, cam.transform.forward);
-        var focus = new Plane(Vector3.up, position).Raycast(ray, out float enter) ? ray.GetPoint(enter) : cam.transform.position;
-        var delta = position - focus;
-        delta.y = 0f;
-        // Uzaklaştırınca (kamera yüksekte) her şey biraz daha kısık duyulur.
-        float zoom = Mathf.InverseLerp(220f, 40f, Vector3.Distance(cam.transform.position, focus));
-        float distance = Mathf.InverseLerp(silentDistance, fullVolumeDistance, delta.magnitude);
-        return distance * Mathf.Lerp(0.45f, 1f, zoom);
+        float distance = Vector3.Distance(cam.transform.position, position);
+        float k = Mathf.InverseLerp(silentDistance, fullVolumeDistance, distance);
+        return k * k; // uzaktan yavaşça açılır
     }
 }

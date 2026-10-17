@@ -11791,10 +11791,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::GameAudio
   treeHit:
-  - {fileID: 8300000, guid: 7848f005142a6cc4b9960d745e866f06, type: 3}
   - {fileID: 8300000, guid: d401d5b427e22d84abf9efc5f579f40a, type: 3}
-  - {fileID: 8300000, guid: 6775d940ee0297746bb5d285727bb15f, type: 3}
-  - {fileID: 8300000, guid: 6dacafea12a807d48a1821b4254a5540, type: 3}
   treeCrack:
   - {fileID: 8300000, guid: ca0498f41a190dd4599229bfe53e1d9b, type: 3}
   - {fileID: 8300000, guid: bed4dafa0afb03d49914dd07a79889d6, type: 3}
@@ -11815,8 +11812,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 99094dec5e51bbd47b49fbc2c45f5f9a, type: 3}
   - {fileID: 8300000, guid: 179039b7c5a9d9a44a707fd2821edfd0, type: 3}
   volume: 0.8
-  fullVolumeDistance: 35
-  silentDistance: 160
+  fullVolumeDistance: 30
+  silentDistance: 60
   voices: 12
 --- !u!4 &501909854
 Transform:
