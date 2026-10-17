@@ -27,6 +27,8 @@ Son güncelleme: 2026-10-17
 
 ## Son durum (yapılanlar)
 
+- **Main birleştirmesi:** Yereldeki `origin/main` (`5002591`, WFC/grid ve zemin modelleri), `cbb3e6e` ile `ContructionMechanics` dalına çakışmasız birleştirildi. Yerel değişiklikler öncesinde `059eb1a` ile kaydedildi. Unity EditMode: `IdleTown.EditModeTests` derlemesinde 26/26 test başarılı. GitHub fetch kimlik doğrulaması başarısız olduğundan main'in sunucudaki en son hali doğrulanamadı; origin/ContructionMechanics ile uzlaştırma ve push yapılmadı.
+
 - **Maden/vagon prefab bağlantısı:** Yerelde yeniden oluşturulan FBX meta GUID'leri kaynak dalındaki özgün değerlere döndürüldü (Quarry: `de100f7e611584749bb32c5aff7ca2c6`, MineCart: `1e0776f0470e66e418ee02157ce9870e`). Prefab kaynak referansları artık mevcut model dosyalarını buluyor. Orman için Git'ten hariç tutulan `Assets/FinottiGames` paketi resmi Asset Store üzerinden bu makineye içe aktarıldı; sahnedeki 34 ağacın özgün prefab bağlantıları geri geldi. ResourceTest Play modunda orman ve üç maden görünür, Console hata ve uyarı sayıları 0.
 
 - **Yeni proje konumu:** `C:\Projects\BigEs`. Gömülü URP 17.6.0 paketlerindeki eksik dosyalar Unity 6000.6.6f1 kurulumundaki aynı paketlerden tamamlandı; mevcut dosyalar korundu. Eksik `Textures/DebugFont.tga` ilk render oluşturulurken MissingReferenceException ve ardından Blitter yeniden başlatma hatasına neden oluyordu.
