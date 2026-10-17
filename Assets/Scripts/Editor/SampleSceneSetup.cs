@@ -21,6 +21,7 @@ public static class SampleSceneSetup
         if (Find<Well>(scene) != null)
         {
             VillagerPrefabSetup.UpgradeScene(scene);
+            EnsureGridForest(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -71,6 +72,7 @@ public static class SampleSceneSetup
         grid.AddComponent<WallDemoGrid>().Configure(world);
         grid.AddComponent<NavIgnore>();
         VillagerPrefabSetup.UpgradeScene(scene);
+        EnsureGridForest(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -83,6 +85,56 @@ public static class SampleSceneSetup
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         Debug.Log("SampleScene: kaynak toplama, köy, dağlar, ana menü ve animasyonlu köylüler güncel WFC ile hazır.");
+    }
+
+    // World'ün WFC ağaçlarını (id 5) toplanabilir yapar: kesilince devrilir, vurulunca sallanır (GridForest).
+    // ResourceTest'ten gelen eski tek tek ağaçlı "Forest" kapatılır (silinmez); oduncular WFC ağaçlarına gider.
+    public static bool EnsureGridForest(Scene scene)
+    {
+        var world = Find<World>(scene);
+        var view = world != null ? world.GetComponent<MapView>() : null;
+        if (view == null)
+            return false;
+
+        bool changed = false;
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var oldForest = root.name == "Gameplay" ? root.transform.Find("Forest") : null;
+            if (oldForest != null && oldForest.gameObject.activeSelf && oldForest.GetComponent<World>() == null)
+            {
+                oldForest.gameObject.SetActive(false);
+                changed = true;
+            }
+        }
+        if (world.GetComponent<GridForest>() != null)
+            return changed;
+
+        const int treeId = 5;
+        var forest = world.gameObject.AddComponent<GridForest>();
+        var settings = new SerializedObject(forest);
+        settings.FindProperty("map").objectReferenceValue = world;
+        settings.FindProperty("solver").objectReferenceValue = world.GetComponent<WfcSolver>();
+        settings.FindProperty("treeId").intValue = treeId;
+        settings.FindProperty("groundId").intValue = 0;
+        var modules = new SerializedObject(view).FindProperty("modules");
+        var tiles = settings.FindProperty("treeTiles");
+        var weights = settings.FindProperty("treeWeights");
+        int count = 0;
+        for (int i = 0; i < modules.arraySize; i++)
+        {
+            var module = modules.GetArrayElementAtIndex(i);
+            var prefab = module.FindPropertyRelative("Prefab").objectReferenceValue;
+            if (module.FindPropertyRelative("Id").intValue != treeId || prefab == null)
+                continue;
+            tiles.arraySize = weights.arraySize = count + 1;
+            tiles.GetArrayElementAtIndex(count).objectReferenceValue = prefab;
+            weights.GetArrayElementAtIndex(count).intValue = module.FindPropertyRelative("Weight").intValue;
+            count++;
+        }
+        settings.FindProperty("treeMaterial").objectReferenceValue = new SerializedObject(view).FindProperty("material").objectReferenceValue;
+        settings.FindProperty("fadeMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/FlatFade.mat");
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return true;
     }
 
     public static void RestoreTerrainColor()

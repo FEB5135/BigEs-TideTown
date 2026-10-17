@@ -1047,9 +1047,9 @@ RectTransform:
   - {fileID: 138727462}
   m_Father: {fileID: 1649012981}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 120, y: -44}
   m_SizeDelta: {x: 240, y: 88}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &58438534
@@ -8146,6 +8146,7 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
   stopDistance: 1.5
@@ -22992,6 +22993,7 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
   stopDistance: 1.5
@@ -26217,6 +26219,7 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
   stopDistance: 1.5
@@ -33211,9 +33214,9 @@ RectTransform:
   - {fileID: 1693718455}
   m_Father: {fileID: 1649012981}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 374, y: -44}
   m_SizeDelta: {x: 240, y: 88}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1288251311
@@ -39691,6 +39694,7 @@ GameObject:
   - component: {fileID: 1602157105}
   - component: {fileID: 1602157104}
   - component: {fileID: 1602157107}
+  - component: {fileID: 1602157108}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -62323,6 +62327,40 @@ MonoBehaviour:
     Y: 103
     Id: 0
     Rotation: 0
+--- !u!114 &1602157108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1602157103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e98c046405f04da4384226a43af93b46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleTown.Runtime::GridForest
+  map: {fileID: 1602157105}
+  solver: {fileID: 1602157107}
+  forestArea:
+    x: 0
+    y: 0
+    width: 0
+    height: 0
+  treeId: 5
+  groundId: 0
+  treeTiles:
+  - {fileID: 919132149155446097, guid: c9745f3cc34d6144dacbe816aafce88a, type: 3}
+  - {fileID: 919132149155446097, guid: e31a73e541af0194b84eb5e649c07d53, type: 3}
+  treeWeights: 0100000001000000i
+  colliderWidth: 0.7
+  colliderHeight: 1.2
+  fallSeconds: 1.1
+  lieSeconds: 2
+  fadeSeconds: 1.5
+  treeMaterial: {fileID: 2100000, guid: 5f4706c69c737794dbb186832db6e4cf, type: 2}
+  fadeMaterial: {fileID: 2100000, guid: 622c0d9c447f9de44ba37659df4aee0d, type: 2}
+  shakeSeconds: 0.35
+  shakeAngle: 4
 --- !u!1 &1604542193
 GameObject:
   m_ObjectHideFlags: 0
@@ -66321,7 +66359,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1810648346
 Transform:
   m_ObjectHideFlags: 0
@@ -70653,6 +70691,7 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
   stopDistance: 1.5
@@ -71633,6 +71672,7 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
   turnSpeed: 360
   stopDistance: 1.5

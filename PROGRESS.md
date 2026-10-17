@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (11:55)
+Son güncelleme: 2026-10-17 (14:45)
 
 ## Bağlam
 
@@ -33,6 +33,8 @@ Son güncelleme: 2026-10-17 (11:55)
 - Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
+
+- **WFC ağaçları main'e (2026-10-17, `feature/wfc-forest`'tan yalnız ağaç kısmı):** Kullanıcı isteği: main'in SampleScene'i ve World'ü kullanılacak, bizim ResourceTest/zemin/inşa değişikliklerimiz alınmadı. SampleScene `World`'üne `GridForest` (`Assets/Scripts/Map/GridForest.cs`) eklendi: WFC'nin koyduğu ağaç hücreleri (id 5) görünmez `ResourceNode` + collider ile toplanabilir. Kesilen ağaç zemin plakası olmadan devrilir (ikili karoda her ağaç ayrı, 8 yönden rastgele), 2 sn yerde kalır, `FlatFade.mat` ile saydamlaşıp kaybolur (renk/doku MapView malzemesinden alınır). Tıklanınca ve oduncu vurunca (`Gatherer.hitInterval` 0.5 sn, yalnız odun) hafifçe sallanır. `ResourceNode`'a `VisibilityChanged` ve `Hit` olayları eklendi. ResourceTest'ten gelen eski tek tek ağaçlı `Gameplay/Forest` kapatıldı (silinmedi). Kurulum: `SampleSceneSetup.EnsureGridForest` (SampleScene kurulum menüsü de çağırır). GridForest `forestArea` boşsa ağaçları WFC'nin koyduğu her yerde bırakır. Unity hatasız derledi; Play'de oduncuların odun getirdiği görüldü. Devrilme/sallanma main sahnesinde gözle kontrol edilmedi (ResourceTest'te doğrulanmıştı). Not: TerrainGround tek renk olduğu için ağaçlar zeminle aynı yeşil görünüyor.
 
 - **Animasyon merge (2026-10-17):** Yürüyüş/odun kesme animasyonları, köylü prefabları ve SampleScene kaynak toplama düzeni main'e çakışmasız birleştirildi. Birleşmiş main sürümünde 37/37 Unity testi başarılı (0 hata); yürüyüş, ağaca yönelme, kol/mesh animasyonu ve odun/taş teslimi doğrulandı. Rapor: Logs/main-villager-merge-tests.xml.
 

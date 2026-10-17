@@ -14,6 +14,8 @@ public class Gatherer : MonoBehaviour
     [SerializeField] ResourceNode home;
     [SerializeField] int carryCapacity = 5;
     [SerializeField] float harvestDuration = 2f;
+    [Tooltip("Odun toplarken ağaca kaç saniyede bir vurur. 0 = vurmaz.")]
+    [SerializeField] float hitInterval = 0.5f;
     [SerializeField] float moveSpeed = 3f;
     [Tooltip("Saniyede en fazla kaç derece döner (köşelerde yumuşak dönüş).")]
     [SerializeField] float turnSpeed = 360f;
@@ -86,7 +88,15 @@ public class Gatherer : MonoBehaviour
             if (node == null)
                 continue;
             Activity = GathererActivity.Harvesting;
-            yield return new WaitForSeconds(harvestDuration);
+            // Odun toplarken ağaca aralıklarla vurur (ağaç sallanır). Ocaklarda vurulmaz.
+            for (float t = 0f; t < harvestDuration; t += hitInterval)
+            {
+                if (node != null && resourceType == ResourceType.Wood && hitInterval > 0f)
+                    node.PlayHitFeedback();
+                yield return new WaitForSeconds(hitInterval > 0f ? Mathf.Min(hitInterval, harvestDuration - t) : harvestDuration);
+                if (hitInterval <= 0f)
+                    break;
+            }
             Activity = GathererActivity.Idle;
             if (node == null)
                 continue;
