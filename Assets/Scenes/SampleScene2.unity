@@ -1104,6 +1104,36 @@ MonoBehaviour:
   - Id: 9
     Prefab: {fileID: 919132149155446097, guid: af98caad9f267de4f8b90b32df346cfa, type: 3}
     Weight: 1
+  - Id: 10
+    Prefab: {fileID: 919132149155446097, guid: deac77179a5b2654a83c51740dac228e, type: 3}
+    Weight: 1
+  - Id: 10
+    Prefab: {fileID: 919132149155446097, guid: b586c733e6881eb48bd68e674025e32a, type: 3}
+    Weight: 1
+  - Id: 11
+    Prefab: {fileID: 919132149155446097, guid: 8a2a627eee3fe48488d10326e7dc91ee, type: 3}
+    Weight: 1
+  - Id: 12
+    Prefab: {fileID: 919132149155446097, guid: f3eb92d29645a9e41afeac04d0b63587, type: 3}
+    Weight: 1
+  - Id: 12
+    Prefab: {fileID: 919132149155446097, guid: bc10eeac1c1382346b8c763c38306242, type: 3}
+    Weight: 1
+  - Id: 13
+    Prefab: {fileID: 919132149155446097, guid: fc2ff5fec7b9b344cba1c598142d988f, type: 3}
+    Weight: 1
+  - Id: 14
+    Prefab: {fileID: 919132149155446097, guid: 0e9dcf3a13cc11749b0262e80dcad4a8, type: 3}
+    Weight: 1
+  - Id: 15
+    Prefab: {fileID: 919132149155446097, guid: f4849942321c0e244a3c93a975fed1a3, type: 3}
+    Weight: 1
+  - Id: 16
+    Prefab: {fileID: 919132149155446097, guid: 756202a8d676d5a44ae0c7cc59121ee0, type: 3}
+    Weight: 1
+  - Id: 17
+    Prefab: {fileID: 919132149155446097, guid: bf1bf830a28d3cf4583217a13a9f5dde, type: 3}
+    Weight: 1
 --- !u!114 &1602157105
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1148,62 +1178,2610 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WfcSolver
   world: {fileID: 1602157105}
   seed: 0
-  maxDistance: 16
+  maxDistance: 32
   rules:
   - Id: 0
-    Left: 0000000001000000020000000300000005000000i
-    Right: 0000000001000000020000000300000005000000i
-    Front: 0000000001000000020000000300000005000000i
-    Back: 0000000001000000020000000300000005000000i
+    Weight: 1
+    Left: 00000000010000000200000003000000050000000a0000000b0000000c0000000d0000000f0000001000000011000000i
+    Right: 00000000010000000200000003000000050000000a0000000b0000000c0000000d0000000f0000001000000011000000i
+    Front: 00000000010000000200000003000000050000000a0000000b0000000c0000000d0000000f0000001000000011000000i
+    Back: 00000000010000000200000003000000050000000a0000000b0000000c0000000d0000000f0000001000000011000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 1
+    Weight: 1
     Left: 010000000200000003000000i
     Right: 010000000200000003000000i
     Front: 04000000i
     Back: 0000000005000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 2
+    Weight: 1
     Left: 0000000005000000i
     Right: 010000000200000003000000i
     Front: 010000000200000003000000i
     Back: 0000000005000000i
+    LeftFit: []
+    RightFit:
+    - Id: 2
+      Rotation: 3
+    FrontFit:
+    - Id: 2
+      Rotation: 1
+    BackFit: []
   - Id: 3
+    Weight: 1
     Left: 0100000002000000i
     Right: 04000000i
     Front: 04000000i
     Back: 0100000002000000i
+    LeftFit:
+    - Id: 3
+      Rotation: 3
+    RightFit: []
+    FrontFit: []
+    BackFit:
+    - Id: 3
+      Rotation: 1
   - Id: 4
+    Weight: 1
     Left: 0100000002000000030000000400000006000000070000000800000009000000i
     Right: 0100000002000000030000000400000006000000070000000800000009000000i
     Front: 0100000002000000030000000400000006000000070000000800000009000000i
     Back: 0100000002000000030000000400000006000000070000000800000009000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 5
-    Left: 0000000001000000020000000300000005000000i
-    Right: 0000000001000000020000000300000005000000i
-    Front: 0000000001000000020000000300000005000000i
-    Back: 0000000001000000020000000300000005000000i
+    Weight: 1
+    Left: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
+    Right: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
+    Front: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
+    Back: 00000000010000000200000003000000050000000a0000000b0000000c0000000d000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 6
+    Weight: 1
     Left: 060000000700000008000000i
     Right: 060000000700000008000000i
     Front: 09000000i
     Back: 04000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 7
+    Weight: 1
     Left: 04000000i
     Right: 0600000008000000i
     Front: 0600000008000000i
     Back: 04000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 8
+    Weight: 1
     Left: 0600000007000000i
     Right: 09000000i
     Front: 09000000i
     Back: 0600000007000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
   - Id: 9
+    Weight: 1
     Left: 06000000070000000800000009000000i
     Right: 06000000070000000800000009000000i
     Front: 06000000070000000800000009000000i
     Back: 06000000070000000800000009000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
+  - Id: 10
+    Weight: 1
+    Left: 0b0000000c0000000d000000i
+    Right: 0000000005000000i
+    Front: 0c0000000d000000i
+    Back: 0000000005000000i
+    LeftFit:
+    - Id: 12
+      Rotation: 0
+    RightFit: []
+    FrontFit:
+    - Id: 12
+      Rotation: 2
+    BackFit: []
+  - Id: 11
+    Weight: 0.1
+    Left: 0c0000000b0000000d000000i
+    Right: 0a0000000b0000000d000000i
+    Front: 0b0000000d000000i
+    Back: 0000000005000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit:
+    - Id: 11
+      Rotation: 2
+    BackFit: []
+  - Id: 12
+    Weight: 1
+    Left: 0000000005000000i
+    Right: 0a0000000b0000000d000000i
+    Front: 0a0000000d000000i
+    Back: 0000000005000000i
+    LeftFit: []
+    RightFit:
+    - Id: 10
+      Rotation: 0
+    FrontFit:
+    - Id: 10
+      Rotation: 2
+    BackFit: []
+  - Id: 13
+    Weight: 0.1
+    Left: 0b0000000d000000i
+    Right: 0a0000000b000000i
+    Front: 0b0000000d000000i
+    Back: 0b0000000c000000i
+    LeftFit:
+    - Id: 11
+      Rotation: 1
+    RightFit:
+    - Id: 10
+      Rotation: 0
+    - Id: 11
+      Rotation: 0
+    - Id: 13
+      Rotation: 1
+    FrontFit:
+    - Id: 11
+      Rotation: 2
+    BackFit:
+    - Id: 11
+      Rotation: 3
+    - Id: 12
+      Rotation: 3
+    - Id: 13
+      Rotation: 3
+  - Id: 14
+    Weight: 1
+    Left: 0e0000000f0000001000000011000000i
+    Right: 0e0000000f0000001000000011000000i
+    Front: 0e0000000f0000001000000011000000i
+    Back: 0e0000000f0000001000000011000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
+  - Id: 15
+    Weight: 1
+    Left: 0f0000001000000011000000i
+    Right: 0f0000001000000011000000i
+    Front: 00000000i
+    Back: 0e000000i
+    LeftFit: []
+    RightFit: []
+    FrontFit: []
+    BackFit: []
+  - Id: 16
+    Weight: 1
+    Left: 0e000000i
+    Right: 0f0000001000000011000000i
+    Front: 0f0000001000000011000000i
+    Back: 0e000000i
+    LeftFit: []
+    RightFit:
+    - Id: 16
+      Rotation: 3
+    FrontFit:
+    - Id: 16
+      Rotation: 1
+    BackFit: []
+  - Id: 17
+    Weight: 1
+    Left: 0f0000001000000011000000i
+    Right: 00000000i
+    Front: 00000000i
+    Back: 0f0000001000000011000000i
+    LeftFit:
+    - Id: 17
+      Rotation: 3
+    RightFit: []
+    FrontFit: []
+    BackFit:
+    - Id: 17
+      Rotation: 1
   initialCells:
+  - X: 2
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 3
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 4
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 6
+    Y: 1
+    Id: 14
+    Rotation: 0
   - X: 8
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 10
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 11
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 12
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 13
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 16
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 17
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 18
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 20
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 22
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 23
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 24
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 26
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 27
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 28
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 29
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 30
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 31
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 32
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 33
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 34
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 35
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 36
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 37
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 38
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 38
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 39
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 40
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 41
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 42
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 43
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 44
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 46
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 47
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 48
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 49
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 50
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 52
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 54
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 55
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 57
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 58
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 59
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 61
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 63
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 65
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 66
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 68
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 70
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 73
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 75
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 76
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 78
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 81
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 82
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 85
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 86
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 89
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 91
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 94
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 96
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 98
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 101
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 104
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 107
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 108
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 111
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 113
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 114
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 116
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 118
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 120
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 121
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 125
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 125
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 1
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 3
+    Y: 2
+    Id: 14
+    Rotation: 0
+  - X: 3
+    Y: 3
+    Id: 14
+    Rotation: 0
+  - X: 3
+    Y: 4
+    Id: 14
+    Rotation: 0
+  - X: 3
+    Y: 5
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 6
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 7
+    Id: 14
+    Rotation: 0
+  - X: 2
     Y: 8
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 10
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 11
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 12
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 14
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 17
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 18
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 20
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 22
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 23
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 25
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 26
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 28
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 29
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 31
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 32
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 33
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 34
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 36
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 37
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 38
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 39
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 41
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 42
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 44
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 45
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 46
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 47
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 48
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 50
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 51
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 52
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 53
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 54
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 55
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 57
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 58
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 59
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 60
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 61
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 62
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 63
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 64
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 65
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 66
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 67
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 68
+    Id: 14
+    Rotation: 0
+  - X: 2
+    Y: 70
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 73
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 75
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 77
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 78
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 80
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 82
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 85
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 88
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 90
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 91
+    Id: 14
+    Rotation: 0
+  - X: 1
+    Y: 94
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 95
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 98
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 100
+    Id: 14
+    Rotation: 0
+  - X: 0
+    Y: 104
+    Id: 14
+    Rotation: 0
+  - X: 3
+    Y: 103
+    Id: 14
+    Rotation: 0
+  - X: 13
+    Y: 103
+    Id: 14
+    Rotation: 0
+  - X: 22
+    Y: 102
+    Id: 14
+    Rotation: 0
+  - X: 24
+    Y: 102
+    Id: 14
+    Rotation: 0
+  - X: 26
+    Y: 103
+    Id: 14
+    Rotation: 0
+  - X: 30
+    Y: 103
+    Id: 14
+    Rotation: 0
+  - X: 33
+    Y: 105
+    Id: 14
+    Rotation: 0
+  - X: 35
+    Y: 105
+    Id: 14
+    Rotation: 0
+  - X: 38
+    Y: 106
+    Id: 14
+    Rotation: 0
+  - X: 40
+    Y: 106
+    Id: 14
+    Rotation: 0
+  - X: 42
+    Y: 106
+    Id: 14
+    Rotation: 0
+  - X: 45
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 48
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 49
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 54
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 55
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 57
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 60
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 63
+    Y: 110
+    Id: 14
+    Rotation: 0
+  - X: 64
+    Y: 110
+    Id: 14
+    Rotation: 0
+  - X: 69
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 74
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 76
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 80
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 84
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 88
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 93
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 97
+    Y: 109
+    Id: 14
+    Rotation: 0
+  - X: 99
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 100
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 105
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 106
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 108
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 109
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 110
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 113
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 114
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 115
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 117
+    Y: 108
+    Id: 14
+    Rotation: 0
+  - X: 118
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 120
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 121
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 107
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 62
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 52
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 49
+    Id: 14
+    Rotation: 0
+  - X: 125
+    Y: 43
+    Id: 14
+    Rotation: 0
+  - X: 125
+    Y: 39
+    Id: 14
+    Rotation: 0
+  - X: 125
+    Y: 37
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 35
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 31
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 29
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 27
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 25
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 23
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 22
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 21
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 19
+    Id: 14
+    Rotation: 0
+  - X: 124
+    Y: 18
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 17
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 16
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 15
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 12
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 11
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 10
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 8
+    Id: 14
+    Rotation: 0
+  - X: 123
+    Y: 7
+    Id: 14
+    Rotation: 0
+  - X: 122
+    Y: 5
+    Id: 14
+    Rotation: 0
+  - X: 122
+    Y: 3
+    Id: 14
+    Rotation: 0
+  - X: 122
+    Y: 2
+    Id: 14
+    Rotation: 0
+  - X: 122
+    Y: 0
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 105
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 103
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 100
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 66
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 68
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 90
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 92
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 93
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 94
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 95
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 96
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 86
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 85
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 84
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 83
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 81
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 80
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 79
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 77
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 76
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 75
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 74
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 73
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 71
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 71
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 70
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 70
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 69
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 68
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 67
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 67
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 66
+    Id: 14
+    Rotation: 0
+  - X: 127
+    Y: 65
+    Id: 14
+    Rotation: 0
+  - X: 126
+    Y: 65
+    Id: 14
+    Rotation: 0
+  - X: 20
+    Y: 94
+    Id: 0
+    Rotation: 0
+  - X: 19
+    Y: 94
+    Id: 0
+    Rotation: 0
+  - X: 18
+    Y: 93
+    Id: 0
+    Rotation: 0
+  - X: 17
+    Y: 93
+    Id: 0
+    Rotation: 0
+  - X: 17
+    Y: 92
+    Id: 0
+    Rotation: 0
+  - X: 16
+    Y: 91
+    Id: 0
+    Rotation: 0
+  - X: 15
+    Y: 90
+    Id: 0
+    Rotation: 0
+  - X: 15
+    Y: 89
+    Id: 0
+    Rotation: 0
+  - X: 14
+    Y: 88
+    Id: 0
+    Rotation: 0
+  - X: 13
+    Y: 86
+    Id: 0
+    Rotation: 0
+  - X: 13
+    Y: 85
+    Id: 0
+    Rotation: 0
+  - X: 12
+    Y: 83
+    Id: 0
+    Rotation: 0
+  - X: 12
+    Y: 82
+    Id: 0
+    Rotation: 0
+  - X: 11
+    Y: 82
+    Id: 0
+    Rotation: 0
+  - X: 11
+    Y: 81
+    Id: 0
+    Rotation: 0
+  - X: 11
+    Y: 80
+    Id: 0
+    Rotation: 0
+  - X: 10
+    Y: 80
+    Id: 0
+    Rotation: 0
+  - X: 10
+    Y: 79
+    Id: 0
+    Rotation: 0
+  - X: 10
+    Y: 77
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 77
+    Id: 0
+    Rotation: 0
+  - X: 10
+    Y: 76
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 76
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 75
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 73
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 73
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 72
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 72
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 70
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 69
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 68
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 67
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 66
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 65
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 64
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 62
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 61
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 60
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 59
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 57
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 56
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 55
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 53
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 52
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 51
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 49
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 47
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 46
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 45
+    Id: 0
+    Rotation: 0
+  - X: 7
+    Y: 44
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 43
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 41
+    Id: 0
+    Rotation: 0
+  - X: 8
+    Y: 38
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 38
+    Id: 0
+    Rotation: 0
+  - X: 9
+    Y: 36
+    Id: 0
+    Rotation: 0
+  - X: 10
+    Y: 34
+    Id: 0
+    Rotation: 0
+  - X: 11
+    Y: 32
+    Id: 0
+    Rotation: 0
+  - X: 12
+    Y: 29
+    Id: 0
+    Rotation: 0
+  - X: 13
+    Y: 29
+    Id: 0
+    Rotation: 0
+  - X: 14
+    Y: 26
+    Id: 0
+    Rotation: 0
+  - X: 15
+    Y: 25
+    Id: 0
+    Rotation: 0
+  - X: 15
+    Y: 24
+    Id: 0
+    Rotation: 0
+  - X: 16
+    Y: 23
+    Id: 0
+    Rotation: 0
+  - X: 16
+    Y: 22
+    Id: 0
+    Rotation: 0
+  - X: 18
+    Y: 21
+    Id: 0
+    Rotation: 0
+  - X: 18
+    Y: 20
+    Id: 0
+    Rotation: 0
+  - X: 19
+    Y: 19
+    Id: 0
+    Rotation: 0
+  - X: 20
+    Y: 17
+    Id: 0
+    Rotation: 0
+  - X: 21
+    Y: 16
+    Id: 0
+    Rotation: 0
+  - X: 22
+    Y: 16
+    Id: 0
+    Rotation: 0
+  - X: 22
+    Y: 15
+    Id: 0
+    Rotation: 0
+  - X: 23
+    Y: 14
+    Id: 0
+    Rotation: 0
+  - X: 24
+    Y: 14
+    Id: 0
+    Rotation: 0
+  - X: 25
+    Y: 13
+    Id: 0
+    Rotation: 0
+  - X: 26
+    Y: 13
+    Id: 0
+    Rotation: 0
+  - X: 26
+    Y: 12
+    Id: 0
+    Rotation: 0
+  - X: 27
+    Y: 12
+    Id: 0
+    Rotation: 0
+  - X: 29
+    Y: 12
+    Id: 0
+    Rotation: 0
+  - X: 33
+    Y: 10
+    Id: 0
+    Rotation: 0
+  - X: 36
+    Y: 9
+    Id: 0
+    Rotation: 0
+  - X: 40
+    Y: 9
+    Id: 0
+    Rotation: 0
+  - X: 41
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 42
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 43
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 44
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 45
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 46
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 47
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 49
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 50
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 53
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 57
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 60
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 65
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 69
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 71
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 73
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 74
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 75
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 77
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 80
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 81
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 83
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 85
+    Y: 6
+    Id: 0
+    Rotation: 0
+  - X: 86
+    Y: 6
+    Id: 0
+    Rotation: 0
+  - X: 88
+    Y: 6
+    Id: 0
+    Rotation: 0
+  - X: 88
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 90
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 91
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 93
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 94
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 95
+    Y: 7
+    Id: 0
+    Rotation: 0
+  - X: 95
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 96
+    Y: 8
+    Id: 0
+    Rotation: 0
+  - X: 98
+    Y: 9
+    Id: 0
+    Rotation: 0
+  - X: 99
+    Y: 9
+    Id: 0
+    Rotation: 0
+  - X: 100
+    Y: 10
+    Id: 0
+    Rotation: 0
+  - X: 102
+    Y: 11
+    Id: 0
+    Rotation: 0
+  - X: 104
+    Y: 13
+    Id: 0
+    Rotation: 0
+  - X: 105
+    Y: 15
+    Id: 0
+    Rotation: 0
+  - X: 106
+    Y: 15
+    Id: 0
+    Rotation: 0
+  - X: 107
+    Y: 17
+    Id: 0
+    Rotation: 0
+  - X: 108
+    Y: 18
+    Id: 0
+    Rotation: 0
+  - X: 109
+    Y: 19
+    Id: 0
+    Rotation: 0
+  - X: 109
+    Y: 20
+    Id: 0
+    Rotation: 0
+  - X: 110
+    Y: 21
+    Id: 0
+    Rotation: 0
+  - X: 110
+    Y: 22
+    Id: 0
+    Rotation: 0
+  - X: 111
+    Y: 24
+    Id: 0
+    Rotation: 0
+  - X: 111
+    Y: 25
+    Id: 0
+    Rotation: 0
+  - X: 111
+    Y: 27
+    Id: 0
+    Rotation: 0
+  - X: 112
+    Y: 28
+    Id: 0
+    Rotation: 0
+  - X: 112
+    Y: 29
+    Id: 0
+    Rotation: 0
+  - X: 112
+    Y: 30
+    Id: 0
+    Rotation: 0
+  - X: 113
+    Y: 32
+    Id: 0
+    Rotation: 0
+  - X: 113
+    Y: 33
+    Id: 0
+    Rotation: 0
+  - X: 114
+    Y: 35
+    Id: 0
+    Rotation: 0
+  - X: 114
+    Y: 37
+    Id: 0
+    Rotation: 0
+  - X: 114
+    Y: 38
+    Id: 0
+    Rotation: 0
+  - X: 115
+    Y: 41
+    Id: 0
+    Rotation: 0
+  - X: 115
+    Y: 43
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 50
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 53
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 54
+    Id: 0
+    Rotation: 0
+  - X: 117
+    Y: 56
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 60
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 62
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 63
+    Id: 0
+    Rotation: 0
+  - X: 116
+    Y: 66
+    Id: 0
+    Rotation: 0
+  - X: 115
+    Y: 67
+    Id: 0
+    Rotation: 0
+  - X: 113
+    Y: 70
+    Id: 0
+    Rotation: 0
+  - X: 113
+    Y: 71
+    Id: 0
+    Rotation: 0
+  - X: 112
+    Y: 72
+    Id: 0
+    Rotation: 0
+  - X: 111
+    Y: 75
+    Id: 0
+    Rotation: 0
+  - X: 110
+    Y: 76
+    Id: 0
+    Rotation: 0
+  - X: 110
+    Y: 77
+    Id: 0
+    Rotation: 0
+  - X: 109
+    Y: 77
+    Id: 0
+    Rotation: 0
+  - X: 110
+    Y: 78
+    Id: 0
+    Rotation: 0
+  - X: 109
+    Y: 79
+    Id: 0
+    Rotation: 0
+  - X: 109
+    Y: 80
+    Id: 0
+    Rotation: 0
+  - X: 108
+    Y: 82
+    Id: 0
+    Rotation: 0
+  - X: 107
+    Y: 85
+    Id: 0
+    Rotation: 0
+  - X: 107
+    Y: 86
+    Id: 0
+    Rotation: 0
+  - X: 106
+    Y: 89
+    Id: 0
+    Rotation: 0
+  - X: 103
+    Y: 93
+    Id: 0
+    Rotation: 0
+  - X: 102
+    Y: 94
+    Id: 0
+    Rotation: 0
+  - X: 100
+    Y: 96
+    Id: 0
+    Rotation: 0
+  - X: 98
+    Y: 98
+    Id: 0
+    Rotation: 0
+  - X: 96
+    Y: 100
+    Id: 0
+    Rotation: 0
+  - X: 94
+    Y: 101
+    Id: 0
+    Rotation: 0
+  - X: 89
+    Y: 102
+    Id: 0
+    Rotation: 0
+  - X: 84
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 80
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 77
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 74
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 69
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 67
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 65
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 62
+    Y: 105
+    Id: 0
+    Rotation: 0
+  - X: 58
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 56
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 54
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 52
+    Y: 104
+    Id: 0
+    Rotation: 0
+  - X: 51
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 50
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 49
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 47
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 46
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 45
+    Y: 103
+    Id: 0
+    Rotation: 0
+  - X: 43
+    Y: 102
+    Id: 0
+    Rotation: 0
+  - X: 39
+    Y: 102
+    Id: 0
+    Rotation: 0
+  - X: 37
+    Y: 101
+    Id: 0
+    Rotation: 0
+  - X: 31
+    Y: 100
+    Id: 0
+    Rotation: 0
+  - X: 27
+    Y: 99
+    Id: 0
+    Rotation: 0
+  - X: 26
+    Y: 99
+    Id: 0
+    Rotation: 0
+  - X: 25
+    Y: 99
+    Id: 0
+    Rotation: 0
+  - X: 24
+    Y: 99
+    Id: 0
+    Rotation: 0
+  - X: 24
+    Y: 98
+    Id: 0
+    Rotation: 0
+  - X: 23
+    Y: 98
+    Id: 0
+    Rotation: 0
+  - X: 22
+    Y: 98
+    Id: 0
+    Rotation: 0
+  - X: 38
+    Y: 95
     Id: 9
+    Rotation: 0
+  - X: 37
+    Y: 95
+    Id: 9
+    Rotation: 0
+  - X: 36
+    Y: 94
+    Id: 9
+    Rotation: 0
+  - X: 35
+    Y: 93
+    Id: 9
+    Rotation: 0
+  - X: 33
+    Y: 92
+    Id: 9
+    Rotation: 0
+  - X: 33
+    Y: 91
+    Id: 9
+    Rotation: 0
+  - X: 32
+    Y: 91
+    Id: 9
+    Rotation: 0
+  - X: 30
+    Y: 88
+    Id: 9
+    Rotation: 0
+  - X: 29
+    Y: 87
+    Id: 9
+    Rotation: 0
+  - X: 28
+    Y: 86
+    Id: 9
+    Rotation: 0
+  - X: 26
+    Y: 84
+    Id: 9
+    Rotation: 0
+  - X: 25
+    Y: 82
+    Id: 9
+    Rotation: 0
+  - X: 21
+    Y: 75
+    Id: 9
+    Rotation: 0
+  - X: 20
+    Y: 73
+    Id: 9
+    Rotation: 0
+  - X: 20
+    Y: 71
+    Id: 9
+    Rotation: 0
+  - X: 17
+    Y: 64
+    Id: 9
+    Rotation: 0
+  - X: 16
+    Y: 61
+    Id: 9
+    Rotation: 0
+  - X: 16
+    Y: 60
+    Id: 9
+    Rotation: 0
+  - X: 16
+    Y: 58
+    Id: 9
+    Rotation: 0
+  - X: 16
+    Y: 56
+    Id: 9
+    Rotation: 0
+  - X: 15
+    Y: 53
+    Id: 9
+    Rotation: 0
+  - X: 15
+    Y: 52
+    Id: 9
+    Rotation: 0
+  - X: 16
+    Y: 46
+    Id: 9
+    Rotation: 0
+  - X: 19
+    Y: 37
+    Id: 9
+    Rotation: 0
+  - X: 21
+    Y: 32
+    Id: 9
+    Rotation: 0
+  - X: 23
+    Y: 30
+    Id: 9
+    Rotation: 0
+  - X: 26
+    Y: 25
+    Id: 9
+    Rotation: 0
+  - X: 28
+    Y: 24
+    Id: 9
+    Rotation: 0
+  - X: 32
+    Y: 21
+    Id: 9
+    Rotation: 0
+  - X: 34
+    Y: 20
+    Id: 9
+    Rotation: 0
+  - X: 36
+    Y: 19
+    Id: 9
+    Rotation: 0
+  - X: 39
+    Y: 18
+    Id: 9
+    Rotation: 0
+  - X: 42
+    Y: 18
+    Id: 9
+    Rotation: 0
+  - X: 49
+    Y: 17
+    Id: 9
+    Rotation: 0
+  - X: 56
+    Y: 16
+    Id: 9
+    Rotation: 0
+  - X: 58
+    Y: 15
+    Id: 9
+    Rotation: 0
+  - X: 64
+    Y: 15
+    Id: 9
+    Rotation: 0
+  - X: 70
+    Y: 15
+    Id: 9
+    Rotation: 0
+  - X: 73
+    Y: 16
+    Id: 9
+    Rotation: 0
+  - X: 78
+    Y: 16
+    Id: 9
+    Rotation: 0
+  - X: 84
+    Y: 17
+    Id: 9
+    Rotation: 0
+  - X: 87
+    Y: 18
+    Id: 9
+    Rotation: 0
+  - X: 88
+    Y: 19
+    Id: 9
+    Rotation: 0
+  - X: 93
+    Y: 20
+    Id: 9
+    Rotation: 0
+  - X: 95
+    Y: 22
+    Id: 9
+    Rotation: 0
+  - X: 96
+    Y: 24
+    Id: 9
+    Rotation: 0
+  - X: 100
+    Y: 30
+    Id: 9
+    Rotation: 0
+  - X: 103
+    Y: 35
+    Id: 9
+    Rotation: 0
+  - X: 104
+    Y: 38
+    Id: 9
+    Rotation: 0
+  - X: 106
+    Y: 45
+    Id: 9
+    Rotation: 0
+  - X: 106
+    Y: 49
+    Id: 9
+    Rotation: 0
+  - X: 101
+    Y: 74
+    Id: 9
+    Rotation: 0
+  - X: 94
+    Y: 83
+    Id: 9
+    Rotation: 0
+  - X: 94
+    Y: 84
+    Id: 9
+    Rotation: 0
+  - X: 93
+    Y: 84
+    Id: 9
+    Rotation: 0
+  - X: 66
+    Y: 97
+    Id: 9
+    Rotation: 0
+  - X: 57
+    Y: 92
+    Id: 9
+    Rotation: 0
+  - X: 47
+    Y: 67
+    Id: 5
+    Rotation: 0
+  - X: 46
+    Y: 67
+    Id: 5
+    Rotation: 0
+  - X: 39
+    Y: 65
+    Id: 5
+    Rotation: 0
+  - X: 36
+    Y: 63
+    Id: 5
+    Rotation: 0
+  - X: 40
+    Y: 63
+    Id: 5
+    Rotation: 0
+  - X: 45
+    Y: 63
+    Id: 5
+    Rotation: 0
+  - X: 50
+    Y: 63
+    Id: 5
+    Rotation: 0
+  - X: 54
+    Y: 63
+    Id: 5
+    Rotation: 0
+  - X: 55
+    Y: 63
+    Id: 5
+    Rotation: 0
+  - X: 54
+    Y: 62
+    Id: 5
+    Rotation: 0
+  - X: 52
+    Y: 61
+    Id: 5
+    Rotation: 0
+  - X: 50
+    Y: 60
+    Id: 5
+    Rotation: 0
+  - X: 44
+    Y: 58
+    Id: 5
+    Rotation: 0
+  - X: 37
+    Y: 56
+    Id: 5
+    Rotation: 0
+  - X: 35
+    Y: 55
+    Id: 5
+    Rotation: 0
+  - X: 33
+    Y: 55
+    Id: 5
+    Rotation: 0
+  - X: 34
+    Y: 55
+    Id: 5
+    Rotation: 0
+  - X: 40
+    Y: 55
+    Id: 5
+    Rotation: 0
+  - X: 47
+    Y: 56
+    Id: 5
+    Rotation: 0
+  - X: 53
+    Y: 57
+    Id: 5
+    Rotation: 0
+  - X: 51
+    Y: 56
+    Id: 5
+    Rotation: 0
+  - X: 46
+    Y: 54
+    Id: 5
+    Rotation: 0
+  - X: 37
+    Y: 50
+    Id: 5
+    Rotation: 0
+  - X: 34
+    Y: 48
+    Id: 5
+    Rotation: 0
+  - X: 36
+    Y: 48
+    Id: 5
+    Rotation: 0
+  - X: 40
+    Y: 48
+    Id: 5
+    Rotation: 0
+  - X: 46
+    Y: 49
+    Id: 5
+    Rotation: 0
+  - X: 50
+    Y: 50
+    Id: 5
+    Rotation: 0
+  - X: 56
+    Y: 51
+    Id: 5
+    Rotation: 0
+  - X: 57
+    Y: 51
+    Id: 5
+    Rotation: 0
+  - X: 56
+    Y: 50
+    Id: 5
+    Rotation: 0
+  - X: 55
+    Y: 50
+    Id: 5
+    Rotation: 0
+  - X: 52
+    Y: 48
+    Id: 5
+    Rotation: 0
+  - X: 45
+    Y: 46
+    Id: 5
+    Rotation: 0
+  - X: 43
+    Y: 44
+    Id: 5
+    Rotation: 0
+  - X: 50
+    Y: 43
+    Id: 5
+    Rotation: 0
+  - X: 58
+    Y: 44
+    Id: 5
+    Rotation: 0
+  - X: 57
+    Y: 43
+    Id: 5
+    Rotation: 0
+  - X: 56
+    Y: 43
+    Id: 5
+    Rotation: 0
+  - X: 32
+    Y: 38
+    Id: 0
+    Rotation: 0
+  - X: 32
+    Y: 37
+    Id: 0
+    Rotation: 0
+  - X: 37
+    Y: 34
+    Id: 0
+    Rotation: 0
+  - X: 39
+    Y: 32
+    Id: 0
+    Rotation: 0
+  - X: 42
+    Y: 31
+    Id: 0
+    Rotation: 0
+  - X: 44
+    Y: 30
+    Id: 0
+    Rotation: 0
+  - X: 46
+    Y: 29
+    Id: 0
+    Rotation: 0
+  - X: 48
+    Y: 29
+    Id: 0
+    Rotation: 0
+  - X: 57
+    Y: 27
+    Id: 0
+    Rotation: 0
+  - X: 58
+    Y: 26
+    Id: 0
+    Rotation: 0
+  - X: 59
+    Y: 26
+    Id: 0
+    Rotation: 0
+  - X: 61
+    Y: 26
+    Id: 0
+    Rotation: 0
+  - X: 72
+    Y: 27
+    Id: 0
+    Rotation: 0
+  - X: 73
+    Y: 27
+    Id: 0
+    Rotation: 0
+  - X: 73
+    Y: 28
+    Id: 0
+    Rotation: 0
+  - X: 75
+    Y: 28
+    Id: 0
+    Rotation: 0
+  - X: 80
+    Y: 32
+    Id: 0
+    Rotation: 0
+  - X: 81
+    Y: 33
+    Id: 0
+    Rotation: 0
+  - X: 82
+    Y: 34
+    Id: 0
+    Rotation: 0
+  - X: 82
+    Y: 35
+    Id: 0
+    Rotation: 0
+  - X: 88
+    Y: 43
+    Id: 0
+    Rotation: 0
+  - X: 88
+    Y: 44
+    Id: 0
+    Rotation: 0
+  - X: 89
+    Y: 45
+    Id: 0
+    Rotation: 0
+  - X: 90
+    Y: 57
+    Id: 0
+    Rotation: 0
+  - X: 90
+    Y: 58
+    Id: 0
+    Rotation: 0
+  - X: 90
+    Y: 59
+    Id: 0
+    Rotation: 0
+  - X: 90
+    Y: 60
+    Id: 0
+    Rotation: 0
+  - X: 87
+    Y: 69
+    Id: 0
+    Rotation: 0
+  - X: 87
+    Y: 70
+    Id: 0
+    Rotation: 0
+  - X: 86
+    Y: 72
+    Id: 0
+    Rotation: 0
+  - X: 79
+    Y: 81
+    Id: 0
+    Rotation: 0
+  - X: 79
+    Y: 82
+    Id: 0
+    Rotation: 0
+  - X: 78
+    Y: 82
+    Id: 0
+    Rotation: 0
+  - X: 78
+    Y: 83
+    Id: 0
+    Rotation: 0
+  - X: 67
+    Y: 86
+    Id: 0
+    Rotation: 0
+  - X: 66
+    Y: 86
+    Id: 0
+    Rotation: 0
+  - X: 44
+    Y: 81
+    Id: 0
+    Rotation: 0
+  - X: 39
+    Y: 79
+    Id: 0
+    Rotation: 0
+  - X: 38
+    Y: 79
+    Id: 0
+    Rotation: 0
+  - X: 64
+    Y: 72
+    Id: 10
+    Rotation: 0
+  - X: 77
+    Y: 60
+    Id: 10
+    Rotation: 0
+  - X: 68
+    Y: 49
+    Id: 10
     Rotation: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (feature/storm-warning: harita tarzında bulutlar, son 1 dk yaklaşma / son 20 sn kararma)
+Son güncelleme: 2026-10-18 (main, `feature/storm-warning`'e birleştirildi)
 
 ## Bağlam
 
@@ -15,7 +15,7 @@ Son güncelleme: 2026-10-18 (feature/storm-warning: harita tarzında bulutlar, s
 ## Branch'ler
 
 - `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi. Ardından `collision-main-merge` (tsunami, duvar çarpışması, katlı inşa) da fast-forward ile main'e alındı.
-- `feature/storm-warning` (GitHub'da, **aktif dal**, main'den): tsunami öncesi fırtına bulutları/şimşek, 2-3 dk sonra kendiliğinden gelen tsunami, uzaktan gelen dalga kabarması, "Anında Etkinleştir" butonu. 2026-10-17'de `origin`e push edildi; main'e birleştirilmedi.
+- `feature/storm-warning` (GitHub'da, **aktif dal**, main'den): tsunami öncesi fırtına bulutları/şimşek, 2-3 dk sonra kendiliğinden gelen tsunami, uzaktan gelen dalga kabarması, "Anında Etkinleştir" butonu. 2026-10-17'de `origin`e push edildi. 2026-10-18'de güncel main (`3d00740`: eski Forest silindi, müzik/AudioManager, ev ve kum modelleri, WFC fırça editörü) bu dala birleştirildi; SampleScene'deki tek çakışma (main'in sildiği Tree 16 ile bizim Incoming Swell yan yanaydı) elle çözüldü. Unity'de açılıp Play'de denenince main'e birleştirilecek.
 - `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
 - `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
@@ -46,6 +46,8 @@ Son güncelleme: 2026-10-18 (feature/storm-warning: harita tarzında bulutlar, s
   - Panel: "Anında Etkinleştir" (kırmızı, panel 388 px). Durum satırı sayacı gösterir: "Fırtına yaklaşıyor - tsunamiye 2:13".
   - Kurulum: `TsunamiTeamMapSetup` yeni kurulumda hepsini ekler; var olan sahne için menü "Tsunami > Add Storm And Release Button To Open Scene" (fırtına ve kabarmayı her seferinde yeniden kurar). SampleScene buna göre güncellendi.
   - Play'de doğrulandı: menüde ve oyun başında ufukta beyaz bulutlar; sayaç 20 sn'ye indirilerek bulutların yaklaşıp karardığı, sayaç bitince uyarının kendiliğinden başladığı, şimşek, kabarmanın ufuktan gelip simülasyona devrettiği ve dalganın kıyıyı bastığı görüldü; Anında Etkinleştir ve Sıfırla çalışıyor; konsol temiz. Gerçek 2-3 dk'lık bekleme baştan sona izlenmedi. Bulutlar kameranın 45° oyun bakışında ancak yakınlaşınca/denize bakınca belirgin; ses (gök gürültüsü) yok. Geri bildirim sonrası Play'de: ada aydınlık kaldı, bulutlar uyarı boyunca üstten yavaşça gelip griye döndü, uzak deniz koyulaştı, şimşek nesnesi oluştu (yıldırım kısa sürdüğü için ekran görüntüsüne denk gelmedi), konsol temiz.
+
+- **Eski Forest SampleScene'den silindi (17 Ekim 2026, `fix/remove-old-forest`; main'e fast-forward ile birleştirilip push edildi):** Kullanıcının OneDrive'daki kopyasında FinottiGames paketi yok; SampleScene açılınca `Gameplay/Forest` altındaki kapalı ağaçlar için "Missing Prefab" hataları çıkıyordu (Tree 11/12/30, üç GUID). Kullanıcı isteğiyle kapalı `Gameplay/Forest` Unity'de silinip sahne kaydedildi; SampleScene'de FinottiGames referansı kalmadı, oyundaki orman zaten `GridForest`'tan geliyor. Unity kaydederken tsunami adaptörünün yeni alanlarını ve birkaç UI anchor'ını da yazdı (değer değişikliği yok). `MergedAssetIntegrationTests`: 34 ağaçlı Forest artık yalnız ResourceTest'te beklenir, SampleScene'de olmaması beklenir. Unity Console temiz; testler bu değişiklikten sonra çalıştırılmadı. ResourceTest hâlâ FinottiGames'e bağlı (paket yoksa orada aynı hata çıkar).
 
 - **Tsunami WFC arazisi + otomatik dalga yönü (17 Ekim 2026, `collision-main-merge`):** Oyun başlayınca WFC haritası kurulduktan 2 kare sonra `TeamMapTsunamiAdapter`, `MapView` parçalarını (eğim, düzlük, tepe, dağ: karo 1–4 ve 6–9) su arazisine çiziyor; ağaç karoları (5) atlanıyor, su aralarından akıyor. Sonra köyden harita kenarına 16 yöndeki koridorları tepe yüksekliğine göre puanlayıp dalgayı en açık koridordan getiriyor, okyanusu o tarafa taşıyor. Editörde arazi düz kalır (WFC yalnız oyunda çalışır). Unity'de geçici Play Mode testiyle doğrulandı: 1907 tepe karosunun hepsi araziye girdi (en yüksek 8.9 m), yön 270° (batı), 25 sn'de köyde 1.26 m su, geçersiz derinlik yok. EditMode 1696 geçti, 13 başarısız (önceki gibi: 3'ü eksik FinottiGames paketi, 10'u URP paket testleri).
 
@@ -154,7 +156,7 @@ Son güncelleme: 2026-10-18 (feature/storm-warning: harita tarzında bulutlar, s
 
 ## Sıradaki işler / açık konular
 
-- [ ] `feature/storm-warning`'i kullanıcı denesin (2026-10-18'deki tek dalga düzeltmeleri yerelde commit'li, push edilmedi); beğenirse main'e birleştirme. Tsunami ekibine söylenmeli: `StylizedWater` artık deniz üstündeki yükselmeye tepe köpüğü veriyor ve fırtına karartmasını kendisi yapıyor. Panelden 1-2 m'lik küçük dalga seçilirse tepe köpüğü az olur (Play'de yalnız 10 m denendi). İstenirse: gök gürültüsü sesi (indirme izni gerekir), yağmur, bulutların oyun bakışında daha görünür olması.
+- [ ] `feature/storm-warning`'e güncel main birleştirildi (2026-10-18). Unity'de SampleScene açılıp Play'de denenmeli (fırtına + tsunami, main'den gelen müzik/AudioManager, orman); hata yoksa main'e birleştirme. Tsunami ekibine söylenmeli: `StylizedWater` artık deniz üstündeki yükselmeye tepe köpüğü veriyor ve fırtına karartmasını kendisi yapıyor. Panelden 1-2 m'lik küçük dalga seçilirse tepe köpüğü az olur (Play'de yalnız 10 m denendi). İstenirse: gök gürültüsü sesi (indirme izni gerekir), yağmur, bulutların oyun bakışında daha görünür olması.
 - [ ] Collision devir kontrolü: `COLLISION_HANDOFF.md` listesindeki düşük/yüksek dalga, bloklama/taşma/kırık boşluk, yatay/dikey/çapraz, pause/reset ve uzun çalışma sınırlarını Unity 6000.6.6f1 Play Mode'da doğrula.
 - [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.

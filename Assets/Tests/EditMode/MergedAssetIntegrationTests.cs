@@ -31,9 +31,10 @@ namespace IdleTown.Tests
                 Assert.That(mesh.sharedMesh, Is.Not.Null, path + "/" + mesh.name);
         }
 
-        [TestCase("Assets/Scenes/ResourceTest.unity")]
-        [TestCase("Assets/Scenes/SampleScene.unity")]
-        public void ResourceScene_KeepsForestQuarriesAndConstructionReferences(string scenePath)
+        // SampleScene'in ormanı GridForest'tan gelir; eski tek tek ağaçlı Forest yalnız ResourceTest'te kaldı.
+        [TestCase("Assets/Scenes/ResourceTest.unity", true)]
+        [TestCase("Assets/Scenes/SampleScene.unity", false)]
+        public void ResourceScene_KeepsForestQuarriesAndConstructionReferences(string scenePath, bool hasOldForest)
         {
             var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
             try
@@ -64,9 +65,16 @@ namespace IdleTown.Tests
                     }
                     controller ??= root.GetComponentInChildren<WallConstructionController>(true);
                 }
-                Assert.That(forest, Is.Not.Null);
-                Assert.That(forest.childCount, Is.EqualTo(34));
-                Assert.That(forest.GetComponentsInChildren<Renderer>(true), Is.Not.Empty);
+                if (hasOldForest)
+                {
+                    Assert.That(forest, Is.Not.Null);
+                    Assert.That(forest.childCount, Is.EqualTo(34));
+                    Assert.That(forest.GetComponentsInChildren<Renderer>(true), Is.Not.Empty);
+                }
+                else
+                {
+                    Assert.That(forest, Is.Null);
+                }
                 Assert.That(quarries, Is.Not.Null);
                 Assert.That(quarries.childCount, Is.EqualTo(3));
                 Assert.That(quarries.GetComponentsInChildren<Renderer>(true), Is.Not.Empty);

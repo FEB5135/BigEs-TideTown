@@ -161,7 +161,8 @@ public class WfcSolver : MonoBehaviour
                 {
                     Id = rule.Id,
                     Rotation = rotation,
-                    Edges = RotateEdges(rule, rotation)
+                    Edges = RotateEdges(rule, rotation),
+                    Weight = rule.Weight > 0f ? rule.Weight : 1f
                 });
             }
         }
@@ -172,22 +173,142 @@ public class WfcSolver : MonoBehaviour
             return false;
         }
 
+        WarnImpossibleFits();
         return true;
     }
 
-    static int[][] RotateEdges(Rule rule, int rotation)
+    static Fit[][] RotateEdges(Rule rule, int rotation)
     {
         // 0 -X right, 1 +X left, 2 +Z back (pivot edge), 3 -Z front (far edge).
-        int[][] authored = { rule.Right, rule.Left, rule.Back, rule.Front };
-        var edges = new int[4][];
+        Fit[][] authored =
+        {
+            Side(rule.RightFit, rule.Right),
+            Side(rule.LeftFit, rule.Left),
+            Side(rule.BackFit, rule.Back),
+            Side(rule.FrontFit, rule.Front)
+        };
+        var edges = new Fit[4][];
         for (var step = 0; step < 4; step++)
         {
             var worldDir = Clockwise[step];
             var authoredDir = Clockwise[(step - rotation + 4) % 4];
-            edges[worldDir] = authored[authoredDir] ?? Array.Empty<int>();
+            edges[worldDir] = Turn(authored[authoredDir], rotation);
         }
 
         return edges;
+    }
+
+    static Fit[] Side(Fit[] exact, int[] ids)
+    {
+        var fitCount = exact != null ? exact.Length : 0;
+        var loose = 0;
+        if (ids != null)
+        {
+            for (var i = 0; i < ids.Length; i++)
+            {
+                if (HasFit(exact, ids[i]))
+                    continue;
+                loose++;
+            }
+        }
+
+        if (fitCount == 0 && loose == 0)
+            return Array.Empty<Fit>();
+
+        var side = new Fit[fitCount + loose];
+        var n = 0;
+        if (ids != null)
+        {
+            for (var i = 0; i < ids.Length; i++)
+            {
+                if (HasFit(exact, ids[i]))
+                    continue;
+                side[n++] = new Fit { Id = ids[i], Rotation = -1 };
+            }
+        }
+
+        if (exact != null)
+        {
+            for (var i = 0; i < exact.Length; i++)
+                side[n++] = exact[i];
+        }
+
+        return side;
+    }
+
+    static bool HasFit(Fit[] fits, int id)
+    {
+        if (fits == null)
+            return false;
+
+        for (var i = 0; i < fits.Length; i++)
+        {
+            if (fits[i].Id == id)
+                return true;
+        }
+
+        return false;
+    }
+
+    void WarnImpossibleFits()
+    {
+        if (rules == null)
+            return;
+
+        foreach (var rule in rules)
+        {
+            if (rule == null)
+                continue;
+
+            WarnSide(rule, "Right", rule.RightFit, 0);
+            WarnSide(rule, "Left", rule.LeftFit, 1);
+            WarnSide(rule, "Back", rule.BackFit, 2);
+            WarnSide(rule, "Front", rule.FrontFit, 3);
+        }
+    }
+
+    void WarnSide(Rule rule, string side, Fit[] fits, int direction)
+    {
+        if (fits == null)
+            return;
+
+        var opposite = Opposite[direction];
+        for (var i = 0; i < fits.Length; i++)
+        {
+            if (fits[i].Rotation < 0)
+                continue;
+
+            var rotation = Normalize(fits[i].Rotation);
+            var faces = false;
+            for (var tile = 0; tile < tiles.Count; tile++)
+            {
+                if (tiles[tile].Id != fits[i].Id || tiles[tile].Rotation != rotation)
+                    continue;
+
+                if (Allows(tiles[tile].Edges[opposite], rule.Id, 0))
+                    faces = true;
+            }
+
+            if (!faces)
+                Debug.LogError($"WFC rule {rule.Id} {side} fit id {fits[i].Id} rotation {rotation} never faces this side, so that join cannot be placed.", this);
+        }
+    }
+
+    static Fit[] Turn(Fit[] side, int rotation)
+    {
+        if (side == null || side.Length == 0 || rotation == 0)
+            return side ?? Array.Empty<Fit>();
+
+        var turned = new Fit[side.Length];
+        for (var i = 0; i < side.Length; i++)
+        {
+            var fit = side[i];
+            if (fit.Rotation >= 0)
+                fit.Rotation = (fit.Rotation + rotation) % 4;
+            turned[i] = fit;
+        }
+
+        return turned;
     }
 
     bool ApplyFixed(IReadOnlyList<FixedCell> cells)
@@ -234,8 +355,8 @@ public class WfcSolver : MonoBehaviour
                 {
                     var opposite = Opposite[dir];
                     compatible[(a * tileCount + b) * 4 + dir] =
-                        Allows(tiles[a].Edges[dir], tiles[b].Id)
-                        && Allows(tiles[b].Edges[opposite], tiles[a].Id);
+                        Allows(tiles[a].Edges[dir], tiles[b].Id, tiles[b].Rotation)
+                        && Allows(tiles[b].Edges[opposite], tiles[a].Id, tiles[a].Rotation);
                 }
             }
         }
@@ -264,10 +385,18 @@ public class WfcSolver : MonoBehaviour
             if (cell < 0)
                 return true;
 
+            var choices = ShuffledChoices(cell);
+            if (choices.Length == 0)
+            {
+                if (!Backtrack(steps))
+                    return false;
+                continue;
+            }
+
             steps.Add(new SearchStep
             {
                 Cell = cell,
-                Choices = ShuffledChoices(cell),
+                Choices = choices,
                 Index = 0,
                 Mark = edits.Count
             });
@@ -345,21 +474,65 @@ public class WfcSolver : MonoBehaviour
                 count++;
         }
 
-        var choices = new int[count];
-        var index = 0;
+        var available = new List<int>(count);
         for (var tile = 0; tile < tileCount; tile++)
         {
-            if (possible[cellBase + tile])
-                choices[index++] = tile;
+            if (!possible[cellBase + tile])
+                continue;
+
+            available.Add(tile);
         }
 
-        for (var i = count - 1; i > 0; i--)
+        if (available.Count == 0)
+            return Array.Empty<int>();
+
+        var open = new Dictionary<int, int>();
+        for (var i = 0; i < available.Count; i++)
         {
-            var swap = random.Next(i + 1);
-            (choices[i], choices[swap]) = (choices[swap], choices[i]);
+            var id = tiles[available[i]].Id;
+            open.TryGetValue(id, out var n);
+            open[id] = n + 1;
+        }
+
+        var choices = new int[available.Count];
+        var weights = new float[available.Count];
+        for (var i = 0; i < available.Count; i++)
+        {
+            var tile = available[i];
+            choices[i] = tile;
+            weights[i] = tiles[tile].Weight / open[tiles[tile].Id];
+        }
+
+        count = available.Count;
+
+        for (var i = 0; i < count; i++)
+        {
+            var pick = PickWeighted(weights, i, count);
+            (choices[i], choices[pick]) = (choices[pick], choices[i]);
+            (weights[i], weights[pick]) = (weights[pick], weights[i]);
         }
 
         return choices;
+    }
+
+    int PickWeighted(float[] weights, int start, int count)
+    {
+        var total = 0.0;
+        for (var i = start; i < count; i++)
+            total += weights[i];
+
+        if (total <= 0.0)
+            return random.Next(start, count);
+
+        var roll = random.NextDouble() * total;
+        for (var i = start; i < count; i++)
+        {
+            roll -= weights[i];
+            if (roll < 0.0)
+                return i;
+        }
+
+        return count - 1;
     }
 
     const byte EditRemove = 0;
@@ -428,7 +601,7 @@ public class WfcSolver : MonoBehaviour
                 RemovePossibility(cell, other);
         }
 
-        if (!Spread(cell))
+        if (counts[cell] == 0 || !Spread(cell))
         {
             ClearQueue();
             DrainWave();
@@ -618,7 +791,11 @@ public class WfcSolver : MonoBehaviour
 
     void RemovePossibility(int cell, int tile)
     {
-        possible[cell * tileCount + tile] = false;
+        var index = cell * tileCount + tile;
+        if (!possible[index])
+            return;
+
+        possible[index] = false;
         counts[cell]--;
         edits.Add(new Edit { Kind = EditRemove, Cell = cell, Tile = tile });
         if (counts[cell] <= 1)
@@ -741,14 +918,16 @@ public class WfcSolver : MonoBehaviour
         return changed;
     }
 
-    static bool Allows(int[] ids, int id)
+    static bool Allows(Fit[] fits, int id, int rotation)
     {
-        if (ids == null)
+        if (fits == null)
             return false;
 
-        for (var i = 0; i < ids.Length; i++)
+        for (var i = 0; i < fits.Length; i++)
         {
-            if (ids[i] == id)
+            if (fits[i].Id != id)
+                continue;
+            if (fits[i].Rotation < 0 || fits[i].Rotation == rotation)
                 return true;
         }
 
@@ -803,18 +982,34 @@ public class WfcSolver : MonoBehaviour
     {
         public int Id;
         public int Rotation;
-        public int[][] Edges;
+        public Fit[][] Edges;
+        public float Weight;
     }
 
     [Serializable]
     public class Rule
     {
         public int Id;
-        [Tooltip("Ids allowed on this side. Left is +X and right is -X, matching Blender. Front is the far edge, -Z. Back is the pivot edge, +Z.")]
+        [Tooltip("How often this id is chosen against other ids. The amount is shared by the rotations still legal in that cell, so four open rotations do not make it four times more common. 0 counts as 1.")]
+        public float Weight;
+        [Tooltip("Ids allowed on this side at any rotation. Left is +X and right is -X, matching Blender. Front is the far edge, -Z. Back is the pivot edge, +Z. An id listed in this side's fit uses the fit instead.")]
         public int[] Left;
         public int[] Right;
         public int[] Front;
         public int[] Back;
+        [Tooltip("Limits this id to those neighbor rotations on this side only. Other ids in the list stay at any rotation, and other sides are unchanged. Rotation is the neighbor while this tile is at rotation 0, and it turns with the tile. -1 is any rotation.")]
+        public Fit[] LeftFit;
+        public Fit[] RightFit;
+        public Fit[] FrontFit;
+        public Fit[] BackFit;
+    }
+
+    [Serializable]
+    public struct Fit
+    {
+        public int Id;
+        [Tooltip("Clockwise quarter-turns of this neighbor while this tile is at rotation 0. -1 allows every rotation. 0 is that rotation, not any.")]
+        public int Rotation;
     }
 
     [Serializable]
