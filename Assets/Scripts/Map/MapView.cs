@@ -5,6 +5,7 @@ using UnityEngine;
 public class MapView : MonoBehaviour
 {
     [SerializeField] World world;
+    [SerializeField] Material material;
     [SerializeField] Module[] modules;
 
     readonly Dictionary<int, GameObject> prefabs = new();
@@ -64,8 +65,17 @@ public class MapView : MonoBehaviour
         if (prefab == null)
             return;
 
-        var rotationY = Quaternion.Euler(0f, rotation * 90f, 0f);
-        instances[key] = Instantiate(prefab, world.CellCenter(x, y), world.transform.rotation * rotationY, transform);
+        var yaw = world.transform.rotation * Quaternion.Euler(0f, rotation * 90f, 0f);
+        var half = world.CellSize * 0.5f;
+        var origin = world.CellCenter(x, y) + yaw * new Vector3(-half, 0f, half);
+        var instance = Instantiate(prefab, origin, yaw, transform);
+        if (material != null)
+        {
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
+                renderer.sharedMaterial = material;
+        }
+
+        instances[key] = instance;
     }
 
     [Serializable]
