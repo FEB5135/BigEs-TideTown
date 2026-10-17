@@ -34,8 +34,27 @@ public class WfcSolver : MonoBehaviour
     float coastBand = 2f;
     [SerializeField, Tooltip("Ids that only appear near painted cells of the same ids (the houses). Empty turns this off.")]
     int[] villageIds = { 10, 11, 12, 13 };
-    [SerializeField, Tooltip("How many cells from a painted village cell these ids may appear.")]
+    [SerializeField, Tooltip("Within this many cells of a painted village cell these ids get the full village weight.")]
     float villageRadius = 12f;
+    [SerializeField, Tooltip("These ids thin out past Village Radius and never appear farther than this from a painted village cell.")]
+    float villageReach = 20f;
+    [SerializeField, Tooltip("Inside the village these ids are chosen this many times more often.")]
+    float villageWeight = 4f;
+    [SerializeField, Tooltip("Rough size of the random clumps and gaps between houses, in cells.")]
+    float villagePatch = 5f;
+    [SerializeField, Tooltip("Hill ids (low slopes and the middle level). They are left out of random flat patches, so hills come in clumps with open ground between. Empty turns this off.")]
+    int[] hillIds = { 1, 2, 3, 4 };
+    [SerializeField, Range(0f, 1f), Tooltip("About how much of the open land becomes flat patches.")]
+    float flatShare = 0.4f;
+    [SerializeField, Tooltip("Rough size of a flat patch, in cells.")]
+    float flatPatch = 14f;
+    [SerializeField, Tooltip("Painted cells of these ids keep their surroundings free, since they stand on hills (the mountains).")]
+    int[] mountainIds = { 6, 7, 8, 9 };
+    [SerializeField, Tooltip("How many cells around painted mountains are never made flat.")]
+    float mountainClearance = 6f;
+
+    float[] villageBias;
+    bool[] villageTile;
 
     readonly List<FixedCell> pins = new();
     readonly List<Tile> tiles = new();
@@ -131,11 +150,12 @@ public class WfcSolver : MonoBehaviour
         if (!ApplyFixed(initialCells) || (usePins && !ApplyFixed(pins)))
             return false;
 
-        ApplyCoast();
-        ApplyVillage();
-
         usedSeed = seed != 0 ? seed : Environment.TickCount;
         random = new System.Random(usedSeed);
+        ApplyCoast();
+        ApplyVillage();
+        ApplyFlats();
+
         attempts = 0;
         attemptLimit = Math.Max(MaxAttempts, cellCount * 32);
         dirty.Clear();
@@ -457,9 +477,11 @@ public class WfcSolver : MonoBehaviour
         return false;
     }
 
-    // Houses stay in the painted village instead of dotting the whole island.
+    // Houses stay around the painted village instead of dotting the whole island. They thin out toward the edge
+    // and random clumps and gaps keep the village from filling a round blob.
     void ApplyVillage()
     {
+        villageBias = null;
         if (villageIds == null || villageIds.Length == 0 || initialCells == null)
             return;
 
@@ -473,14 +495,103 @@ public class WfcSolver : MonoBehaviour
         if (village.Count == 0)
             return;
 
-        var isVillage = IdMask(villageIds);
-        var radiusSquared = villageRadius * villageRadius;
+        villageTile = IdMask(villageIds);
+        villageBias = new float[counts.Length];
+        var reach = Math.Max(villageReach, villageRadius);
+        var noise = Noise(villagePatch);
         for (var i = 0; i < counts.Length; i++)
         {
-            if (counts[i] > 1 && NearestSquared(i, village) > radiusSquared)
-                Restrict(i, isVillage, false);
+            var distance = Math.Sqrt(NearestSquared(i, village));
+            if (distance > reach)
+            {
+                if (counts[i] > 1)
+                    Restrict(i, villageTile, false);
+                continue;
+            }
+
+            var falloff = distance <= villageRadius ? 1.0 : 1.0 - (distance - villageRadius) / (reach - villageRadius + 1e-6);
+            villageBias[i] = (float)(villageWeight * Math.Max(falloff, 0.05) * 2.0 * noise[i]);
         }
     }
+
+    // Smooth value noise in 0..1 with features about this many cells across.
+    double[] Noise(float patch)
+    {
+        var field = new double[counts.Length];
+        if (patch <= 0f)
+        {
+            for (var i = 0; i < field.Length; i++)
+                field[i] = 0.5;
+            return field;
+        }
+
+        var gridW = (int)Math.Ceiling(width / patch) + 2;
+        var gridH = (int)Math.Ceiling(height / patch) + 2;
+        var grid = new double[gridW * gridH];
+        for (var i = 0; i < grid.Length; i++)
+            grid[i] = random.NextDouble();
+
+        for (var i = 0; i < field.Length; i++)
+        {
+            var gx = i % width / patch;
+            var gy = i / width / patch;
+            var x0 = (int)gx;
+            var y0 = (int)gy;
+            var tx = Smooth(gx - x0);
+            var ty = Smooth(gy - y0);
+            var top = Lerp(grid[y0 * gridW + x0], grid[y0 * gridW + x0 + 1], tx);
+            var bottom = Lerp(grid[(y0 + 1) * gridW + x0], grid[(y0 + 1) * gridW + x0 + 1], tx);
+            field[i] = Lerp(top, bottom, ty);
+        }
+
+        return field;
+    }
+
+    // Without this, hills spread evenly over the whole island. Smooth noise picks open patches that stay flat.
+    void ApplyFlats()
+    {
+        if (hillIds == null || hillIds.Length == 0 || flatShare <= 0f || flatPatch <= 0f)
+            return;
+
+        var mountains = new List<int>();
+        if (initialCells != null && mountainIds != null)
+        {
+            foreach (var cell in initialCells)
+            {
+                if (world.InBounds(cell.X, cell.Y) && Array.IndexOf(mountainIds, cell.Id) >= 0)
+                    mountains.Add(cell.Y * width + cell.X);
+            }
+        }
+
+        var noise = Noise(flatPatch);
+        var isHill = IdMask(hillIds);
+        var clearance = mountainClearance * mountainClearance;
+        for (var i = 0; i < counts.Length; i++)
+        {
+            if (counts[i] <= 1 || !HasAny(i, isHill) || noise[i] >= flatShare)
+                continue;
+            if (mountains.Count > 0 && NearestSquared(i, mountains) <= clearance)
+                continue;
+
+            Restrict(i, isHill, false);
+        }
+    }
+
+    bool HasAny(int cell, bool[] mask)
+    {
+        var cellBase = cell * tileCount;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile] && mask[tile])
+                return true;
+        }
+
+        return false;
+    }
+
+    static double Smooth(double t) => t * t * (3 - 2 * t);
+
+    static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
     bool[] IdMask(int[] ids)
     {
@@ -689,6 +800,8 @@ public class WfcSolver : MonoBehaviour
             var tile = available[i];
             choices[i] = tile;
             weights[i] = tiles[tile].Weight / open[tiles[tile].Id];
+            if (villageBias != null && villageTile[tile])
+                weights[i] *= villageBias[cell];
         }
 
         count = available.Count;
