@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+[DefaultExecutionOrder(-25)]
 public class MapView : MonoBehaviour
 {
     [SerializeField] World world;
     [SerializeField] Material material;
     [SerializeField] int chunkSize = 16;
+    [SerializeField] bool createColliders;
     [SerializeField] Module[] modules;
 
     readonly Dictionary<int, List<Variant>> variants = new();
@@ -90,7 +92,7 @@ public class MapView : MonoBehaviour
             var yaw = world.transform.rotation * Quaternion.Euler(0f, rotation * 90f, 0f);
             var half = world.CellSize * 0.5f;
             var origin = world.CellCenter(x, y) + yaw * new Vector3(-half, 0f, half);
-            var worldMatrix = Matrix4x4.TRS(origin, yaw, prefab.transform.localScale);
+            var worldMatrix = Matrix4x4.TRS(origin, yaw, prefab.transform.localScale * world.CellSize);
             cells[index] = new CellDraw
             {
                 Prefab = prefab,
@@ -122,6 +124,8 @@ public class MapView : MonoBehaviour
                 Filter = chunkObject.AddComponent<MeshFilter>(),
                 Renderer = chunkObject.AddComponent<MeshRenderer>()
             };
+            if (createColliders)
+                chunk.Collider = chunkObject.AddComponent<MeshCollider>();
             chunks.Add(key, chunk);
         }
 
@@ -168,6 +172,8 @@ public class MapView : MonoBehaviour
             }
         }
 
+        if (chunk.Collider != null)
+            chunk.Collider.sharedMesh = null;
         if (chunk.Mesh != null)
             Destroy(chunk.Mesh);
 
@@ -183,6 +189,8 @@ public class MapView : MonoBehaviour
         mesh.CombineMeshes(combines.ToArray(), true, true);
         chunk.Mesh = mesh;
         chunk.Filter.sharedMesh = mesh;
+        if (chunk.Collider != null)
+            chunk.Collider.sharedMesh = mesh;
         chunk.Renderer.enabled = true;
         chunk.Renderer.sharedMaterial = chunkMaterial;
     }
@@ -236,6 +244,7 @@ public class MapView : MonoBehaviour
         public MeshFilter Filter;
         public MeshRenderer Renderer;
         public Mesh Mesh;
+        public MeshCollider Collider;
     }
 
     [Serializable]

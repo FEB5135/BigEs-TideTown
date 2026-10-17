@@ -74,6 +74,17 @@ public class NavigationBaker : MonoBehaviour
                 continue;
             if (renderer.GetComponentInParent<Gatherer>() != null || renderer.GetComponentInParent<NavIgnore>() != null)
                 continue;
+            // A WFC chunk contains both flat ground and slopes. Its bounding box is not terrain.
+            var filter = renderer.GetComponent<MeshFilter>();
+            if (renderer.GetComponentInParent<MapView>() != null && filter != null && filter.sharedMesh != null)
+            {
+                sources.Add(new NavMeshBuildSource {
+                    shape = NavMeshBuildSourceShape.Mesh, sourceObject = filter.sharedMesh,
+                    transform = filter.transform.localToWorldMatrix, area = 0
+                });
+                Encapsulate(ref bounds, ref any, renderer.bounds);
+                continue;
+            }
             var local = renderer.localBounds;
             var matrix = renderer.transform.localToWorldMatrix * Matrix4x4.Translate(local.center);
             sources.Add(new NavMeshBuildSource
