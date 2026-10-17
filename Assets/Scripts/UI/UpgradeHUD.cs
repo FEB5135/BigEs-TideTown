@@ -24,6 +24,8 @@ public class UpgradeHUD : MonoBehaviour
 
     [Header("İşçi")]
     [SerializeField] Gatherer workerPrefab;
+    [Tooltip("Sahnede köylü yokken yeni işçinin boyunu, hızını ve mesafelerini aldığı kapalı köylü.")]
+    [SerializeField] Gatherer workerTemplate;
     [SerializeField] float workerButtonWidth = 290f;
     [SerializeField] int workerWood = 15;
     [SerializeField] int workerStone = 10;
@@ -235,7 +237,7 @@ public class UpgradeHUD : MonoBehaviour
             Refresh();
             return;
         }
-        var template = Gatherer.Villagers.Count > 0 ? Gatherer.Villagers[0] : null;
+        var template = Gatherer.Villagers.Count > 0 ? Gatherer.Villagers[0] : workerTemplate;
         var direction = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward;
         var spot = well.transform.position + direction * (well.ApproachRadius + 2.5f);
         if (NavMesh.SamplePosition(spot, out var hit, 6f, NavMesh.AllAreas))

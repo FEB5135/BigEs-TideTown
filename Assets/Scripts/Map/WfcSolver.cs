@@ -26,6 +26,16 @@ public class WfcSolver : MonoBehaviour
     int maxDistance = 16;
     [SerializeField] Rule[] rules;
     [SerializeField] FixedCell[] initialCells;
+    [SerializeField, Tooltip("Ids that make up the coast: sand and its slopes. Between the painted coast and the map edge only these ids are allowed. Inland they reach at most Coast Width cells past the painted coast. Empty turns this off.")]
+    int[] coastIds = { 14, 15, 16, 17 };
+    [SerializeField, Tooltip("How many cells the beach may reach inland from the painted coast.")]
+    float coastWidth = 3f;
+    [SerializeField, Tooltip("Cells this much nearer to the painted coast than to other painted cells must be coast. Past Coast Width the same many cells stay free, so the shore has room for its slopes.")]
+    float coastBand = 2f;
+    [SerializeField, Tooltip("Ids that only appear near painted cells of the same ids (the houses). Empty turns this off.")]
+    int[] villageIds = { 10, 11, 12, 13 };
+    [SerializeField, Tooltip("How many cells from a painted village cell these ids may appear.")]
+    float villageRadius = 12f;
 
     readonly List<FixedCell> pins = new();
     readonly List<Tile> tiles = new();
@@ -120,6 +130,9 @@ public class WfcSolver : MonoBehaviour
 
         if (!ApplyFixed(initialCells) || (usePins && !ApplyFixed(pins)))
             return false;
+
+        ApplyCoast();
+        ApplyVillage();
 
         usedSeed = seed != 0 ? seed : Environment.TickCount;
         random = new System.Random(usedSeed);
@@ -365,6 +378,159 @@ public class WfcSolver : MonoBehaviour
         }
 
         return true;
+    }
+
+    // Local rules alone let sand pits open inland and grass, trees and houses spread over the beach.
+    // The painted coast outlines the island: outside it (toward the map edge) is all coast, and the beach
+    // reaches only a few cells inland from it.
+    void ApplyCoast()
+    {
+        if (coastIds == null || coastIds.Length == 0 || initialCells == null)
+            return;
+
+        var coast = new List<int>();
+        var land = new List<int>();
+        foreach (var cell in initialCells)
+        {
+            if (world.InBounds(cell.X, cell.Y))
+                (Array.IndexOf(coastIds, cell.Id) >= 0 ? coast : land).Add(cell.Y * width + cell.X);
+        }
+
+        if (coast.Count == 0)
+            return;
+
+        // 1 coast only, -1 no coast, 0 free.
+        var zone = new sbyte[counts.Length];
+        for (var i = 0; i < counts.Length; i++)
+        {
+            if (counts[i] < tileCount)
+                continue;
+
+            var sand = Nearest(i, coast, out var toCoastSquared);
+            var toCoast = Math.Sqrt(toCoastSquared);
+            var toLand = double.MaxValue;
+            var outside = false;
+            if (land.Count > 0)
+            {
+                var ground = Nearest(i, land, out var toLandSquared);
+                toLand = Math.Sqrt(toLandSquared);
+                // The painted coast lies between this cell and the land: the cell is past the shore line.
+                outside = (sand % width - i % width) * (ground % width - i % width)
+                    + (sand / width - i / width) * (ground / width - i / width) > 0;
+            }
+
+            if (toCoast + coastBand < toLand && (outside || toCoast <= coastWidth))
+                zone[i] = 1;
+            else if (!outside && toCoast > coastWidth + coastBand)
+                zone[i] = -1;
+        }
+
+        // Coast and land never touch directly; the shore needs free cells for its slopes.
+        var gap = (int)Math.Ceiling(coastBand);
+        for (var i = 0; i < zone.Length; i++)
+        {
+            if (zone[i] == -1 && HasZoneNear(zone, i, gap, 1))
+                zone[i] = 0;
+        }
+
+        var isCoast = IdMask(coastIds);
+        for (var i = 0; i < zone.Length; i++)
+        {
+            if (zone[i] != 0)
+                Restrict(i, isCoast, zone[i] > 0);
+        }
+    }
+
+    bool HasZoneNear(sbyte[] zone, int cell, int radius, sbyte value)
+    {
+        var x = cell % width;
+        var y = cell / width;
+        for (var ny = Math.Max(0, y - radius); ny <= Math.Min(height - 1, y + radius); ny++)
+        {
+            for (var nx = Math.Max(0, x - radius); nx <= Math.Min(width - 1, x + radius); nx++)
+            {
+                if (zone[ny * width + nx] == value)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Houses stay in the painted village instead of dotting the whole island.
+    void ApplyVillage()
+    {
+        if (villageIds == null || villageIds.Length == 0 || initialCells == null)
+            return;
+
+        var village = new List<int>();
+        foreach (var cell in initialCells)
+        {
+            if (world.InBounds(cell.X, cell.Y) && Array.IndexOf(villageIds, cell.Id) >= 0)
+                village.Add(cell.Y * width + cell.X);
+        }
+
+        if (village.Count == 0)
+            return;
+
+        var isVillage = IdMask(villageIds);
+        var radiusSquared = villageRadius * villageRadius;
+        for (var i = 0; i < counts.Length; i++)
+        {
+            if (counts[i] > 1 && NearestSquared(i, village) > radiusSquared)
+                Restrict(i, isVillage, false);
+        }
+    }
+
+    bool[] IdMask(int[] ids)
+    {
+        var mask = new bool[tileCount];
+        for (var tile = 0; tile < tileCount; tile++)
+            mask[tile] = Array.IndexOf(ids, tiles[tile].Id) >= 0;
+        return mask;
+    }
+
+    // Keeps only the tiles whose mask matches. The cell becomes an origin of the first propagation.
+    void Restrict(int cell, bool[] mask, bool keep)
+    {
+        var cellBase = cell * tileCount;
+        var kept = 0;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile] && mask[tile] != keep)
+                possible[cellBase + tile] = false;
+            if (possible[cellBase + tile])
+                kept++;
+        }
+
+        counts[cell] = kept;
+    }
+
+    int NearestSquared(int cell, List<int> cells)
+    {
+        Nearest(cell, cells, out var best);
+        return best;
+    }
+
+    int Nearest(int cell, List<int> cells, out int bestSquared)
+    {
+        var x = cell % width;
+        var y = cell / width;
+        bestSquared = int.MaxValue;
+        var nearest = -1;
+        for (var i = 0; i < cells.Count; i++)
+        {
+            var dx = cells[i] % width - x;
+            var dy = cells[i] / width - y;
+            var d = dx * dx + dy * dy;
+            if (d < bestSquared)
+            {
+                bestSquared = d;
+                nearest = cells[i];
+            }
+        }
+
+        return nearest;
     }
 
     void BuildCompatibility()

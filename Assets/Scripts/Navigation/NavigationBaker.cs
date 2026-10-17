@@ -142,4 +142,13 @@ public class NavigationBaker : MonoBehaviour
         corners.AddRange(path.corners);
         return corners.Count > 0;
     }
+
+    // NavMesh üstündeki from'dan to'ya düz gidilirse NavMesh'te kalınan son nokta (to bir engelin içindeyse kenarı).
+    public static Vector3 ClampToNavMesh(Vector3 from, Vector3 to)
+    {
+        if (!Ready)
+            return to;
+        var filter = new NavMeshQueryFilter { agentTypeID = instance.settings.agentTypeID, areaMask = NavMesh.AllAreas };
+        return NavMesh.Raycast(from, to, out var hit, filter) ? hit.position : to;
+    }
 }

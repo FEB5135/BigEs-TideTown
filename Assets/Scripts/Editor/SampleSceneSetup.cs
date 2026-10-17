@@ -347,8 +347,49 @@ public static class SampleSceneSetup
         ui.FindProperty("stoneIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/Stone.png");
         ui.FindProperty("workerPrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Gatherer>("Assets/Prefabs/Economy/Woodcutter.prefab");
         ui.ApplyModifiedPropertiesWithoutUndo();
+        EnsureWorkerTemplate(scene);
         return true;
     }
+
+    // Oyun köylüsüz başlar: oyuncu elle topladığıyla işçi alır. Sahnedeki köylülerden biri kapalı "Worker Template"
+    // olarak kalır ve yeni işçiler onun ayarlarını (boy, hız, mesafeler) alır; diğerleri silinir.
+    public static bool EnsureWorkerTemplate(Scene scene)
+    {
+        var hud = Find<UpgradeHUD>(scene);
+        if (hud == null)
+            return false;
+
+        Gatherer template = null;
+        var extra = new List<Gatherer>();
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (var worker in root.GetComponentsInChildren<Gatherer>(true))
+            {
+                if (worker.Type != ResourceType.Wood || worker.GetComponent<VillagerAnimation>() == null)
+                    continue;
+                if (template == null || (worker.name == WorkerTemplateName && template.name != WorkerTemplateName))
+                {
+                    if (template != null)
+                        extra.Add(template);
+                    template = worker;
+                }
+                else
+                    extra.Add(worker);
+            }
+        if (template == null)
+            return false;
+
+        foreach (var worker in extra)
+            Object.DestroyImmediate(worker.gameObject);
+        template.name = WorkerTemplateName;
+        template.gameObject.SetActive(false);
+
+        var ui = new SerializedObject(hud);
+        ui.FindProperty("workerTemplate").objectReferenceValue = template;
+        ui.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
+
+    const string WorkerTemplateName = "Worker Template";
 
     // Oyun içi kısa sesler (GameAudio): Kenney RPG Audio ve Impact Sounds (CC0) ile bizim ürettiğimiz vagon sesi
     // (Art/Audio/make_cart_roll.py). Hepsi Assets/Audio/SFX'te.

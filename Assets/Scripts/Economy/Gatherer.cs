@@ -430,17 +430,26 @@ public class Gatherer : MonoBehaviour
         return System.Array.ConvertAll(System.Array.FindAll(path, p => p != null), p => p.position);
     }
 
-    // NavMesh varsa engellerin etrafından, yoksa düz çizgide gider.
+    // NavMesh varsa engellerin etrafından, yoksa düz çizgide gider. NavMesh olup yol bulunamazsa yerinde kalır;
+    // düz gitse evlerin ve dağların içinden geçerdi.
     IEnumerator TravelTo(Vector3 target, float distance)
     {
-        if (NavigationBaker.TryFindPath(transform.position, target, corners))
+        if (!NavigationBaker.Exists)
         {
-            var points = corners.ToArray();
-            for (int i = 1; i < points.Length; i++)
-                yield return MoveTo(points[i], PathStopDistance);
+            yield return MoveTo(target, distance);
+            yield break;
         }
-        // Hedef bir engelin içindeyse NavMesh kenarında biter; kalan kısa mesafe düz gidilir.
-        yield return MoveTo(target, distance);
+        if (!NavigationBaker.TryFindPath(transform.position, target, corners))
+        {
+            Activity = GathererActivity.Idle;
+            yield return new WaitForSeconds(0.5f);
+            yield break;
+        }
+        var points = corners.ToArray();
+        for (int i = 1; i < points.Length; i++)
+            yield return MoveTo(points[i], PathStopDistance);
+        // Hedef bir engelin içindeyse (ağaç, kuyu) NavMesh'in bittiği yerde durulur.
+        yield return MoveTo(NavigationBaker.ClampToNavMesh(points[points.Length - 1], target), distance);
     }
 
     IEnumerator MoveTo(Vector3 target, float distance)
@@ -482,9 +491,21 @@ public class Gatherer : MonoBehaviour
         transform.rotation = facing;
     }
 
+    // Zemin ayağın bu kadar üstünden aşağı bakılarak bulunur. Harita parçalarının collider'ında ev çatısı ve ağaç
+    // tepesi de var; yukarıdan bakılsaydı yanlarından geçerken çatıya, ağacın üstüne çıkılırdı.
+    const float MaxClimb = 0.75f;
+
     bool TryGetGroundHeight(Vector3 position, out float height)
     {
-        int count = Physics.RaycastNonAlloc(position + Vector3.up * 50f, Vector3.down, groundHits, 100f, groundMask, QueryTriggerInteraction.Ignore);
+        // Önce ayağın hemen üstünden; altında hiçbir şey yoksa (zeminin altına düşmüş) eskisi gibi yukarıdan.
+        return TryGetGroundHeight(position, position.y - heightOffset + MaxClimb, out height)
+            || TryGetGroundHeight(position, position.y + 50f, out height);
+    }
+
+    bool TryGetGroundHeight(Vector3 position, float fromY, out float height)
+    {
+        var origin = new Vector3(position.x, fromY, position.z);
+        int count = Physics.RaycastNonAlloc(origin, Vector3.down, groundHits, 100f, groundMask, QueryTriggerInteraction.Ignore);
         float bestDistance = float.MaxValue;
         height = position.y;
         for (int i = 0; i < count; i++)
