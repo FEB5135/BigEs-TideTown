@@ -172,7 +172,6 @@ Son güncelleme: 2026-10-18 (main, `feature/storm-warning`'e birleştirildi)
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (henüz kararlaştırılmadı).
 - [ ] Teslimden önce: repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak. Pixabay sesi (`RockBreak.mp3`) lisansı tek başına dağıtımı yasaklıyor, public repoda durumu değerlendirilmeli.
-- [ ] `ProjectSettings/Packages/com.unity.probuilder/Settings.json` Unity tarafından değişti, commit edilmedi (bilerek).
 - [ ] URP gölge mesafesi (`m_ShadowDistance: 50`) uzaktan bakınca gölgeleri kesiyor; ekip isterse artırılabilir (ortak ayar, dokunulmadı).
 
 ## Çalışma notları (oturumlar arası)

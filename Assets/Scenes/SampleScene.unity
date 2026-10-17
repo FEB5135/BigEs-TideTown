@@ -18536,7 +18536,7 @@ Transform:
   m_GameObject: {fileID: 712898890}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 64, y: 0, z: 64}
+  m_LocalPosition: {x: 256, y: 0, z: 256}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -28218,7 +28218,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Tsunami.TerrainGrid
   resolution: 208
-  cellSize: 2
+  cellSize: 4
   seed: 7
   seaFloor: -12
   coastHeight: 1.2
@@ -28327,7 +28327,7 @@ Transform:
   m_GameObject: {fileID: 1047607400}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 64, y: 0, z: 64}
+  m_LocalPosition: {x: 256, y: 0, z: 256}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -28562,13 +28562,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Tsunami.TsunamiSwell
   controller: {fileID: 1964409333}
-  startDistance: 520
-  matchWaveSpeed: 1
-  startHeight: 0.35
-  fadeTime: 1.5
-  blendToSimFrom: 0.6
-  foamHeight: 6
-  crestSpeed: 14
   crossSegments: 14
   frontSegments: 48
 --- !u!23 &1061862297
@@ -38756,9 +38749,11 @@ MonoBehaviour:
   controller: {fileID: 1964409333}
   cloudMaterial: {fileID: 2100000, guid: b2377c338f5d79946a030392b5188536, type: 2}
   lightningMaterial: {fileID: 2100000, guid: 189435b978de35043bfea9be1a0707fb, type: 2}
-  seaShadeMaterial: {fileID: 2100000, guid: a5b4baf0942f0ed4aa701a03d60ff5e5, type: 2}
+  approachSeconds: 60
+  darkenSeconds: 20
+  catchUpRate: 0.1
   cloudCount: 18
-  puffsPerCloud: {x: 5, y: 9}
+  lumpsPerCloud: {x: 4, y: 7}
   altitude: {x: 34, y: 46}
   bankWidth: 440
   bankDepth: 140
@@ -38768,11 +38763,8 @@ MonoBehaviour:
   calmColor: {r: 0.96, g: 0.97, b: 0.99, a: 1}
   stormColor: {r: 0.24, g: 0.26, b: 0.3, a: 1}
   selfLight: 0.4
-  darkenRange: {x: 0.4, y: 0.95}
-  catchUpRate: 0.1
   seaShade: 0.5
   shadeReach: 900
-  lightningFrom: 0.55
   lightningInterval: {x: 6, y: 1}
   boltChance: 0.45
   boltDuration: 0.3
@@ -68247,7 +68239,7 @@ Transform:
   m_GameObject: {fileID: 1809185245}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 64, y: 0, z: 64}
+  m_LocalPosition: {x: 256, y: 0, z: 256}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -70316,6 +70308,7 @@ MonoBehaviour:
   scenarioIndex: 0
   useWarning: 1
   warningDuration: 16
+  incomingStartHeight: 0.35
   autoRelease: 1
   releaseDelayMin: 120
   releaseDelayMax: 180
