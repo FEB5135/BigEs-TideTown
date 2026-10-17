@@ -44,6 +44,24 @@ public class IsometricCamera : MonoBehaviour
         }
     }
 
+    public float Distance => distance;
+    public float Pitch => pitch;
+    public float Yaw => yaw;
+
+    // Kapalıyken zoom ve kaydırma çalışmaz (menü, açılış geçişi).
+    public bool InputEnabled { get; set; } = true;
+
+    // Kamerayı doğrudan bir duruşa koyar. Mesafe min-max sınırına bağlı değildir (menüde çok uzaktan bakmak için).
+    public void SetPose(Vector3 focus, float newDistance, float newPitch, float newYaw)
+    {
+        focusPoint = focus;
+        distance = targetDistance = newDistance;
+        zoomVelocity = 0f;
+        pitch = newPitch;
+        yaw = newYaw;
+        Apply();
+    }
+
     void Awake()
     {
         cam = GetComponent<Camera>();
@@ -55,7 +73,13 @@ public class IsometricCamera : MonoBehaviour
     void LateUpdate()
     {
         var mouse = Mouse.current;
-        if (mouse != null)
+        if (!InputEnabled)
+        {
+            panning = false;
+            if (mouse != null)
+                lastPointer = mouse.position.ReadValue();
+        }
+        else if (mouse != null)
         {
             float scroll = mouse.scroll.ReadValue().y;
             bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();

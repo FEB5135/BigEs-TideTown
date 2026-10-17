@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (04:05)
+Son güncelleme: 2026-10-17 (10:20)
 
 ## Bağlam
 
@@ -15,7 +15,8 @@ Son güncelleme: 2026-10-17 (04:05)
 ## Branch'ler
 
 - `main`: Ekibin ortak branch'i. Son merge edilen commit: `22f7139 Simple Grid Worldmodel` (harita grid sistemi, `well.obj`, ProBuilder).
-- `feature/resource-gathering`: Bizim çalışmamız. Push edilmemiş commit'ler var; push etmeden önce kullanıcıya sor.
+- `feature/resource-gathering`: Bizim çalışmamız (kaynak toplama). Push etmeden önce kullanıcıya sor.
+- `feature/main-menu`: `feature/resource-gathering`'den açıldı. Ana menü burada. Push edilmedi.
 - `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
 
 ## ⚠ Yarım kalan iş (önce bunu bitir)
@@ -54,9 +55,21 @@ Son güncelleme: 2026-10-17 (04:05)
   - `Gatherer`: NavMesh varsa köşe köşe engellerin etrafından gider (yoksa düz çizgi), köşelerde yumuşak döner, kuyunun kendi tarafındaki kenarına gider. Ev ocağı tükenirse ray başında bekler. Oduncular ev olmadan en yakın ağacı arar, onlar da NavMesh kullanır.
   - Deneme: Quarry 2 köyün arkasına taşındı. Vagon evlerin arasındaki boşluklardan geçip ocağa gitti ve döngüyü tamamladı. Sonra sahne normal yerleşime geri kuruldu.
   - **WFC ekibine:** (1) Ocak için `Quarry.prefab`'ı koyun, istediğiniz yöne döndürün; ray başı girişin ~12 m önünde, orası boş/yürünebilir kalmalı. (2) Harita bitince `NavigationBaker.RequestRebuild()` çağırın (sahnede bir `NavigationBaker` olmalı; haritayı sonradan üretiyorsanız `buildOnStart`'ı kapatın). (3) Hareket eden ya da engel sayılmaması gereken objelere `NavIgnore` ekleyin.
+- **Ana menü** (`feature/main-menu`): Harita arka planda uzaktan ve bulanık; üstte logo (şimdilik yazı: "BigEs" + "KÖYÜ TSUNAMİDEN KORU", dalga amblemi), en yüksek skor kartı, Oyna / Nasıl Oynanır / Ayarlar / Çıkış. Play'de kontrol edildi.
+  - `Assets/Scripts/UI/MainMenu.cs`: Sayfalar, açılışta öğelerin sırayla kayarak gelmesi, Esc ile geri. Oyna deyince menü kaybolur, `CameraIntro` geçişi oynar, sonra kaynak paneli belirir, kuyudaki kaynaklar sıfırlanır (menüde arka planda toplananlar) ve `MainMenu.GameStarted` olayı çağrılır. Diğer ekipler oyunu bu olayla başlatabilir; `MainMenu.IsOpen` menü açık mı söyler.
+  - `Assets/Scripts/Gameplay/CameraIntro.cs` (Main Camera'da): Menü duruşu (mesafe 190, açı oyunla aynı 45/45, odak yavaşça sağa sola kayar). Geçiş 3.2 sn, smootherstep (yavaş-hızlı-yavaş), uzaklık logaritmik yaklaşır. Menü açısı (`menuPitch`/`menuYaw`) farklı verilirse geçişte açı da döner: ileride eğimli giriş için hazır. Bulanıklık: oyun sırasında oluşturulan bir Volume'da Bokeh alan derinliği; geçişin ilk %55'inde kaybolur, sonra post-processing sahnenin kendi ayarına döner. Menüdeyken `IsometricCamera.InputEnabled` ve `ClickHarvester` kapalı.
+  - `HighScore` (PlayerPrefs): Oyun sonunda `HighScore.Submit(skor)` çağrılmalı. Skorun ne olacağı henüz belli değil.
+  - `GameSettings` + `SettingsPanel`: Ses (AudioListener), tam ekran, grafik kalitesi (Düşük=Mobile, Yüksek=PC). PlayerPrefs'te saklanır, açılışta uygulanır.
+  - Görünüm: Oyunun paleti (ahşap kahve, kırmızı çatı, krem, sarı). Kalın alt kenarlı 2.5B butonlar (`PressableButton`: üzerine gelince kalkar, basınca iner). Sprite'lar `Assets/UI/Menu/`, `Art/UI/make_menu_sprites.py` ile üretilir (Pillow). Yazı tipi Unity'nin varsayılanı (LegacyRuntime).
+  - Kurulum: `Assets/Scripts/Editor/MainMenuSetup.cs` (Tools > BigEs > Ana Menüyü Kur, varsa silip yeniden kurar). `ResourceTestSetup` sahnede menü yoksa kendisi kurar.
 - **Kural uyumu:** `THIRD_PARTY.md`'de tüm hazır kaynaklar ve AI kullanımı yazılı. FinottiGames ağaç paketi (Asset Store EULA) `.gitignore`'da ve geçmişten silindi.
 
 ## Sıradaki işler / açık konular
+
+- [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir). Yuvarlak, kalın bir yazı tipi (ör. OFL lisanslı Fredoka/Baloo) menüyü çok iyileştirir; indirmek için kullanıcı izni gerekli.
+- [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
+- [ ] Ana menü: eğimli kamera girişi (CameraIntro'da `menuPitch`/`menuYaw` değiştirmek yeterli).
+- [ ] Ana menü şu an `ResourceTest` sahnesinde. Asıl oyun sahnesi belli olunca orada Tools > BigEs > Ana Menüyü Kur çalıştırılmalı. Build Settings'te yalnız `SampleScene` var.
 
 - [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).

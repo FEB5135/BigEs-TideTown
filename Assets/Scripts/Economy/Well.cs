@@ -67,6 +67,18 @@ public class Well : MonoBehaviour
         Changed?.Invoke(type, amounts[(int)type]);
     }
 
+    // Tüm kaynakları sıfırlar (ör. oyun menüden başlarken).
+    public void ResetAmounts()
+    {
+        for (int i = 0; i < amounts.Length; i++)
+        {
+            if (amounts[i] == 0)
+                continue;
+            amounts[i] = 0;
+            Changed?.Invoke((ResourceType)i, 0);
+        }
+    }
+
     public bool CanAfford(IReadOnlyList<ResourceCost> costs)
     {
         // Aynı tür listede birden fazla geçebilir, önce topla.

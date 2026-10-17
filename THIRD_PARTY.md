@@ -30,8 +30,8 @@ Ses, metin, diğer: kullanılmadı (şimdilik).
 
 | Kategori | Kullanım | Araç | Amaç ve kullanım yeri |
 | --- | --- | --- | --- |
-| Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, kamera, tıklama ve arayüz scriptleri; test sahnesi kurulum scripti; Unity paket derleme hatasının çözümü. |
-| Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/quarry.py`, `minecart.py`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. İlk sürümdeki AI tarafından çizilen ikonlar ise saint11 CC0 ikonlarıyla değiştirildi. |
+| Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, kamera, tıklama ve arayüz scriptleri; ana menü, kamera giriş geçişi ve ayarlar; test sahnesi kurulum scripti; Unity paket derleme hatasının çözümü. |
+| Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/quarry.py`, `minecart.py`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. İlk sürümdeki AI tarafından çizilen ikonlar ise saint11 CC0 ikonlarıyla değiştirildi. Ana menünün sprite'ları (yuvarlak panel, gölge, oyna/ayarlar/kupa/kitap/çıkış ikonları, dalga amblemi; `Assets/UI/Menu/`) Claude'un yazdığı bir Python scriptiyle (`Art/UI/make_menu_sprites.py`) çizildi. |
 | Ses | Kullanılmadı | — | — |
 | Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası ve kod içi açıklamalar. |
 | Diğer | Kullanılmadı | — | — |

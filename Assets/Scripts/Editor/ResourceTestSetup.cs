@@ -114,6 +114,7 @@ public static class ResourceTestSetup
             BuildHud();
             changed = true;
         }
+        changed |= MainMenuSetup.EnsureMenu();
         return changed;
     }
 
