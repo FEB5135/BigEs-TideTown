@@ -493,6 +493,14 @@ namespace Tsunami.EditorTools
                 cloud = GetOrCreate("Storm_Cloud", lit, new Color(0.96f, 0.97f, 0.99f)),
                 lightning = GetOrCreate("Storm_Lightning", Shader.Find("Universal Render Pipeline/Unlit"), new Color(0.88f, 0.92f, 1f))
             };
+            // Clouds take their colours from the team palette (like the trees and mountains), by face direction.
+            if (m.cloud != null && m.cloud.GetTexture("_BaseMap") == null)
+            {
+                var palette = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/palette.png");
+                m.cloud.SetTexture("_BaseMap", palette);
+                m.cloud.SetFloat("_Smoothness", 0f);
+                EditorUtility.SetDirty(m.cloud);
+            }
             AssetDatabase.SaveAssets();
             return m;
         }

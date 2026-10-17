@@ -5,30 +5,41 @@ using UnityEngine.Rendering;
 namespace Tsunami
 {
     /// <summary>
-    /// Storm that announces the tsunami. Broken low-poly clouds wait far out at sea on the side the wave will come
-    /// from and drift slowly towards the coast as <see cref="TsunamiController.StormProgress"/> rises; on the way
-    /// they grow and turn from white to dark grey, the sea under and beyond them darkens (the island keeps its
-    /// light), and lightning starts to flash in the clouds, more often the closer the release. While a tsunami is
-    /// running the storm stays at full strength. Everything is built at runtime.
+    /// Storm that announces the tsunami. Broken low-poly clouds in the map's style (flat-shaded, faceted, coloured
+    /// from the team palette like the snowy mountains) wait white on the horizon on the side the wave will come
+    /// from. In the last minute of the countdown (<see cref="TsunamiController.SecondsToRelease"/>) they drift very
+    /// slowly towards the coast and grow; in the last 20 seconds they slowly darken, the sea under and beyond them
+    /// darkens (the island keeps its light) and lightning flashes inside them, more often the closer the release.
+    /// While a tsunami is announced or running the storm stays at full strength. Everything is built at runtime.
     /// </summary>
     public class TsunamiStorm : MonoBehaviour
     {
         [SerializeField] TsunamiController controller;
-        [Tooltip("Clouds (Simple Lit, opaque). Each cloud gets its own instance for colour and flashes.")]
+        [Tooltip("Clouds (Simple Lit, opaque, base map = the team palette). Each cloud gets its own instance for " +
+                 "colour and flashes.")]
         [SerializeField] Material cloudMaterial;
         [Tooltip("Lightning bolts (unlit).")]
         [SerializeField] Material lightningMaterial;
 
+        [Header("Timing (seconds before the release)")]
+        [Tooltip("The clouds wait on the horizon until this many seconds are left, then drift very slowly in.")]
+        [SerializeField, Min(1f)] float approachSeconds = 60f;
+        [Tooltip("The clouds start to darken and lightning starts this many seconds before the release.")]
+        [SerializeField, Min(1f)] float darkenSeconds = 20f;
+        [Tooltip("How fast the shown storm follows a jump (Release now, Reset), per second. 0.1 = about 10 s.")]
+        [SerializeField, Min(0.01f)] float catchUpRate = 0.1f;
+
         [Header("Clouds")]
         [SerializeField, Range(1, 60)] int cloudCount = 18;
-        [SerializeField] Vector2Int puffsPerCloud = new Vector2Int(5, 9);
+        [Tooltip("Rounded lumps along each cloud (one or two more are stacked on top).")]
+        [SerializeField] Vector2Int lumpsPerCloud = new Vector2Int(4, 7);
         [Tooltip("Height of the cloud bases above the ground (m).")]
         [SerializeField] Vector2 altitude = new Vector2(34f, 46f);
         [Tooltip("Width of the cloud bank across the approach axis (m).")]
         [SerializeField, Min(10f)] float bankWidth = 440f;
         [Tooltip("Depth of the cloud bank along the approach axis (m).")]
         [SerializeField, Min(10f)] float bankDepth = 140f;
-        [Tooltip("Bank centre beyond the coast (m, along the approach axis) when the storm starts...")]
+        [Tooltip("Bank centre beyond the coast (m, along the approach axis) while waiting on the horizon...")]
         [SerializeField] float startBeyondCoast = 560f;
         [Tooltip("...and when the tsunami is released.")]
         [SerializeField] float endBeyondCoast = 80f;
@@ -37,11 +48,6 @@ namespace Tsunami
         [SerializeField] Color stormColor = new Color(0.24f, 0.26f, 0.3f);
         [Tooltip("Share of the cloud colour that glows by itself, so shaded sides don't turn black.")]
         [SerializeField, Range(0f, 1f)] float selfLight = 0.4f;
-        [Tooltip("Storm progress at which the clouds start to darken and where they are fully dark.")]
-        [SerializeField] Vector2 darkenRange = new Vector2(0.4f, 0.95f);
-        [Tooltip("How fast the shown storm follows a jump (Release now, Reset), progress per second. " +
-                 "0.1 = the clouds take about 10 s to come in, the length of the warning.")]
-        [SerializeField, Min(0.01f)] float catchUpRate = 0.1f;
 
         [Header("Stormy sea")]
         [Tooltip("Darkness of the sea under and behind the clouds at full storm (0..1).")]
@@ -50,8 +56,6 @@ namespace Tsunami
         [SerializeField, Min(50f)] float shadeReach = 900f;
 
         [Header("Lightning")]
-        [Tooltip("Storm progress from which lightning flashes.")]
-        [SerializeField, Range(0f, 1f)] float lightningFrom = 0.55f;
         [Tooltip("Seconds between flashes when lightning begins / at the release and while the tsunami runs.")]
         [SerializeField] Vector2 lightningInterval = new Vector2(6f, 1f);
         [Tooltip("Share of the flashes that also send a bolt down to the sea (the rest light up inside the cloud).")]
@@ -62,6 +66,7 @@ namespace Tsunami
         {
             public Transform transform;
             public Material material;
+            public Mesh mesh;
             public Vector2 offset;      // along / across the approach axis, relative to the bank centre (m)
             public float height;
             public float scale;
@@ -73,14 +78,12 @@ namespace Tsunami
         readonly List<LineRenderer> bolts = new List<LineRenderer>();
         readonly List<float> boltAges = new List<float>();
         Transform root;
-        Mesh puffMesh;
-        float shown;                // displayed storm progress (follows the controller smoothly)
+        float shownApproach;        // 0 = waiting on the horizon .. 1 = at the coast (follows the countdown smoothly)
+        float shownDark;            // 0 = white .. 1 = storm dark
         float nextStrike;
         // Bank frame, updated every frame by PlaceClouds.
         Vector3 bankCentre, outward, across;
         float seaY;
-
-        public float ShownProgress => shown;
 
         void Start()
         {
@@ -92,26 +95,35 @@ namespace Tsunami
                 return;
             }
             BuildClouds();
-            shown = controller.StormProgress;
+            shownApproach = ApproachTarget;
+            shownDark = DarkTarget;
             nextStrike = Random.Range(1f, 3f);
         }
 
         void OnDestroy()
         {
-            if (puffMesh != null) Destroy(puffMesh);
             Shader.SetGlobalVector(StormShadeParamsId, Vector4.zero);
-            foreach (Cloud c in clouds) if (c.material != null) Destroy(c.material);
+            foreach (Cloud c in clouds)
+            {
+                if (c.material != null) Destroy(c.material);
+                if (c.mesh != null) Destroy(c.mesh);
+            }
         }
+
+        // Infinity (nothing scheduled) gives 0: calm.
+        float ApproachTarget => Mathf.Clamp01(1f - controller.SecondsToRelease / approachSeconds);
+        float DarkTarget => Mathf.Clamp01(1f - controller.SecondsToRelease / darkenSeconds);
 
         void Update()
         {
             if (controller == null || root == null) return;
-            float target = controller.StormProgress;
-            // A countdown moves far slower than catchUpRate, so the clouds follow it exactly; jumps are smoothed.
-            shown = Mathf.MoveTowards(shown, target, catchUpRate * Time.deltaTime);
+            // The countdown moves slower than catchUpRate, so the clouds follow it exactly; jumps are smoothed.
+            float step = catchUpRate * Time.deltaTime;
+            shownApproach = Mathf.MoveTowards(shownApproach, ApproachTarget, step);
+            shownDark = Mathf.MoveTowards(shownDark, DarkTarget, step);
 
-            float darkness = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(darkenRange.x, darkenRange.y, shown));
-            PlaceClouds(darkness);
+            float darkness = Mathf.SmoothStep(0f, 1f, shownDark);
+            PlaceClouds(Mathf.SmoothStep(0f, 1f, shownApproach), darkness);
             UpdateSeaShade(darkness);
             UpdateLightning();
         }
@@ -122,15 +134,15 @@ namespace Tsunami
         {
             root = new GameObject("Storm Clouds").transform;
             root.SetParent(transform, false);
-            puffMesh = CreateFlatIcosphere();
             for (int i = 0; i < cloudCount; i++)
             {
-                var cloudGO = new GameObject($"Cloud {i}");
+                var cloudGO = new GameObject($"Cloud {i}", typeof(MeshFilter), typeof(MeshRenderer));
                 cloudGO.transform.SetParent(root, false);
                 var cloud = new Cloud
                 {
                     transform = cloudGO.transform,
                     material = new Material(cloudMaterial) { name = $"Storm Cloud {i}" },
+                    mesh = BuildCloudMesh(i),
                     // Spread over the bank, jittered on a loose grid so the clouds stay broken but cover it.
                     offset = new Vector2((Random.value - 0.5f) * bankDepth,
                                          ((i + Random.Range(0.1f, 0.9f)) / cloudCount - 0.5f) * bankWidth),
@@ -139,35 +151,20 @@ namespace Tsunami
                     drift = Random.value * Mathf.PI * 2f
                 };
                 cloud.material.EnableKeyword("_EMISSION");
-                int puffs = Random.Range(puffsPerCloud.x, puffsPerCloud.y + 1);
-                float halfLength = puffs * 3.2f;
-                for (int p = 0; p < puffs; p++)
-                {
-                    // Wide, flat-bottomed cloud: big puffs in the middle stacked a little higher, small ones at the
-                    // ends, a second row offset behind so it isn't a string of balls.
-                    float u = puffs == 1 ? 0f : p / (puffs - 1f) * 2f - 1f;
-                    float middle = 1f - Mathf.Abs(u);
-                    float size = Mathf.Lerp(8f, 16f, middle) * Random.Range(0.85f, 1.15f);
-                    float height = size * Random.Range(0.38f, 0.48f);
-                    var puff = new GameObject("Puff", typeof(MeshFilter), typeof(MeshRenderer));
-                    puff.transform.SetParent(cloudGO.transform, false);
-                    puff.transform.localPosition = new Vector3(u * halfLength + Random.Range(-1.5f, 1.5f),
-                        height * 0.5f + middle * Random.Range(0.5f, 2.5f), (p % 2 == 0 ? -1f : 1f) * Random.Range(1f, 4f));
-                    puff.transform.localRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-                    puff.transform.localScale = new Vector3(size * Random.Range(1.2f, 1.5f), height, size * Random.Range(0.8f, 1f));
-                    puff.GetComponent<MeshFilter>().sharedMesh = puffMesh;
-                    var r = puff.GetComponent<MeshRenderer>();
-                    r.sharedMaterial = cloud.material;
-                    r.shadowCastingMode = ShadowCastingMode.On;
-                    r.receiveShadows = false;
-                    r.lightProbeUsage = LightProbeUsage.Off;
-                    r.reflectionProbeUsage = ReflectionProbeUsage.Off;
-                }
+                cloudGO.GetComponent<MeshFilter>().sharedMesh = cloud.mesh;
+                var r = cloudGO.GetComponent<MeshRenderer>();
+                r.sharedMaterial = cloud.material;
+                r.shadowCastingMode = ShadowCastingMode.On;
+                r.receiveShadows = false;
+                r.lightProbeUsage = LightProbeUsage.Off;
+                r.reflectionProbeUsage = ReflectionProbeUsage.Off;
                 clouds.Add(cloud);
             }
         }
 
-        void PlaceClouds(float darkness)
+        /// <param name="approach">0 = waiting on the horizon, 1 = at the coast.</param>
+        /// <param name="darkness">0 = white, 1 = storm dark.</param>
+        void PlaceClouds(float approach, float darkness)
         {
             Vector3 target = controller.MapAdapter != null ? controller.MapAdapter.ApproachTarget : Vector3.zero;
             Vector2 toLand = controller.TravelDirection;
@@ -178,14 +175,13 @@ namespace Tsunami
                 ? controller.MapAdapter.World.transform.position.y : 0f;
             seaY = groundY + (controller.Simulation != null ? controller.Simulation.SeaLevel : 0f);
             float coast = CoastDistance(target, outward);
-            // Steady drift towards the coast from the first second, slowing a little only at the very end.
-            float travel = shown * (1.3f - 0.3f * shown);
-            float centre = coast + Mathf.Lerp(startBeyondCoast, endBeyondCoast, travel);
+            float centre = coast + Mathf.Lerp(startBeyondCoast, endBeyondCoast, approach);
             bankCentre = target + outward * centre;
             bankCentre.y = groundY;
-            float scale = Mathf.Lerp(cloudScale.x, cloudScale.y, shown);
+            float scale = Mathf.Lerp(cloudScale.x, cloudScale.y, approach);
             Color baseColor = Color.Lerp(calmColor, stormColor, darkness);
-            Quaternion facing = Quaternion.LookRotation(across, Vector3.up);
+            // Each cloud's long side runs along the coast.
+            Quaternion facing = Quaternion.LookRotation(outward, Vector3.up);
             float t = Time.time;
 
             foreach (Cloud c in clouds)
@@ -242,11 +238,11 @@ namespace Tsunami
                 bolts[i].enabled = on;
             }
 
-            if (shown < lightningFrom || clouds.Count == 0) return;
+            // Lightning comes with the darkening: from the last 20 s, more and more often.
+            if (shownDark <= 0f || clouds.Count == 0) return;
             nextStrike -= Time.deltaTime;
             if (nextStrike > 0f) return;
-            float strength = Mathf.InverseLerp(lightningFrom, 1f, shown);
-            float interval = Mathf.Lerp(lightningInterval.x, lightningInterval.y, strength);
+            float interval = Mathf.Lerp(lightningInterval.x, lightningInterval.y, shownDark);
             nextStrike = interval * Random.Range(0.5f, 1.5f);
             Strike();
         }
@@ -324,8 +320,89 @@ namespace Tsunami
 
         // ------------------------------------------------------------------------------------------ mesh
 
-        /// <summary>Once-subdivided icosahedron with flat normals (low-poly puff), unit diameter.</summary>
-        static Mesh CreateFlatIcosphere()
+        // Team palette cells (64 x 64 texture, like the trees and mountains): the snow column runs from white to a
+        // pale cyan, the next columns are pure white.
+        static readonly Vector2 TopUV = PaletteUV(8, 2);      // white
+        static readonly Vector2 SideUV = PaletteUV(6, 12);    // snow white
+        static readonly Vector2 BottomUV = PaletteUV(6, 40);  // pale cyan underside
+
+        static Vector2 PaletteUV(int column, int row) => new Vector2((column + 0.5f) / 64f, 1f - (row + 0.5f) / 64f);
+
+        /// <summary>
+        /// One cumulus cloud in the map's low-poly style: faceted lumps (jittered icospheres) along its length, big
+        /// in the middle and small at the ends, one or two more stacked on top, all cut flat at the base (local
+        /// y = 0). Flat shaded, coloured by face direction from the palette: white tops, snow-white sides, a pale
+        /// cyan underside. Long side along local X.
+        /// </summary>
+        Mesh BuildCloudMesh(int index)
+        {
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            int lumps = Random.Range(lumpsPerCloud.x, lumpsPerCloud.y + 1);
+            float halfLength = lumps * Random.Range(3.4f, 4.2f);
+            float tallest = 0f;
+            for (int p = 0; p < lumps; p++)
+            {
+                float u = lumps == 1 ? 0f : p / (lumps - 1f) * 2f - 1f;
+                u = Mathf.Clamp(u + Random.Range(-0.08f, 0.08f), -1f, 1f);
+                float middle = 1f - Mathf.Abs(u);
+                float r = Mathf.Lerp(4.5f, 9f, middle) * Random.Range(0.85f, 1.15f);
+                float y = r * Mathf.Lerp(0.1f, 0.45f, middle);
+                var centre = new Vector3(u * halfLength, y, (p % 2 == 0 ? -1f : 1f) * Random.Range(0.5f, 3f));
+                AddLump(verts, uvs, tris, centre, new Vector3(r * 1.35f, r * 0.8f, r * Random.Range(0.85f, 1.05f)));
+                tallest = Mathf.Max(tallest, y + r * 0.8f);
+            }
+            int tops = Random.Range(1, 3);
+            for (int p = 0; p < tops; p++)
+            {
+                float r = Random.Range(4.5f, 7f);
+                var centre = new Vector3(Random.Range(-0.35f, 0.35f) * halfLength, tallest - r * 0.35f, Random.Range(-1.5f, 1.5f));
+                AddLump(verts, uvs, tris, centre, new Vector3(r * 1.25f, r * 0.85f, r));
+            }
+            var mesh = new Mesh { name = $"Storm Cloud {index} (generated)" };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals(); // every triangle has its own vertices: flat shading
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        static void AddLump(List<Vector3> verts, List<Vector2> uvs, List<int> tris, Vector3 centre, Vector3 radii)
+        {
+            Vector3[] unit = UnitIcosphere;
+            var p = new Vector3[unit.Length];
+            for (int i = 0; i < unit.Length; i++)
+            {
+                // Jitter each corner a little (shared by its faces, so the lump stays closed): faceted, not round.
+                Vector3 q = centre + Vector3.Scale(unit[i] * Random.Range(0.88f, 1.12f), radii);
+                if (q.y < 0f) q.y = 0f; // flat cloud base
+                p[i] = q;
+            }
+            int[] faces = UnitIcosphereFaces;
+            for (int f = 0; f < faces.Length; f += 3)
+            {
+                Vector3 a = p[faces[f]], b = p[faces[f + 1]], c = p[faces[f + 2]];
+                Vector3 n = Vector3.Cross(b - a, c - a);
+                float area = n.magnitude;
+                if (area < 1e-4f) continue; // collapsed on the flat base
+                n /= area;
+                Vector2 uv = n.y > 0.35f ? TopUV : n.y > -0.45f ? SideUV : BottomUV;
+                int k = verts.Count;
+                verts.Add(a); verts.Add(b); verts.Add(c);
+                uvs.Add(uv); uvs.Add(uv); uvs.Add(uv);
+                tris.Add(k); tris.Add(k + 1); tris.Add(k + 2);
+            }
+        }
+
+        static Vector3[] unitIcosphere;
+        static int[] unitIcosphereFaces;
+        static Vector3[] UnitIcosphere { get { if (unitIcosphere == null) BuildUnitIcosphere(); return unitIcosphere; } }
+        static int[] UnitIcosphereFaces { get { if (unitIcosphereFaces == null) BuildUnitIcosphere(); return unitIcosphereFaces; } }
+
+        /// <summary>Once-subdivided icosahedron with shared corners (42 corners, 80 faces), unit radius.</summary>
+        static void BuildUnitIcosphere()
         {
             float t = (1f + Mathf.Sqrt(5f)) / 2f;
             var v = new List<Vector3>
@@ -334,40 +411,30 @@ namespace Tsunami
                 new Vector3(0, -1, t), new Vector3(0, 1, t), new Vector3(0, -1, -t), new Vector3(0, 1, -t),
                 new Vector3(t, 0, -1), new Vector3(t, 0, 1), new Vector3(-t, 0, -1), new Vector3(-t, 0, 1)
             };
+            for (int i = 0; i < v.Count; i++) v[i] = v[i].normalized;
             int[] f =
             {
                 0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
                 3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1
             };
-            for (int i = 0; i < v.Count; i++) v[i] = v[i].normalized * 0.5f;
-            var verts = new List<Vector3>();
-            var tris = new List<int>();
+            var midpoints = new Dictionary<long, int>();
+            int Mid(int a, int b)
+            {
+                long key = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+                if (midpoints.TryGetValue(key, out int m)) return m;
+                v.Add((v[a] + v[b]).normalized);
+                midpoints[key] = v.Count - 1;
+                return v.Count - 1;
+            }
+            var faces = new List<int>();
             for (int i = 0; i < f.Length; i += 3)
             {
-                Vector3 a = v[f[i]], b = v[f[i + 1]], c = v[f[i + 2]];
-                Vector3 ab = (a + b).normalized * 0.5f, bc = (b + c).normalized * 0.5f, ca = (c + a).normalized * 0.5f;
-                AddTri(verts, tris, a, ab, ca);
-                AddTri(verts, tris, b, bc, ab);
-                AddTri(verts, tris, c, ca, bc);
-                AddTri(verts, tris, ab, bc, ca);
+                int a = f[i], b = f[i + 1], c = f[i + 2];
+                int ab = Mid(a, b), bc = Mid(b, c), ca = Mid(c, a);
+                faces.AddRange(new[] { a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca });
             }
-            var mesh = new Mesh { name = "Storm Cloud Puff" };
-            mesh.SetVertices(verts);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals(); // every triangle has its own vertices: flat shading
-            mesh.RecalculateBounds();
-            return mesh;
-        }
-
-        static void AddTri(List<Vector3> verts, List<int> tris, Vector3 a, Vector3 b, Vector3 c)
-        {
-            int i = verts.Count;
-            verts.Add(a);
-            verts.Add(b);
-            verts.Add(c);
-            tris.Add(i);
-            tris.Add(i + 1);
-            tris.Add(i + 2);
+            unitIcosphere = v.ToArray();
+            unitIcosphereFaces = faces.ToArray();
         }
     }
 }

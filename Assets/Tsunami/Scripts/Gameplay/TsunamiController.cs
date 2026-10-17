@@ -45,7 +45,7 @@ namespace Tsunami
                  "height; it reaches the full height where it enters the simulated area.")]
         [SerializeField, Range(0f, 1f)] float incomingStartHeight = 0.35f;
         [Tooltip("Release the tsunami by itself a random time after the game starts (MainMenu.GameStarted, or Start " +
-                 "when the scene has no main menu). The storm clouds approach during this time.")]
+                 "when the scene has no main menu). The storm clouds come in during the last minute (TsunamiStorm).")]
         [SerializeField] bool autoRelease;
         [SerializeField, Min(0f)] float releaseDelayMin = 120f;
         [SerializeField, Min(0f)] float releaseDelayMax = 180f;
@@ -65,7 +65,6 @@ namespace Tsunami
         bool appliedBathymetryValid;
         bool gameStarted;
         bool releaseScheduled;
-        float releaseDelay;
         float releaseRemaining;
 
         public TsunamiState State { get; private set; } = TsunamiState.Idle;
@@ -88,16 +87,15 @@ namespace Tsunami
         /// <summary>Seconds until the automatic release, or 0 when none is scheduled.</summary>
         public float ReleaseRemaining => ReleaseScheduled ? Mathf.Max(0f, releaseRemaining) : 0f;
         /// <summary>
-        /// How close the tsunami is: 0 = calm (nothing scheduled), rising to 1 at the automatic release, 1 while a
-        /// tsunami is announced, running or paused. Drives the storm.
+        /// Seconds until the tsunami is released: the automatic countdown while it runs, 0 while a tsunami is
+        /// announced, running or paused, infinity when nothing is scheduled (calm). Drives the storm.
         /// </summary>
-        public float StormProgress
+        public float SecondsToRelease
         {
             get
             {
-                if (State != TsunamiState.Idle) return 1f;
-                if (!releaseScheduled || releaseDelay <= 0f) return 0f;
-                return Mathf.Clamp01(1f - releaseRemaining / releaseDelay);
+                if (State != TsunamiState.Idle) return 0f;
+                return releaseScheduled ? Mathf.Max(0f, releaseRemaining) : float.PositiveInfinity;
             }
         }
         public WaterSimulation Simulation => simulation;
@@ -188,9 +186,9 @@ namespace Tsunami
             releaseScheduled = false;
             if (!autoRelease || !gameStarted || State != TsunamiState.Idle) return;
             float min = Mathf.Min(releaseDelayMin, releaseDelayMax), max = Mathf.Max(releaseDelayMin, releaseDelayMax);
-            releaseDelay = releaseRemaining = UnityEngine.Random.Range(min, max);
+            releaseRemaining = UnityEngine.Random.Range(min, max);
             releaseScheduled = true;
-            Debug.Log($"[TsunamiController] Tsunami in {releaseDelay:0} s.", this);
+            Debug.Log($"[TsunamiController] Tsunami in {releaseRemaining:0} s.", this);
         }
 
         /// <summary>
