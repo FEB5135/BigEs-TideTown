@@ -1,4 +1,5 @@
-# Ana menünün ikon, gölge ve perde sprite'larını üretir (beyaz, Unity'de renklendirilir). Butonlar: adapt_kenney.py. Çalıştırma: python Art/UI/make_menu_sprites.py
+# Ana menünün ikon, gölge, perde, buton ve panel sprite'larını üretir. İkon ve paneller beyaz (Unity'de renklendirilir),
+# butonlar renkli: düz yüz, sert alt kalınlık, kesik (pah kırılmış) köşeler. Çalıştırma: python Art/UI/make_menu_sprites.py
 import math
 import os
 from PIL import Image, ImageDraw, ImageFilter
@@ -24,6 +25,76 @@ def shadow(name, size, radius, blur):
     white = Image.new("RGBA", (size, size), (255, 255, 255, 0))
     white.putalpha(img.getchannel("A"))
     white.save(os.path.join(OUT, name))
+
+
+def hex_rgba(h, a=255):
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)) + (a,)
+
+
+def chamfer(x0, y0, x1, y1, c):
+    # Köşeleri kesik dikdörtgen (low-poly poligon dili).
+    return [(x0 + c, y0), (x1 - c, y0), (x1, y0 + c), (x1, y1 - c), (x1 - c, y1), (x0 + c, y1), (x0, y1 - c), (x0, y0 + c)]
+
+
+def chamfer_sprite(name, w, h, c, layers):
+    # layers: (y0, y1, renk) üstten alta; aynı genişlikte üst üste kesik köşeli katmanlar.
+    img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for y0, y1, color in layers:
+        d.polygon(chamfer(0, y0 * SS, w * SS - 1, y1 * SS - 1, c * SS), fill=color)
+    img.resize((w, h), Image.LANCZOS).save(os.path.join(OUT, name))
+
+
+# Butonlar: 192x72, yüz 64 px + 8 px alt kalınlık. Basılı hali: yüz 70 px + 2 px kalınlık (Unity'de kısalır).
+BUTTONS = {"Coral": ("F2542D", "B83A1B"), "Ocean": ("1F5F8B", "154566")}
+BUTTON_W, BUTTON_H, LIP, CUT = 192, 72, 8, 12
+
+
+def button(style):
+    face, lip = BUTTONS[style]
+    chamfer_sprite(f"Button{style}.png", BUTTON_W, BUTTON_H, CUT,
+                   [(LIP, BUTTON_H, hex_rgba(lip)), (0, BUTTON_H - LIP, hex_rgba(face))])
+    chamfer_sprite(f"Button{style}Pressed.png", BUTTON_W, BUTTON_H, CUT,
+                   [(2, BUTTON_H, hex_rgba(lip)), (0, BUTTON_H - 2, hex_rgba(face))])
+    # Kare (ayar okları): 64x72.
+    chamfer_sprite(f"Square{style}.png", 64, BUTTON_H, CUT,
+                   [(LIP, BUTTON_H, hex_rgba(lip)), (0, BUTTON_H - LIP, hex_rgba(face))])
+    chamfer_sprite(f"Square{style}Pressed.png", 64, BUTTON_H, CUT,
+                   [(2, BUTTON_H, hex_rgba(lip)), (0, BUTTON_H - 2, hex_rgba(face))])
+
+
+def ghost_button():
+    # Hayalet buton: yarı saydam beyaz dolgu, 3 px beyaz çerçeve, kalınlık yok.
+    for name, fill in (("ButtonGhost.png", 40), ("ButtonGhostPressed.png", 90)):
+        chamfer_sprite(name, BUTTON_W, BUTTON_H, CUT,
+                       [(0, BUTTON_H, (255, 255, 255, 235)), (3, BUTTON_H - 3, (255, 255, 255, 0))])
+        img = Image.open(os.path.join(OUT, name))
+        inner = Image.new("RGBA", (BUTTON_W * SS, BUTTON_H * SS), (0, 0, 0, 0))
+        ImageDraw.Draw(inner).polygon(chamfer(3 * SS, 3 * SS, (BUTTON_W - 3) * SS - 1, (BUTTON_H - 3) * SS - 1, (CUT - 1) * SS), fill=(255, 255, 255, fill))
+        inner = inner.resize((BUTTON_W, BUTTON_H), Image.LANCZOS)
+        ring = Image.new("RGBA", (BUTTON_W * SS, BUTTON_H * SS), (0, 0, 0, 0))
+        ImageDraw.Draw(ring).polygon(chamfer(0, 0, BUTTON_W * SS - 1, BUTTON_H * SS - 1, CUT * SS), fill=(255, 255, 255, 235))
+        ImageDraw.Draw(ring).polygon(chamfer(3 * SS, 3 * SS, (BUTTON_W - 3) * SS - 1, (BUTTON_H - 3) * SS - 1, (CUT - 1) * SS), fill=(0, 0, 0, 0))
+        ring = ring.resize((BUTTON_W, BUTTON_H), Image.LANCZOS)
+        Image.alpha_composite(inner, ring).save(os.path.join(OUT, name))
+
+
+def handle():
+    # Ses kaydırıcısının tutamacı: küçük mercan buton.
+    face, lip = BUTTONS["Coral"]
+    chamfer_sprite("Handle.png", 44, 52, 9, [(6, 52, hex_rgba(lip)), (0, 46, hex_rgba(face))])
+
+
+def scrim(name, w, h):
+    # Buton sütununun arkasındaki yumuşak koyuluk: ortada dolu, kenarlara doğru eriyen elips.
+    img = Image.new("RGBA", (w, h))
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            d = math.hypot((x - (w - 1) / 2) / (w / 2), (y - (h - 1) / 2) / (h / 2))
+            a = max(0.0, min(1.0, 1.0 - d)) ** 1.5
+            px[x, y] = (255, 255, 255, int(a * 255))
+    img.save(os.path.join(OUT, name))
 
 
 def circle(name, size):
@@ -119,3 +190,10 @@ if __name__ == "__main__":
     icon_trophy()
     icon_exit()
     waves()
+    for style in BUTTONS:
+        button(style)
+    ghost_button()
+    handle()
+    chamfer_sprite("Panel.png", 96, 96, 16, [(0, 96, (255, 255, 255, 255))])
+    chamfer_sprite("Bar.png", 64, 20, 5, [(0, 20, (255, 255, 255, 255))])
+    scrim("Scrim.png", 128, 128)
