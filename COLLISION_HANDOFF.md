@@ -1,5 +1,19 @@
 # Tsunami–Duvar Çarpışması Devir Notu
 
+## Windows / Unity entegrasyon sonucu — 17 Ekim 2026
+
+- `origin/collision` commit `eed4ee5` yerel `collision` dalına fast-forward alındı. Çalışma klasörü: `C:\Users\demir\OneDrive\Desktop\PojectIdletown\Collision`. Ana `BigEs` klasöründeki değişikliklere dokunulmadı.
+- Unity 6000.6.6f1 gerçek C# derlemesi başarılı. Mevcut CS0108 DestroyObject uyarısı sürüyor.
+- `SampleScene` yeniden oluşturulmadı; inşa ve su adaptörünün aynı World'ü kullanması, simulation/terrain/controller/splash referansları doğrulandı. 100 HP dayanıklılık, hasar eşikleri, 20 enkaz / 8 saniye ve 320 köpük parçacığı ayarları sahneye kaydedildi.
+- Görsel Play kontrolünde tsunami panelinin ana menü üstünde görünmesi düzeltildi: Tsunami UI CanvasGroup'u mevcut `MainMenu.gameplayUI` listesine bağlandı. Menüde gizli/tıklanamaz, kamera giriş geçişi tamamlanınca diğer oyun panelleriyle birlikte görünür. Menü → Oyna → gerçek kasaba ve tsunami paneli geçişi ekranda doğrulandı.
+- Grafik açık Unity Play kontrolünde 10 m dalga başlatıldı; gerçek kasabada su ilerlemesi, dağ/ev temasındaki sıçramalar ve köy flood/destruction sayaçlarının değişmesi görüldü. Test sonunda Sıfırla ile deniz ve köy başlangıca döndürüldü; Unity Collision/SampleScene projesinde Play modunda hazır bırakıldı. Gerçek dalga ile farklı duvar düzenlerinin koruma dengesi henüz kapsamlı test edilmedi. Unity Cloud Project ID için 403 uyarısı var; oynanışı engellemedi.
+- `Tsunami > Collision > Validate and Save Team Map` menüsü eklendi. Aynı editör aracının `PrepareAndSmoke` giriş noktası gerçek haritada kontrollü bir Play Mode doğrulaması çalıştırır: iki segment inşa etme, su bariyerine kaydolma, gerçek yük örnekleme/hasar olay zinciriyle tek segmenti kırma, Rigidbody enkazı, bariyer kaldırma, komşuyu koruma ve aynı kenara yeniden inşa. Bu kontrol geçti. Test girdisi deterministik olarak çözücü hücresine yazılır; tam tsunami yayılımının veya görsel kalitenin doğrulaması değildir. Test kaynak deposu ve su girdisi yalnız kaydedilmeyen Play Mode durumunda kullanılır.
+- Yerel ağaç bağımlılığı eksik olduğu için ilk geniş Unity koşumunda 37/40 geçti. Önceden indirilmiş FinottiGames unitypackage yerel önbellekten aktarıldı; paket Git dışında kalıyor. Yeniden koşum: **40/40 EditMode testi geçti**, 0 başarısız.
+- Saf C# çarpışma testleri: **10/10 geçti**. Bilgisayarda .NET 10 olduğu için test projesinin hedefi komut satırında net10.0 olarak override edildi; proje dosyası değiştirilmedi.
+- Kanıt dosyaları çalışma klasörünün üst dizininde: `collision-compile.log`, `collision-runtime.log`, `collision-editmode-verified.xml`, `collision-editmode-verified.log`.
+- İlk headless Play koşumunda UnityEditor.Search.SearchDatabase kaynaklı editör indeksleme exception'ı görüldü; oyun kodu kaynaklı değildi ve kontrollü runtime kontrolü geçti. Bu, görsel oynanış doğrulamasının yerine geçmez.
+- Commit, push veya başka dala merge yapılmadı. Aşağıdaki eski teslim notları OpenCode'un teslim anını anlatır; yukarıdaki sonuçlar bu makinedeki güncel entegrasyon kontrolleridir.
+
 ## Çalışma kapsamı
 
 - Workspace: `/Users/egedemirturkanil/Documents/GitHub/Collision`

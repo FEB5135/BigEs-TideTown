@@ -8826,6 +8826,7 @@ GameObject:
   - component: {fileID: 354062195}
   - component: {fileID: 354062194}
   - component: {fileID: 354062193}
+  - component: {fileID: 354062197}
   m_Layer: 0
   m_Name: Tsunami UI
   m_TagString: Untagged
@@ -8938,6 +8939,18 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: -1
   m_TargetDisplay: 0
+--- !u!225 &354062197
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 354062191}
+  m_Enabled: 1
+  m_Alpha: 0
+  m_Interactable: 0
+  m_BlocksRaycasts: 0
+  m_IgnoreParentGroups: 0
 --- !u!1 &357712727
 GameObject:
   m_ObjectHideFlags: 0
@@ -13441,7 +13454,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 54
     m_Alignment: 1
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -15923,6 +15936,7 @@ MonoBehaviour:
   menuGroup: {fileID: 619408209}
   gameplayUI:
   - {fileID: 1107757182}
+  - {fileID: 354062197}
   gameplayBehaviours:
   - {fileID: 1230817875}
   mainPage: {fileID: 901532984}
@@ -20780,8 +20794,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 824923020}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 64, y: 0, z: 64}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -38602,8 +38616,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1379666237}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 64, y: 0, z: 64}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -68368,6 +68382,7 @@ MonoBehaviour:
   maxImpactsPerFrame: 24
   maxDroplets: 900
   maxMist: 160
+  maxFoam: 320
   upPerImpact: 1.1
   maxUpSpeed: 20
   dropletSize: {x: 0.6, y: 2.2}
@@ -77394,6 +77409,15 @@ MonoBehaviour:
   approachThrough: {x: 81.85364, y: 0, z: 60.117844}
   approachTarget: {x: 1.8130038, y: 0, z: -2.1274276}
   fallbackWallHeight: 1.25
+  wallDamage:
+    durability: 100
+    impactThresholdKilonewtons: 6
+    impactDamagePerKilonewtonSecond: 0.32
+    sustainedThresholdKilonewtons: 12
+    sustainedDamagePerKilonewtonSecond: 0.055
+  maxDebris: 20
+  debrisLifetime: 8
+  debrisImpulseScale: 0.18
 --- !u!4 &2126911861
 Transform:
   m_ObjectHideFlags: 0
