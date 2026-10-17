@@ -87,53 +87,82 @@ public static class SampleSceneSetup
         Debug.Log("SampleScene: kaynak toplama, köy, dağlar, ana menü ve animasyonlu köylüler güncel WFC ile hazır.");
     }
 
-    // World'ün WFC ağaçlarını (id 5) toplanabilir yapar: kesilince devrilir, vurulunca sallanır (GridForest).
-    // ResourceTest'ten gelen eski tek tek ağaçlı "Forest" kapatılır (silinmez); oduncular WFC ağaçlarına gider.
+    // Zemin ve orman, ResourceTest'te onaylanan görünümle (feature/wfc-forest): MapView palet malzemesiyle (Flat.mat)
+    // çizer, düz zeminde çimenli karolar görünür. Ağaçlar yalnız köyün solundaki orman alanında WFC ile çıkar, alanın
+    // dışı zemine sabitlenir (GridForest). WFC ağaçları toplanabilir: kesilince devrilir, vurulunca sallanır.
+    // ResourceTest'ten gelen eski tek tek ağaçlı "Forest" kapatılır (silinmez). İnşa grid'i yalnız inşa modunda görünür.
+    const string PaletteMaterialPath = "Assets/Materials/Flat.mat";
+    const int TreeId = 5;
+    const float ForestYaw = 45f;
+    // ResourceTest ormanı: kasabanın (yarıçap 36.5 m) 6 m dışında, ekranın solunda 30 x 55 m.
+    static readonly Vector3 ForestCenter = Quaternion.Euler(0f, ForestYaw, 0f) * new Vector3(-(36.5f + 6f) - 15f, 0f, 0f);
+    static readonly Vector2 ForestSize = new(30f, 55f);
+
     public static bool EnsureGridForest(Scene scene)
     {
         var world = Find<World>(scene);
         var view = world != null ? world.GetComponent<MapView>() : null;
-        if (view == null)
+        var solver = world != null ? world.GetComponent<WfcSolver>() : null;
+        if (view == null || solver == null)
             return false;
 
-        bool changed = false;
         foreach (var root in scene.GetRootGameObjects())
         {
             var oldForest = root.name == "Gameplay" ? root.transform.Find("Forest") : null;
-            if (oldForest != null && oldForest.gameObject.activeSelf && oldForest.GetComponent<World>() == null)
-            {
+            if (oldForest != null && oldForest.GetComponent<World>() == null)
                 oldForest.gameObject.SetActive(false);
-                changed = true;
-            }
         }
-        if (world.GetComponent<GridForest>() != null)
-            return changed;
 
-        const int treeId = 5;
-        var forest = world.gameObject.AddComponent<GridForest>();
+        var palette = AssetDatabase.LoadAssetAtPath<Material>(PaletteMaterialPath);
+        var viewSettings = new SerializedObject(view);
+        viewSettings.FindProperty("material").objectReferenceValue = palette;
+        viewSettings.ApplyModifiedPropertiesWithoutUndo();
+
+        var forest = world.GetComponent<GridForest>();
+        if (forest == null)
+            forest = world.gameObject.AddComponent<GridForest>();
         var settings = new SerializedObject(forest);
         settings.FindProperty("map").objectReferenceValue = world;
-        settings.FindProperty("solver").objectReferenceValue = world.GetComponent<WfcSolver>();
-        settings.FindProperty("treeId").intValue = treeId;
+        settings.FindProperty("solver").objectReferenceValue = solver;
+        settings.FindProperty("forestCenter").vector3Value = ForestCenter;
+        settings.FindProperty("forestSize").vector2Value = ForestSize;
+        settings.FindProperty("forestYaw").floatValue = ForestYaw;
+        settings.FindProperty("treeId").intValue = TreeId;
         settings.FindProperty("groundId").intValue = 0;
-        var modules = new SerializedObject(view).FindProperty("modules");
+        var modules = viewSettings.FindProperty("modules");
         var tiles = settings.FindProperty("treeTiles");
         var weights = settings.FindProperty("treeWeights");
-        int count = 0;
+        tiles.arraySize = weights.arraySize = 0;
         for (int i = 0; i < modules.arraySize; i++)
         {
             var module = modules.GetArrayElementAtIndex(i);
             var prefab = module.FindPropertyRelative("Prefab").objectReferenceValue;
-            if (module.FindPropertyRelative("Id").intValue != treeId || prefab == null)
+            if (module.FindPropertyRelative("Id").intValue != TreeId || prefab == null)
                 continue;
-            tiles.arraySize = weights.arraySize = count + 1;
-            tiles.GetArrayElementAtIndex(count).objectReferenceValue = prefab;
-            weights.GetArrayElementAtIndex(count).intValue = module.FindPropertyRelative("Weight").intValue;
-            count++;
+            int index = tiles.arraySize;
+            tiles.arraySize = weights.arraySize = index + 1;
+            tiles.GetArrayElementAtIndex(index).objectReferenceValue = prefab;
+            weights.GetArrayElementAtIndex(index).intValue = module.FindPropertyRelative("Weight").intValue;
         }
-        settings.FindProperty("treeMaterial").objectReferenceValue = new SerializedObject(view).FindProperty("material").objectReferenceValue;
+        settings.FindProperty("treeMaterial").objectReferenceValue = palette;
         settings.FindProperty("fadeMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/FlatFade.mat");
         settings.ApplyModifiedPropertiesWithoutUndo();
+
+        // Köy için ayrılan başlangıç hücrelerinden orman alanına düşenler kaldırılır, yoksa orada ağaç çıkmaz.
+        var solverSettings = new SerializedObject(solver);
+        var cells = solverSettings.FindProperty("initialCells");
+        for (int i = cells.arraySize - 1; i >= 0; i--)
+        {
+            var cell = cells.GetArrayElementAtIndex(i);
+            if (forest.InForest(cell.FindPropertyRelative("X").intValue, cell.FindPropertyRelative("Y").intValue))
+                cells.DeleteArrayElementAtIndex(i);
+        }
+        solverSettings.ApplyModifiedPropertiesWithoutUndo();
+
+        var controller = Find<WallConstructionController>(scene);
+        foreach (var grid in world.GetComponentsInChildren<WallDemoGrid>(true))
+            if (grid.GetComponent<ConstructionGridToggle>() == null)
+                grid.gameObject.AddComponent<ConstructionGridToggle>().Configure(controller);
         return true;
     }
 

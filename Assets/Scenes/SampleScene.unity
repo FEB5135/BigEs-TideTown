@@ -3054,6 +3054,7 @@ GameObject:
   - component: {fileID: 123608663}
   - component: {fileID: 123608662}
   - component: {fileID: 123608661}
+  - component: {fileID: 123608665}
   m_Layer: 0
   m_Name: Construction Grid
   m_TagString: Untagged
@@ -3159,6 +3160,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 123608659}
   m_Mesh: {fileID: 0}
+--- !u!114 &123608665
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 123608659}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fdb11420d08eaa49be4380ec3fdcddf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleTown.Runtime::ConstructionGridToggle
+  controller: {fileID: 1230817875}
 --- !u!1 &125717582
 GameObject:
   m_ObjectHideFlags: 0
@@ -39715,7 +39729,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapView
   world: {fileID: 1602157105}
-  material: {fileID: 2100000, guid: 5f4706c69c737794dbb186832db6e4cf, type: 2}
+  material: {fileID: 2100000, guid: 8608a2c3fecca27489e749a343983910, type: 2}
   chunkSize: 16
   createColliders: 1
   modules:
@@ -52179,14 +52193,6 @@ MonoBehaviour:
     Y: 70
     Id: 0
     Rotation: 0
-  - X: 38
-    Y: 70
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 70
-    Id: 0
-    Rotation: 0
   - X: 40
     Y: 70
     Id: 0
@@ -52475,22 +52481,6 @@ MonoBehaviour:
     Y: 71
     Id: 0
     Rotation: 0
-  - X: 37
-    Y: 71
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 71
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 71
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 71
-    Id: 0
-    Rotation: 0
   - X: 41
     Y: 71
     Id: 0
@@ -52771,30 +52761,6 @@ MonoBehaviour:
     Y: 72
     Id: 0
     Rotation: 0
-  - X: 36
-    Y: 72
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 72
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 72
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 72
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 72
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 72
-    Id: 0
-    Rotation: 0
   - X: 42
     Y: 72
     Id: 0
@@ -53067,38 +53033,6 @@ MonoBehaviour:
     Y: 73
     Id: 0
     Rotation: 0
-  - X: 35
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 73
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 73
-    Id: 0
-    Rotation: 0
   - X: 43
     Y: 73
     Id: 0
@@ -53363,46 +53297,6 @@ MonoBehaviour:
     Y: 74
     Id: 0
     Rotation: 0
-  - X: 34
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 74
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 74
-    Id: 0
-    Rotation: 0
   - X: 44
     Y: 74
     Id: 0
@@ -53659,54 +53553,6 @@ MonoBehaviour:
     Y: 75
     Id: 0
     Rotation: 0
-  - X: 33
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 75
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 75
-    Id: 0
-    Rotation: 0
   - X: 45
     Y: 75
     Id: 0
@@ -53955,62 +53801,6 @@ MonoBehaviour:
     Y: 76
     Id: 0
     Rotation: 0
-  - X: 32
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 76
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 76
-    Id: 0
-    Rotation: 0
   - X: 46
     Y: 76
     Id: 0
@@ -54251,70 +54041,6 @@ MonoBehaviour:
     Y: 77
     Id: 0
     Rotation: 0
-  - X: 31
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 32
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 77
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 77
-    Id: 0
-    Rotation: 0
   - X: 47
     Y: 77
     Id: 0
@@ -54547,78 +54273,6 @@ MonoBehaviour:
     Y: 78
     Id: 0
     Rotation: 0
-  - X: 30
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 31
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 32
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 78
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 78
-    Id: 0
-    Rotation: 0
   - X: 48
     Y: 78
     Id: 0
@@ -54843,86 +54497,6 @@ MonoBehaviour:
     Y: 79
     Id: 0
     Rotation: 0
-  - X: 29
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 30
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 31
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 32
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 79
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 79
-    Id: 0
-    Rotation: 0
   - X: 49
     Y: 79
     Id: 0
@@ -55140,90 +54714,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 28
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 29
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 30
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 31
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 32
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 80
-    Id: 0
-    Rotation: 0
-  - X: 49
     Y: 80
     Id: 0
     Rotation: 0
@@ -55447,90 +54937,6 @@ MonoBehaviour:
     Y: 81
     Id: 0
     Rotation: 0
-  - X: 30
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 31
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 32
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 81
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 81
-    Id: 0
-    Rotation: 0
   - X: 51
     Y: 81
     Id: 0
@@ -55748,90 +55154,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 30
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 31
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 32
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 82
-    Id: 0
-    Rotation: 0
-  - X: 51
     Y: 82
     Id: 0
     Rotation: 0
@@ -56055,90 +55377,6 @@ MonoBehaviour:
     Y: 83
     Id: 0
     Rotation: 0
-  - X: 32
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 83
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 83
-    Id: 0
-    Rotation: 0
   - X: 53
     Y: 83
     Id: 0
@@ -56356,90 +55594,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 32
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 33
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 34
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 84
-    Id: 0
-    Rotation: 0
-  - X: 53
     Y: 84
     Id: 0
     Rotation: 0
@@ -56663,90 +55817,6 @@ MonoBehaviour:
     Y: 85
     Id: 0
     Rotation: 0
-  - X: 34
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 85
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 85
-    Id: 0
-    Rotation: 0
   - X: 55
     Y: 85
     Id: 0
@@ -56964,90 +56034,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 34
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 35
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 36
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 86
-    Id: 0
-    Rotation: 0
-  - X: 55
     Y: 86
     Id: 0
     Rotation: 0
@@ -57271,90 +56257,6 @@ MonoBehaviour:
     Y: 87
     Id: 0
     Rotation: 0
-  - X: 36
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 37
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 55
-    Y: 87
-    Id: 0
-    Rotation: 0
-  - X: 56
-    Y: 87
-    Id: 0
-    Rotation: 0
   - X: 57
     Y: 87
     Id: 0
@@ -57575,90 +56477,6 @@ MonoBehaviour:
     Y: 88
     Id: 0
     Rotation: 0
-  - X: 37
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 55
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 56
-    Y: 88
-    Id: 0
-    Rotation: 0
-  - X: 57
-    Y: 88
-    Id: 0
-    Rotation: 0
   - X: 58
     Y: 88
     Id: 0
@@ -57876,86 +56694,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 37
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 38
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 55
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 56
-    Y: 89
-    Id: 0
-    Rotation: 0
-  - X: 57
     Y: 89
     Id: 0
     Rotation: 0
@@ -58180,78 +56918,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 38
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 39
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 55
-    Y: 90
-    Id: 0
-    Rotation: 0
-  - X: 56
     Y: 90
     Id: 0
     Rotation: 0
@@ -58484,70 +57150,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 39
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 40
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 54
-    Y: 91
-    Id: 0
-    Rotation: 0
-  - X: 55
     Y: 91
     Id: 0
     Rotation: 0
@@ -58788,62 +57390,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 40
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 41
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 53
-    Y: 92
-    Id: 0
-    Rotation: 0
-  - X: 54
     Y: 92
     Id: 0
     Rotation: 0
@@ -59092,54 +57638,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 41
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 42
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 52
-    Y: 93
-    Id: 0
-    Rotation: 0
-  - X: 53
     Y: 93
     Id: 0
     Rotation: 0
@@ -59396,46 +57894,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 42
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 43
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 51
-    Y: 94
-    Id: 0
-    Rotation: 0
-  - X: 52
     Y: 94
     Id: 0
     Rotation: 0
@@ -59700,38 +58158,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 43
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 44
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 50
-    Y: 95
-    Id: 0
-    Rotation: 0
-  - X: 51
     Y: 95
     Id: 0
     Rotation: 0
@@ -60004,30 +58430,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 44
-    Y: 96
-    Id: 0
-    Rotation: 0
-  - X: 45
-    Y: 96
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 96
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 96
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 96
-    Id: 0
-    Rotation: 0
-  - X: 49
-    Y: 96
-    Id: 0
-    Rotation: 0
-  - X: 50
     Y: 96
     Id: 0
     Rotation: 0
@@ -60308,22 +58710,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 45
-    Y: 97
-    Id: 0
-    Rotation: 0
-  - X: 46
-    Y: 97
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 97
-    Id: 0
-    Rotation: 0
-  - X: 48
-    Y: 97
-    Id: 0
-    Rotation: 0
-  - X: 49
     Y: 97
     Id: 0
     Rotation: 0
@@ -60612,14 +58998,6 @@ MonoBehaviour:
     Id: 0
     Rotation: 0
   - X: 46
-    Y: 98
-    Id: 0
-    Rotation: 0
-  - X: 47
-    Y: 98
-    Id: 0
-    Rotation: 0
-  - X: 48
     Y: 98
     Id: 0
     Rotation: 0
@@ -62341,11 +60719,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: IdleTown.Runtime::GridForest
   map: {fileID: 1602157105}
   solver: {fileID: 1602157107}
-  forestArea:
-    x: 0
-    y: 0
-    width: 0
-    height: 0
+  forestCenter: {x: -40.658638, y: 0, z: 40.65864}
+  forestSize: {x: 30, y: 55}
+  forestYaw: 45
   treeId: 5
   groundId: 0
   treeTiles:
@@ -62357,7 +60733,7 @@ MonoBehaviour:
   fallSeconds: 1.1
   lieSeconds: 2
   fadeSeconds: 1.5
-  treeMaterial: {fileID: 2100000, guid: 5f4706c69c737794dbb186832db6e4cf, type: 2}
+  treeMaterial: {fileID: 2100000, guid: 8608a2c3fecca27489e749a343983910, type: 2}
   fadeMaterial: {fileID: 2100000, guid: 622c0d9c447f9de44ba37659df4aee0d, type: 2}
   shakeSeconds: 0.35
   shakeAngle: 4

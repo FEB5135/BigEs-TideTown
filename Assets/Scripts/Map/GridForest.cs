@@ -11,8 +11,12 @@ public class GridForest : MonoBehaviour
 {
     [SerializeField] World map;
     [SerializeField] WfcSolver solver;
-    [Tooltip("Ağaçların çıkabildiği alanın sol alt hücresi ve boyu (hücre). Boyu 0 ise ağaçlar WFC'nin koyduğu her yerde çıkar.")]
-    [SerializeField] RectInt forestArea;
+    [Tooltip("Ağaçların çıkabildiği alanın merkezi (dünya). Alanın dışı WFC'de zemine sabitlenir.")]
+    [SerializeField] Vector3 forestCenter;
+    [Tooltip("Orman alanının eni (x) ve boyu (z), metre. 0 ise ağaçlar WFC'nin koyduğu her yerde çıkar.")]
+    [SerializeField] Vector2 forestSize;
+    [Tooltip("Orman alanının Y dönüşü (kamera gibi 45°).")]
+    [SerializeField] float forestYaw = 45f;
     [SerializeField] int treeId = 5;
     [SerializeField] int groundId;
     [Tooltip("MapView'daki ağaç karoları, aynı sıra ve ağırlıkla (devrilen ağaç hücredekiyle aynı görünsün diye).")]
@@ -57,11 +61,19 @@ public class GridForest : MonoBehaviour
         nodes.SetParent(transform, false);
 
         // WfcSolver Start'ta çözer; orman dışını ondan önce zemine sabitle (dönüş serbest, çimen çeşitlensin).
-        if (solver != null && forestArea.width > 0 && forestArea.height > 0)
+        if (solver != null && HasForestArea)
             for (int y = 0; y < map.Height; y++)
                 for (int x = 0; x < map.Width; x++)
-                    if (!forestArea.Contains(new Vector2Int(x, y)))
+                    if (!InForest(x, y))
                         solver.Pin(x, y, groundId, -1);
+    }
+
+    bool HasForestArea => forestSize.x > 0f && forestSize.y > 0f;
+
+    public bool InForest(int x, int y)
+    {
+        var local = Quaternion.Euler(0f, -forestYaw, 0f) * (map.CellCenter(x, y) - forestCenter);
+        return Mathf.Abs(local.x) <= forestSize.x * 0.5f && Mathf.Abs(local.z) <= forestSize.y * 0.5f;
     }
 
     void OnDestroy()
@@ -77,6 +89,12 @@ public class GridForest : MonoBehaviour
     void OnCellChanged(int x, int y)
     {
         map.Get(x, y, out var id, out var rotation);
+        // Orman alanında yalnız ağaç ve düz zemin olur; WFC'nin koyduğu yokuş/tepe karoları zemine çevrilir.
+        if (id != treeId && id != groundId && HasForestArea && InForest(x, y))
+        {
+            map.Set(x, y, groundId, rotation);
+            return;
+        }
         if (id == treeId && trees.Add(new Vector2Int(x, y)))
             AddNode(x, y, rotation);
     }
