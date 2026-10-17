@@ -107,6 +107,7 @@ public static class SampleSceneSetup
         var solver = world != null ? world.GetComponent<WfcSolver>() : null;
         if (view == null || solver == null)
             return false;
+        EnsureTerrain(scene, view, solver);
 
         foreach (var root in scene.GetRootGameObjects())
         {
@@ -131,6 +132,8 @@ public static class SampleSceneSetup
         settings.FindProperty("forestYaw").floatValue = ForestYaw;
         settings.FindProperty("treeId").intValue = TreeId;
         settings.FindProperty("groundId").intValue = 0;
+        // Orman dışında WFC serbest: ekibin dağ ve tepeleri çıkar (köy alanı initialCells ile düz).
+        settings.FindProperty("pinOutsideForest").boolValue = false;
         var modules = viewSettings.FindProperty("modules");
         for (int i = 0; i < modules.arraySize; i++)
         {
@@ -178,6 +181,53 @@ public static class SampleSceneSetup
             if (grid.GetComponent<ConstructionGridToggle>() == null)
                 grid.gameObject.AddComponent<ConstructionGridToggle>().Configure(controller);
         return true;
+    }
+
+    // Dağlar ve tepeler ekibin grid'inden: tasarımcının SampleScene2'deki WFC kuralları ve karo listesi (yokuş, köşe,
+    // düzlük, karlı kayalık...) olduğu gibi bu World'e kopyalanır; SampleScene2'ye ve modellere dokunulmaz. Köy, ocaklar
+    // ve kuyunun alanı main kurulumunun başlangıç hücreleriyle (ReserveGameplayGround) düz kalır, dışı rastgele kurulur.
+    // Elle konmuş eski dağlar (Gameplay/Mountains) kapatılır, silinmez.
+    const string TerrainSourcePath = "Assets/Scenes/SampleScene2.unity";
+
+    static void EnsureTerrain(Scene scene, MapView view, WfcSolver solver)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var oldMountains = root.name == "Gameplay" ? root.transform.Find("Mountains") : null;
+            if (oldMountains != null)
+                oldMountains.gameObject.SetActive(false);
+        }
+
+        if (!System.IO.File.Exists(TerrainSourcePath))
+        {
+            Debug.LogWarning($"{TerrainSourcePath} bulunamadı; dağ/tepe kuralları kopyalanmadı.");
+            return;
+        }
+        var source = SceneManager.GetSceneByPath(TerrainSourcePath);
+        bool wasOpen = source.IsValid() && source.isLoaded;
+        if (!wasOpen)
+            source = EditorSceneManager.OpenScene(TerrainSourcePath, OpenSceneMode.Additive);
+        try
+        {
+            var sourceSolver = Find<WfcSolver>(source);
+            var sourceView = Find<MapView>(source);
+            if (sourceSolver == null || sourceView == null)
+            {
+                Debug.LogWarning($"{TerrainSourcePath} içinde WfcSolver/MapView yok; dağ/tepe kuralları kopyalanmadı.");
+                return;
+            }
+            var solverSettings = new SerializedObject(solver);
+            solverSettings.CopyFromSerializedProperty(new SerializedObject(sourceSolver).FindProperty("rules"));
+            solverSettings.ApplyModifiedPropertiesWithoutUndo();
+            var viewSettings = new SerializedObject(view);
+            viewSettings.CopyFromSerializedProperty(new SerializedObject(sourceView).FindProperty("modules"));
+            viewSettings.ApplyModifiedPropertiesWithoutUndo();
+        }
+        finally
+        {
+            if (!wasOpen)
+                EditorSceneManager.CloseScene(source, true);
+        }
     }
 
     // Ağaç karosu ekibin modelinin kendisi. Önceki sürümün 2.5 kat büyütülmüş kopyaları (*_big) ekibin .obj'sine

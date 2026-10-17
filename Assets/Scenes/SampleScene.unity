@@ -18286,6 +18286,7 @@ MonoBehaviour:
   closedHand: {fileID: 2800000, guid: 8f79a8eb9ac9f4f498cf6b511cd335cc, type: 3}
   hotspot: {x: 22, y: 10}
   maxRayDistance: 400
+  pickRadius: 32
   holdHeight: 3
   forestRadius: 6
   quarryRadius: 12
@@ -39030,7 +39031,7 @@ MonoBehaviour:
     Prefab: {fileID: 919132149155446097, guid: e31a73e541af0194b84eb5e649c07d53, type: 3}
     Weight: 1
   - Id: 6
-    Prefab: {fileID: 919132149155446097, guid: f91f2f6fafa95da478d6920235c22982, type: 3}
+    Prefab: {fileID: 919132149155446097, guid: e143b4e2b8cd53e4c8c57b540c803240, type: 3}
     Weight: 1
   - Id: 7
     Prefab: {fileID: 919132149155446097, guid: f0739bb8f889dbe42b44dfdf6365dcb9, type: 3}
@@ -60024,6 +60025,8 @@ MonoBehaviour:
   forestCenter: {x: -40.658638, y: 0, z: 40.65864}
   forestSize: {x: 30, y: 55}
   forestYaw: 45
+  pinOutsideForest: 0
+  treeChance: 0.5
   treeId: 5
   groundId: 0
   treeTiles:
@@ -63386,7 +63389,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1738778670
 Transform:
   m_ObjectHideFlags: 0
