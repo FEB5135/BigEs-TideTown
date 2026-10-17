@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (SampleScene'deki eski kapalı Forest silindi)
+Son güncelleme: 2026-10-18 (imleç cursor_default / cursor_open / cursor_clenched)
 
 ## Bağlam
 
@@ -32,6 +32,8 @@ Son güncelleme: 2026-10-17 (SampleScene'deki eski kapalı Forest silindi)
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **İmleç (18 Ekim 2026):** `VillagerPicker` `Assets/UI/Cursor` kökündeki yeni `cursor_default`, `cursor_open` ve `cursor_clenched` dokularını kullanıyor (48 px). Eski üçlü `Cursor/New Folder` altında duruyor. Varsayılan imleç her zaman görünür; köylünün üstünde açık el, tutarken yumruk. Tıklama noktası parmak ucu (yumrukta yumruğun üstü).
 
 - **Eski Forest SampleScene'den silindi (17 Ekim 2026, `fix/remove-old-forest`; main'e fast-forward ile birleştirilip push edildi):** Kullanıcının OneDrive'daki kopyasında FinottiGames paketi yok; SampleScene açılınca `Gameplay/Forest` altındaki kapalı ağaçlar için "Missing Prefab" hataları çıkıyordu (Tree 11/12/30, üç GUID). Kullanıcı isteğiyle kapalı `Gameplay/Forest` Unity'de silinip sahne kaydedildi; SampleScene'de FinottiGames referansı kalmadı, oyundaki orman zaten `GridForest`'tan geliyor. Unity kaydederken tsunami adaptörünün yeni alanlarını ve birkaç UI anchor'ını da yazdı (değer değişikliği yok). `MergedAssetIntegrationTests`: 34 ağaçlı Forest artık yalnız ResourceTest'te beklenir, SampleScene'de olmaması beklenir. Unity Console temiz; testler bu değişiklikten sonra çalıştırılmadı. ResourceTest hâlâ FinottiGames'e bağlı (paket yoksa orada aynı hata çıkar).
 
