@@ -18,6 +18,8 @@ public class MainMenu : MonoBehaviour
     [SerializeField] CanvasGroup menuGroup;
     [Tooltip("Menüdeyken gizlenen, oyun başlayınca beliren arayüz (kaynak paneli...).")]
     [SerializeField] CanvasGroup[] gameplayUI;
+    [Tooltip("Menüdeyken kapalı tutulan, oyun başlayınca açılan bileşenler (duvar inşası...).")]
+    [SerializeField] Behaviour[] gameplayBehaviours;
 
     [Header("Sayfalar")]
     [SerializeField] CanvasGroup mainPage;
@@ -46,6 +48,9 @@ public class MainMenu : MonoBehaviour
             cameraIntro.EnterMenu();
         foreach (var group in gameplayUI)
             SetVisible(group, false);
+        foreach (var behaviour in gameplayBehaviours)
+            if (behaviour != null)
+                behaviour.enabled = false;
 
         playButton?.onClick.AddListener(Play);
         settingsButton?.onClick.AddListener(() => ShowPage(settingsPage));
@@ -101,6 +106,9 @@ public class MainMenu : MonoBehaviour
             Well.Instance.ResetAmounts();
         foreach (var group in gameplayUI)
             StartCoroutine(Fade(group, 1f, 0.4f, true));
+        foreach (var behaviour in gameplayBehaviours)
+            if (behaviour != null)
+                behaviour.enabled = true;
         GameStarted?.Invoke();
     }
 

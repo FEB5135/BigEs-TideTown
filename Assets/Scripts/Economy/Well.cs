@@ -1,10 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using IdleTown.Construction;
 using UnityEngine;
 
 // Köyün ortasındaki kuyu: toplanan kaynaklar buraya atılır ve buradan harcanır.
-public class Well : MonoBehaviour
+public class Well : MonoBehaviour, IWallResourceStore
 {
     public static Well Instance { get; private set; }
 
@@ -45,9 +46,10 @@ public class Well : MonoBehaviour
             return;
         }
         Instance = this;
-        if (amounts == null || amounts.Length != ResourceTypeCount)
-            Array.Resize(ref amounts, ResourceTypeCount);
+        NormalizeAmounts();
     }
+
+    void OnValidate() => NormalizeAmounts();
 
     void OnDestroy()
     {
@@ -56,15 +58,24 @@ public class Well : MonoBehaviour
     }
 
     public float ApproachRadius => approachRadius;
+    public int Wood => Get(ResourceType.Wood);
+    public int Stone => Get(ResourceType.Stone);
 
-    public int Get(ResourceType type) => amounts[(int)type];
+    public int Get(ResourceType type)
+    {
+        NormalizeAmounts();
+        var index = (int)type;
+        return (uint)index < (uint)ResourceTypeCount ? amounts[index] : 0;
+    }
 
     public void Deposit(ResourceType type, int amount)
     {
-        if (amount <= 0)
+        NormalizeAmounts();
+        var index = (int)type;
+        if ((uint)index >= (uint)ResourceTypeCount || amount <= 0)
             return;
-        amounts[(int)type] += amount;
-        Changed?.Invoke(type, amounts[(int)type]);
+        amounts[index] = (int)Math.Min(int.MaxValue, (long)amounts[index] + amount);
+        NotifyChanged(type);
     }
 
     // Tüm kaynakları sıfırlar (ör. oyun menüden başlarken).
@@ -81,10 +92,18 @@ public class Well : MonoBehaviour
 
     public bool CanAfford(IReadOnlyList<ResourceCost> costs)
     {
+        NormalizeAmounts();
+        if (costs == null)
+            return false;
+
         // Aynı tür listede birden fazla geçebilir, önce topla.
-        var needed = new int[ResourceTypeCount];
+        var needed = new long[ResourceTypeCount];
         foreach (var cost in costs)
+        {
+            if ((uint)cost.type >= (uint)ResourceTypeCount || cost.amount < 0)
+                return false;
             needed[(int)cost.type] += cost.amount;
+        }
         for (int i = 0; i < ResourceTypeCount; i++)
             if (needed[i] > amounts[i])
                 return false;
@@ -94,19 +113,71 @@ public class Well : MonoBehaviour
     // Ya tamamını harcar ya da hiçbir şey harcamaz.
     public bool TrySpend(IReadOnlyList<ResourceCost> costs)
     {
+        NormalizeAmounts();
         if (!CanAfford(costs))
             return false;
+
+        var spent = new int[ResourceTypeCount];
         foreach (var cost in costs)
         {
-            if (cost.amount <= 0)
-                continue;
-            amounts[(int)cost.type] -= cost.amount;
-            Changed?.Invoke(cost.type, amounts[(int)cost.type]);
+            spent[(int)cost.type] += cost.amount;
         }
+
+        // Önce tüm bakiyeler commit edilir. Dinleyiciler daha sonra ve birbirinden izole çağrılır;
+        // hatalı bir HUD/observer, tamamlanmış harcamayı kısmi veya başarısız gösteremez.
+        for (int i = 0; i < ResourceTypeCount; i++)
+            amounts[i] -= spent[i];
+        for (int i = 0; i < ResourceTypeCount; i++)
+            if (spent[i] > 0)
+                NotifyChanged((ResourceType)i);
         return true;
     }
 
     public bool TrySpend(ResourceType type, int amount) => TrySpend(new[] { new ResourceCost(type, amount) });
+
+    public bool CanAfford(int wood, int stone)
+    {
+        return wood >= 0 && stone >= 0 && Wood >= wood && Stone >= stone;
+    }
+
+    public bool TrySpend(int wood, int stone)
+    {
+        if (wood < 0 || stone < 0)
+            return false;
+        return TrySpend(new[]
+        {
+            new ResourceCost(ResourceType.Wood, wood),
+            new ResourceCost(ResourceType.Stone, stone),
+        });
+    }
+
+    void NormalizeAmounts()
+    {
+        if (amounts == null || amounts.Length != ResourceTypeCount)
+            Array.Resize(ref amounts, ResourceTypeCount);
+        for (int i = 0; i < amounts.Length; i++)
+            amounts[i] = Mathf.Max(0, amounts[i]);
+    }
+
+    void NotifyChanged(ResourceType type)
+    {
+        var subscribers = Changed?.GetInvocationList();
+        if (subscribers == null)
+            return;
+
+        var amount = amounts[(int)type];
+        for (int i = 0; i < subscribers.Length; i++)
+        {
+            try
+            {
+                ((Action<ResourceType, int>)subscribers[i])(type, amount);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+            }
+        }
+    }
 
     // Kaynağı "from" noktasından eğik atışla kuyuya fırlatır. Yörünge baştan hesaplanır
     // (tek bir parabol), parça duvarın üstünden geçip kuyunun içine iner.

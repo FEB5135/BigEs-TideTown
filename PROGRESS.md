@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (10:55)
+Son güncelleme: 2026-10-17 (11:45)
 
 ## Bağlam
 
@@ -27,6 +27,14 @@ Son güncelleme: 2026-10-17 (10:55)
 - Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
 
 ## Son durum (yapılanlar)
+
+- **Uzak construction dalıyla uzlaştırma:** Pull sonrası 232 add/add çakışması çözüldü. 225 paket meta dosyasında Unity 6000.6.6f1 kurulumuyla eşleşen uzak kimlikler, 5 UI meta dosyasında özgün sprite ayarları korundu. ResourceTest sahnesindeki inşa/kuyu entegrasyonu ve main WFC kodu korundu. URP ayarlarındaki eski bir dosya kimliği doğru değere bağlandı. Yinelenen GUID yok; `MergedAssetIntegrationTests` dahil 34/34 EditMode testi geçti. Push yapılmadı.
+
+- **Main birleştirmesi:** Yereldeki `origin/main` (`5002591`, WFC/grid ve zemin modelleri), `cbb3e6e` ile `ContructionMechanics` dalına çakışmasız birleştirildi. Yerel değişiklikler öncesinde `059eb1a` ile kaydedildi. Unity EditMode: `IdleTown.EditModeTests` derlemesinde 26/26 test başarılı. Sonraki başarılı fetch ile GitHub main sürümünün de 5002591 olduğu doğrulandı.
+
+- **Maden/vagon prefab bağlantısı:** Yerelde yeniden oluşturulan FBX meta GUID'leri kaynak dalındaki özgün değerlere döndürüldü (Quarry: `de100f7e611584749bb32c5aff7ca2c6`, MineCart: `1e0776f0470e66e418ee02157ce9870e`). Prefab kaynak referansları artık mevcut model dosyalarını buluyor. Orman için Git'ten hariç tutulan `Assets/FinottiGames` paketi resmi Asset Store üzerinden bu makineye içe aktarıldı; sahnedeki 34 ağacın özgün prefab bağlantıları geri geldi. ResourceTest Play modunda orman ve üç maden görünür, Console hata ve uyarı sayıları 0.
+
+- **Yeni proje konumu:** `C:\Projects\BigEs`. Gömülü URP 17.6.0 paketlerindeki eksik dosyalar Unity 6000.6.6f1 kurulumundaki aynı paketlerden tamamlandı; mevcut dosyalar korundu. Eksik `Textures/DebugFont.tga` ilk render oluşturulurken MissingReferenceException ve ardından Blitter yeniden başlatma hatasına neden oluyordu.
 
 - **Unity derleme hatası (CS0246 MaterialReferenceChanger):** Unity 6000.6.6f1'in kendi hatası. URP core ve universal paketleri `Packages/` içine gömüldü, eksik `.meta` dosyaları eklendi. Yeni bir URP projesinde aynı hata çıkarsa aynı çözüm uygulanır.
 - **Kaynak sistemi** (`Assets/Scripts/Economy/`):
@@ -63,18 +71,24 @@ Son güncelleme: 2026-10-17 (10:55)
   - Görünüm (ikinci sürüm, kullanıcı ilkini beğenmedi): Kenney UI Pack 2.0'ın gri parçaları oyunun paletine göre yeniden renklendirildi (`Art/UI/adapt_kenney.py <kenney klasörü>` → `Assets/UI/Menu/Kenney/`). Kullanıcı "olduğu gibi alınmasın, uyarlansın" dedi. Butonlar kalınlıklı; üzerine gelince büyür, basınca düz sprite'a geçip içerik iner, Kenney tık sesi çalar (`PressableButton`). İkon, gölge, perde ve dalga sprite'ları `Art/UI/make_menu_sprites.py` ile üretilir.
   - Yazı tipi: Baloo 2 ExtraBold (OFL, `Assets/UI/Fonts/`). **Lilita One, Fredoka ve Kenney Future'da Ğ, Ş, İ yok**; yeni font seçilirse Türkçe harfler önce Pillow ile çizilip kontrol edilmeli. Unity eski `Text` değişken fontta yalnız varsayılan ağırlığı kullanır; ExtraBold sabit dosyası Google Fonts CSS API'den alındı.
   - Kurulum: `Assets/Scripts/Editor/MainMenuSetup.cs` (Tools > BigEs > Ana Menüyü Kur, varsa silip yeniden kurar). `ResourceTestSetup` sahnede menü yoksa kendisi kurar.
+- **ContructionMechanics merge'i (2026-10-17, `feature/main-menu`):** Kullanıcı SampleScene'deki WFC haritasını beğenmedi ("dağlar yok"); tek-sahne kurulumu geri alındı (yedek yerel branch: `backup/single-scene-setup`, push edilmedi) ve `origin/ContructionMechanics` merge edildi. Oynanan harita yine `ResourceTest` (dağlar, köy, orman, ocaklar + 240×240 m inşa grid'i ve duvar inşası).
+  - Arkadaşın asmdef'lerinde `Unity.ugui` diye olmayan bir assembly vardı (doğrusu `UnityEngine.UI`) ve URP referansı yoktu; düzeltildi (`IdleTown.Runtime`, `IdleTown.ResourceEditor`). Unity hatasız derliyor.
+  - `MainMenu.gameplayBehaviours`: menü açıkken `WallConstructionController` kapalı (yoksa OnGUI paneli menünün üstünde çiziliyor ve B tuşu çalışıyordu). `MainMenuSetup` bunu kendisi bağlar.
+  - Play'de doğrulandı: menü → Oyna → kamera iner, kaynak paneli ve inşa paneli (Toplama modu) gelir, kaynaklar artar.
+  - Kalan uyarı: `WallConstructionController.DestroyObject` (CS0108), arkadaşın kodu, dokunulmadı.
 - **Kural uyumu:** `THIRD_PARTY.md`'de tüm hazır kaynaklar ve AI kullanımı yazılı; dosya public repoya ve jüriye uygun dille yazıldı (iç notlar `PROGRESS.md`'de). FinottiGames ağaç paketi (Asset Store EULA) `.gitignore`'da ve geçmişten silindi.
+- **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
 ## Sıradaki işler / açık konular
 
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir).
 - [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Ana menü: eğimli kamera girişi (CameraIntro'da `menuPitch`/`menuYaw` değiştirmek yeterli).
-- [ ] Ana menü şu an `ResourceTest` sahnesinde. Asıl oyun sahnesi belli olunca orada Tools > BigEs > Ana Menüyü Kur çalıştırılmalı. Build Settings'te yalnız `SampleScene` var.
+- [ ] Tek sahne kararı: kullanıcı önce "tek sahne SampleScene" dedi, sonra ContructionMechanics haritasını (ResourceTest) tercih etti. Hangi sahnenin kalacağı ve Build Settings (şu an yalnız `SampleScene`) netleşmeli. ContructionMechanics'ten gelen `WallConstructionDemo*` sahneleri de duruyor.
 
 - [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
-- [ ] Duvar ekibine `Well.TrySpend` / `ResourceCost` kullanımını anlatmak.
+- [x] Duvar sistemini `Well.TrySpend` ile bağlamak; ResourceHUD aynı bakiye olaylarını izliyor.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.
 - [ ] Arkadaşa iletilecek: `.obj` modellerin `.mtl` dosyaları repoda yok, modeller beyaz görünüyor. Malzemeleri `Flat.mat`'e eşlemeli.
 - [ ] Teslimden önce: Repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak.

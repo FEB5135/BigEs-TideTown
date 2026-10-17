@@ -68,7 +68,7 @@ public class NavigationBaker : MonoBehaviour
         var sources = new List<NavMeshBuildSource>();
         var bounds = new Bounds();
         bool any = false;
-        foreach (var renderer in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        foreach (var renderer in FindObjectsByType<Renderer>())
         {
             if (!renderer.enabled || !renderer.gameObject.activeInHierarchy || renderer is ParticleSystemRenderer)
                 continue;
@@ -85,7 +85,7 @@ public class NavigationBaker : MonoBehaviour
             });
             Encapsulate(ref bounds, ref any, renderer.bounds);
         }
-        foreach (var terrain in FindObjectsByType<Terrain>(FindObjectsSortMode.None))
+        foreach (var terrain in FindObjectsByType<Terrain>())
         {
             sources.Add(new NavMeshBuildSource
             {

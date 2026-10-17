@@ -1,0 +1,13 @@
+{
+    "name": "IdleTown.ResourceEditor",
+    "rootNamespace": "IdleTown.Editor",
+    "references": [
+        "IdleTown.Runtime",
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "autoReferenced": true
+}

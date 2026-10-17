@@ -116,6 +116,10 @@ public static class MainMenuSetup
                 hudGroup = hud.gameObject.AddComponent<CanvasGroup>();
             SetArray(so.FindProperty("gameplayUI"), hudGroup);
         }
+        // Duvar inşası menüdeyken çalışmasın (paneli menünün üstünde çizilir, B tuşunu dinler).
+        var construction = Object.FindAnyObjectByType<IdleTown.Construction.WallConstructionController>(FindObjectsInactive.Include);
+        if (construction != null)
+            SetArray(so.FindProperty("gameplayBehaviours"), construction);
         so.ApplyModifiedPropertiesWithoutUndo();
 
         settingsPage.gameObject.SetActive(false);
