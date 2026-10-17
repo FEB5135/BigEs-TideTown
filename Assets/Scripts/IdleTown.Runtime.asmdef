@@ -2,7 +2,8 @@
     "name": "IdleTown.Runtime",
     "rootNamespace": "IdleTown",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.ugui"
     ],
     "autoReferenced": true
 }
