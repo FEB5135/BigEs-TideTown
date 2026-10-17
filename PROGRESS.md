@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (14:45)
+Son güncelleme: 2026-10-17 (19:10)
 
 ## Bağlam
 
@@ -14,23 +14,20 @@ Son güncelleme: 2026-10-17 (14:45)
 
 ## Branch'ler
 
-- `main`: Ekibin ortak branch'i. `feature/main-menu` main'e merge edildi (2026-10-17, ana menü + ContructionMechanics + palet düzeltmesi). Son çekilen commit: `7afe46b Wave Collapse Function` (WFC ile grid harita: `Assets/Scripts/Map/WfcSolver.cs`, `MapView`, yeni zemin/yokuş modelleri, `villager.obj`; `SampleScene`'de). `feature/main-menu`'ye merge edildi (2026-10-17), çakışma yok; `Flat.mat`'te iki tarafın değişikliği birleşti. `testground*` modelleri main'de silindi, bizim sahne onları kullanmıyordu.
-- `feature/resource-gathering`: Bizim çalışmamız (kaynak toplama). Push etmeden önce kullanıcıya sor.
-- `feature/main-menu`: `feature/resource-gathering`'den açıldı. Ana menü burada. GitHub'a push edildi (2026-10-17).
-- `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
-
-## ⚠ Yarım kalan iş (önce bunu bitir)
-
-**Maden ocakları + taş toplayan vagonlar** kodlandı, derlendi (hata yok), sahne kuruldu (3 ocak + 3 vagon) ve commit edildi. **Play'de henüz test edilmedi.**
-- İlgili dosyalar: `Assets/Scripts/Economy/ResourceNode.cs` (`maxGatherers`: bir kaynakta birden fazla toplayıcı), `Assets/Scripts/Editor/ResourceTestSetup.cs` (`BuildQuarries`, `BuildMineCarts`, köyde ocak yönüne ±24° yol boşluğu).
-- Tasarım: Ekranın sağında, kasabanın dışında (TownRadius+9) 3 ocak, girişleri kasabaya bakıyor. Her ocak bir Stone `ResourceNode` (kapasite 200, yenilenme 15 sn, en fazla 3 vagon); tıklayınca taş kuyuya atılır. 3 vagon (`Gatherer`, Stone, 8 taş, hız 4, girişin 5 m önünde durur) taşı kuyuya götürüp atar.
-- Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
+- `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. Bizim main'e giren son işimiz `fbd8b40` (ana menü yeniden tasarımı); GitHub'da main o günden beri ilerledi (son çekilen: `5077d4f`, "Slope half-fix"). Yerel `main` origin'in 2 commit gerisinde.
+- `fix/tree-cell-ground` (GitHub'da): main üstüne ağaç/maden düzeltmeleri: ekibin güncel ağaç meshi, ağaçlar orijinal boyda, ocak ve vagon için ayrı palet (`EconomyPalette.png`). **Main'e birleştirilmedi.**
+- `feature/villager-jobs` (GitHub'da, **aktif dal**): `fix/tree-cell-ground` + güncel main üstüne köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. **Main'e birleştirilmedi.** Son 3 commit (sesler) henüz push edilmedi.
+- `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
+- `feature/wfc-forest`: Eski ResourceTest tabanlı orman çalışması; main'e alınmadı, yerine SampleScene'e yalnız ağaç kısmı taşındı. Arşiv.
+- `feature/main-menu`, `feature/resource-gathering`: Eski dallar; işleri main'de.
+- `backup/resource-gathering-before-rewrite`: Yalnız yerelde, Asset Store ağaç paketi içerir, **asla push etme**. `backup/single-scene-setup`: yalnız yerelde. İkisi de silinebilir.
 
 ## Aktif çalışma
 
-- Dal: `main`. `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
-- Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
-- Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
+- Dal: `feature/villager-jobs`. Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
+- `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
+- ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
+- Kullanıcı dağ/tepe düzeni için "tam böyle olmayacak, şimdilik beklesin" dedi; odun kesme animasyonu için "hâlâ garip ama şimdilik kalsın".
 
 ## Son durum (yapılanlar)
 
@@ -120,27 +117,27 @@ Son güncelleme: 2026-10-17 (14:45)
 
 ## Sıradaki işler / açık konular
 
-- [x] Köylü animasyonlarını ve SampleScene düzenini main'e birleştir.
-- [ ] Yerel main değişikliklerini paylaşmak için push (henüz yapılmadı).
-
-- [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir).
-- [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
-- [ ] Ana menü: eğimli kamera girişi (CameraIntro'da `menuPitch`/`menuYaw` değiştirmek yeterli).
-- [x] Tek sahne kararı: kullanıcı kaynak toplama düzeninin SampleScene içine taşınmasını istedi; animasyonlu köylüler, menü ve kaynak sistemleri burada kuruldu.
-
-- [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
-- [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
-- [x] Duvar sistemini `Well.TrySpend` ile bağlamak; ResourceHUD aynı bakiye olaylarını izliyor.
+- [ ] `feature/villager-jobs`'ın son 3 commit'ini push etmek (kullanıcıya sor).
+- [ ] `fix/tree-cell-ground` ve `feature/villager-jobs`'ı main'e birleştirmek (kullanıcıya sor; main ilerlediği için önce main çekilmeli).
+- [ ] Vagon yuvarlanma sesi: sentez beğenilmedi; kullanıcı gerçek bir tekerlek kaydı seçecek, döngülü yapılıp `GameAudio.cartRoll`'a bağlanacak.
+- [ ] Odun kesme animasyonu hâlâ garip (kullanıcı ertelendi dedi); istenirse elde balta modeli ve daha belirgin vuruş.
+- [ ] Dağ/tepe düzeni değişecek (kullanıcı ayrıntı verecek). Eski elle konmuş dağlar kapalı; tsunaminin geleceği vadi artık yok, dalga tasarımı bunu dikkate almalı.
+- [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek.
+- [ ] Ana menü: skorun tanımı belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.
-- [ ] Arkadaşa iletilecek: `.obj` modellerin `.mtl` dosyaları repoda yok, modeller beyaz görünüyor. Malzemeleri `Flat.mat`'e eşlemeli.
-- [ ] Teslimden önce: Repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak.
-- [ ] `ProjectSettings/Packages/com.unity.probuilder/Settings.json` Unity tarafından değişti, commit edilmedi.
-- [ ] URP gölge mesafesi (`Assets/Settings/PC_RPAsset.asset`, `m_ShadowDistance: 50`) büyük haritada uzaktan bakınca gölgeleri kesiyor; ekip isterse artırılabilir (ortak ayar, dokunulmadı).
+- [ ] Sol alttaki odun/taş butonlarına işlev vermek (henüz kararlaştırılmadı).
+- [ ] Teslimden önce: repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak. Pixabay sesi (`RockBreak.mp3`) lisansı tek başına dağıtımı yasaklıyor, public repoda durumu değerlendirilmeli.
+- [ ] `ProjectSettings/Packages/com.unity.probuilder/Settings.json` Unity tarafından değişti, commit edilmedi (bilerek).
+- [ ] URP gölge mesafesi (`m_ShadowDistance: 50`) uzaktan bakınca gölgeleri kesiyor; ekip isterse artırılabilir (ortak ayar, dokunulmadı).
 
 ## Çalışma notları (oturumlar arası)
 
-- **Sahneyi değiştirmek:** `ResourceTestSetup.cs` düzenlenir. Mevcut sahneye uygulamak için tek seferlik bir `Assets/Scripts/Editor/RebuildResourceTestOnce.cs` yazılır: `[InitializeOnLoad]` + `delayCall` kökü siler, menüyü çalıştırır, sahneyi kaydeder ve kendini siler.
-- **Derleme:** Unity ancak penceresi öne gelince derler. Play modundayken derlemez. Sonuç `Logs/Editor.log`'dan (`Tundra build success`, `error CS`) okunur.
+- **Sahneyi değiştirmek:** `SampleSceneSetup.cs`'teki `Ensure...` fonksiyonu düzenlenir. Sahneye uygulamak için tek seferlik bir `Assets/Scripts/Editor/Apply...Once.cs` yazılır: `[InitializeOnLoad]` + `delayCall`, `isPlayingOrWillChangePlaymode` ise çıkar; SampleScene açık değilse additive açar, fonksiyonu çağırır, kaydeder, kendini siler. Play modundayken çalışmaz: Play'i durdurup dosyaya bir satır ekleyerek yeniden derletmek gerekir.
+- **Serileştirilmiş alanlar:** Bir bileşenin `[SerializeField]` varsayılanı değişirse sahnedeki eski değer kalır; kurulumda ya da sahne dosyasında ayrıca güncellenmeli.
+- **Mesh asset yazma:** Aynı yola `AssetDatabase.CreateAsset` ile yeniden yazmak bağlı prefab referanslarını "Missing" yapabiliyor ve ağaçlar çizilmeden gri delik bırakmıştı. Var olan mesh `EditorUtility.CopySerialized` ile yerinde güncellenip zorla yeniden içe aktarılır.
+- **Ekip palette.png'yi değiştirebiliyor:** Bizim modeller (ocak, vagon) `EconomyPalette.png` / `EconomyFlat.mat` kullanır, ekibin paletine bağlı değil.
+- **Derleme:** Unity ancak penceresi öne gelince derler; gerekirse boş bir alana tıklayıp Ctrl+R. Play modundayken derlemez. Bu makinede `Logs/Editor.log` kısa; sonuç Unity Console'dan okunur.
+- **Play'de yakından bakmak:** Hiyerarşi aramasıyla objeyi bulup çift tıklayınca Scene görünümü ona odaklanır; arama kutusu temizlenmezse Scene soluk görünür. Köylüler uzaktan birkaç piksel; fareyle test zor, gerekirse geçici bir runtime betiği köylüleri işe koyar (commit edilmez).
 - **Ekran kontrolü:** Kullanıcının Unity düzeni değişebiliyor (Game görünümü üstte küçük). Fare/klavye ile test etmeden önce tam pencere görüntüsü alınmalı. Unity önde değilse kullanıcı bilgisayarı kullanıyordur; dokunulmaz.
 - **İndirme:** Her dosya indirmesi için kullanıcıdan izin alınır. Yalnız CC0 ya da repoya konabilir lisanslar repoya girer; Asset Store paketleri `.gitignore`'a eklenir ve `THIRD_PARTY.md`'ye yazılır.
 - **Model tasarımcısı var:** Görsellerde fazladan iş yapılmaz, placeholder'lar yeterli.
