@@ -19,6 +19,39 @@ public class MapView : MonoBehaviour
     GameObject defaultPrefab;
     bool filling;
 
+    public bool IsConstructionGround(Vector3 position)
+    {
+        if (world == null || modules == null) return false;
+        var local = world.transform.InverseTransformPoint(position);
+        int x = Mathf.FloorToInt(local.x / world.CellSize), z = Mathf.FloorToInt(local.z / world.CellSize);
+        if (!world.InBounds(x, z)) return false;
+        world.Get(x, z, out var id, out _);
+        bool found = false;
+        foreach (var module in modules)
+        {
+            if (module.Id != id || module.Prefab == null) continue;
+            found = true;
+            string name = module.Prefab.name;
+            if (!(name.StartsWith("ground_") || name.StartsWith("slope_") ||
+                  name.StartsWith("cornerslope_") || name.StartsWith("innercornerslope_"))) return false;
+        }
+        return found;
+    }
+
+    public bool IsConstructionGroundPath(Vector3 a, Vector3 b, float padding)
+    {
+        if (world == null) return false;
+        var across = Vector3.Cross(world.transform.up, b - a).normalized * padding;
+        int samples = Mathf.Max(2, Mathf.CeilToInt(Vector3.Distance(a, b) / (world.CellSize * .2f)));
+        // Sample both sides of grid edges: a neighbouring house/tree tile must still block.
+        for (int i = 0; i <= samples; i++)
+        {
+            var point = Vector3.Lerp(a, b, Mathf.Lerp(.001f, .999f, i / (float)samples));
+            if (!IsConstructionGround(point + across) || !IsConstructionGround(point - across)) return false;
+        }
+        return true;
+    }
+
     void Start()
     {
         if (world == null)

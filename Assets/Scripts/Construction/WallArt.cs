@@ -56,6 +56,9 @@ namespace IdleTown.Construction
         {
             var builder = new Builder();
             float length = 1f - 2f * inset;
+            // Continuous core seals board/mortar gaps and reaches the shared grid-node posts.
+            // Surface details remain separate, but no daylight passes through the wall body.
+            builder.Box(Vector3.zero, new Vector3(.72f, 1f, 1f), 0, 0f);
             if (tier == WallTier.Timber)
             {
                 // Staggered pickets, chamfered edges and two dark horizontal rails.

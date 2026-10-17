@@ -11,6 +11,19 @@ namespace IdleTown.Editor
     {
         const string ArtPath = "Assets/Art/Walls";
 
+        [MenuItem("Tools/Idle Town/Wallfix/Refresh Solid Wall Meshes")]
+        public static void RefreshSolidMeshes()
+        {
+            ExportAssets();
+            foreach (WallTier tier in new[] { WallTier.Timber, WallTier.Stone, WallTier.Reinforced })
+            {
+                var mesh = WallArt.CreatePanel(tier, .117f);
+                EditorUtility.CopySerialized(mesh, AssetDatabase.LoadAssetAtPath<Mesh>($"{ArtPath}/{tier}.asset"));
+                Object.DestroyImmediate(mesh);
+            }
+            AssetDatabase.SaveAssets();
+        }
+
         [InitializeOnLoadMethod]
         static void ScheduleAssets() => EditorApplication.delayCall += () =>
         {

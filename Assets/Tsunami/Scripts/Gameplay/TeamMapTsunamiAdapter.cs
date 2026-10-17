@@ -57,7 +57,7 @@ namespace Tsunami
 
         [Header("Walls")]
         [Tooltip("Wall top above the ground (m) when it can't be read from the wall's renderers.")]
-        [SerializeField, Min(0.1f)] float fallbackWallHeight = 1.25f;
+        [SerializeField, Min(0.1f)] float fallbackWallHeight = WallConstructionController.StoreyHeight;
 
         [Header("Wall durability (game model)")]
         [Tooltip("Hit points and kN.s-to-damage scales. Loads come from water density, depth and normal velocity; these rates are gameplay tuning, not structural certification.")]
@@ -493,7 +493,7 @@ namespace Tsunami
             // Upgrading/rebinding replaces an owner's old barrier rather than leaking a duplicate crest.
             if (segments.TryGetValue(key, out var previous) && previous.handle.IsValid)
                 simulation.RemoveWallSegment(previous.handle);
-            WallSegmentHandle handle = simulation.AddWallSegment(NodePosition(edge.A), NodePosition(edge.B), top, bottom);
+            WallSegmentHandle handle = simulation.AddWallSegment(NodePosition(edge.A), NodePosition(edge.B), top, bottom, true);
             if (!handle.IsValid) return;
             if (!segments.TryGetValue(key, out SegmentState state))
             {

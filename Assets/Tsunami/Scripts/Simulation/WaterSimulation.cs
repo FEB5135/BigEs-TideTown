@@ -143,6 +143,7 @@ namespace Tsunami
             public int id;
             public Vector3 worldA, worldB;
             public float topLocal, bottomLocal;
+            public bool impermeable;
             public readonly List<WallFace> faces = new List<WallFace>(2);
         }
 
@@ -341,9 +342,10 @@ namespace Tsunami
         /// <summary>
         /// Adds a thin wall between two cell corners (world positions, e.g. the ends of a player-built wall segment
         /// on a grid aligned with this simulation). Diagonal segments become a two-face staircase.
-        /// <paramref name="topWorldY"/> is the world height of the wall top; water above it spills over.
+        /// <paramref name="topWorldY"/> is the physical wall top. Impermeable player walls remain sealed until removed;
+        /// other barriers allow water above their crest to spill over.
         /// </summary>
-        public WallSegmentHandle AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY, float bottomWorldY = float.NegativeInfinity)
+        public WallSegmentHandle AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY, float bottomWorldY = float.NegativeInfinity, bool impermeable = false)
         {
             EnsureInitialized();
             float top = topWorldY - terrain.transform.position.y;
@@ -351,38 +353,22 @@ namespace Tsunami
             Vector2 ga = terrain.WorldToGrid(worldA), gb = terrain.WorldToGrid(worldB);
             var a = new Vector2Int(Mathf.RoundToInt(ga.x + 0.5f), Mathf.RoundToInt(ga.y + 0.5f));
             var b = new Vector2Int(Mathf.RoundToInt(gb.x + 0.5f), Mathf.RoundToInt(gb.y + 0.5f));
-            var corner = new Vector2Int(b.x, a.y);
             int id = nextWallHandle++;
             if (nextWallHandle <= 0) nextWallHandle = 1;
             var wall = new RegisteredWall { id = id, worldA = worldA, worldB = worldB, topLocal = top,
-                bottomLocal = bottomWorldY - terrain.transform.position.y };
-            WallAlongX(a.y, a.x, corner.x, top, wall);      // horizontal leg a -> corner
-            WallAlongZ(corner.x, corner.y, b.y, top, wall); // vertical leg corner -> b
+                bottomLocal = bottomWorldY - terrain.transform.position.y, impermeable = impermeable };
+            WallBarrierRasterizer.Trace(a.x, a.y, b.x, b.y, (x,z,alongX) => AddFace(x,z,alongX,top,wall));
             if (wall.faces.Count == 0) return default;
             walls.Add(id, wall);
             wallIteration.Add(wall);
             return new WallSegmentHandle(id);
         }
 
-        // Horizontal edge on corner row v between corner columns u0..u1: separates cells (u, v-1) and (u, v).
-        void WallAlongX(int v, int u0, int u1, float top, RegisteredWall wall)
-        {
-            if (u0 > u1) { int t = u0; u0 = u1; u1 = t; }
-            for (int u = u0; u < u1; u++) AddFace(u, v - 1, false, top, wall);
-        }
-
-        // Vertical edge on corner column u between corner rows v0..v1: separates cells (u-1, v) and (u, v).
-        void WallAlongZ(int u, int v0, int v1, float top, RegisteredWall wall)
-        {
-            if (v0 > v1) { int t = v0; v0 = v1; v1 = t; }
-            for (int v = v0; v < v1; v++) AddFace(u - 1, v, true, top, wall);
-        }
-
         void AddFace(int x, int z, bool alongX, float top, RegisteredWall wall)
         {
             if (x < 0 || z < 0 || x >= solver.Size || z >= solver.Size ||
                 (alongX ? x >= solver.Size - 1 : z >= solver.Size - 1)) return;
-            solver.SetOwnedBarrier(wall.id, x, z, alongX, top);
+            solver.SetOwnedBarrier(wall.id, x, z, alongX, top, wall.impermeable);
             wall.faces.Add(new WallFace(x, z, alongX));
         }
 

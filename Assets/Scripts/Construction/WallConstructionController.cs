@@ -1042,7 +1042,9 @@ namespace IdleTown.Construction
                 for (var overlapIndex = 0; overlapIndex < count; overlapIndex++)
                 {
                     var overlap = overlapBuffer[overlapIndex];
-                    if (terrainSurface != null && terrainSurface.Contains(overlap)) continue;
+                    var map = overlap.GetComponentInParent<MapView>();
+                    if (map != null && map.IsConstructionGroundPath(start, end, JointHalfWidth + obstaclePadding)) continue;
+                    if (map == null && terrainSurface != null && terrainSurface.Contains(overlap)) continue;
                     // Picking/collection triggers are not solid buildings. Explicit trigger layers opt in.
                     if (overlap.isTrigger && (obstacleLayers.value & (1 << overlap.gameObject.layer)) == 0)
                         continue;

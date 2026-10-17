@@ -71,6 +71,7 @@ namespace Tsunami
         public readonly bool[] InitiallyWet;
         /// <summary>Thin walls: top height on the face between cell i and i+1 (BarrierX) or i and i+n (BarrierZ).</summary>
         public readonly float[] BarrierX, BarrierZ;
+        public readonly bool[] SealedBarrierX, SealedBarrierZ;
         /// <summary>Per cell: which faces carry a wall (1 = -x, 2 = +x, 4 = -z, 8 = +z). For rendering.</summary>
         public readonly byte[] BarrierMask;
 
@@ -124,6 +125,7 @@ namespace Tsunami
             public int owner;
             public BarrierFaceKey face;
             public float top;
+            public bool impermeable;
         }
 
         readonly struct BarrierFaceKey : IEquatable<BarrierFaceKey>
@@ -147,6 +149,7 @@ namespace Tsunami
             VelocityX = new float[c]; VelocityZ = new float[c]; Speed = new float[c];
             InitiallyWet = new bool[c];
             BarrierX = new float[c]; BarrierZ = new float[c]; BarrierMask = new byte[c];
+            SealedBarrierX = new bool[c]; SealedBarrierZ = new bool[c];
             stillDepth = new float[c];
             h0 = new float[c]; qx0 = new float[c]; qz0 = new float[c];
             pU = new float[c]; pV = new float[c]; pEta = new float[c];
@@ -288,6 +291,7 @@ namespace Tsunami
                 BarrierX[i] = float.NegativeInfinity;
                 BarrierZ[i] = float.NegativeInfinity;
                 BarrierMask[i] = 0;
+                SealedBarrierX[i] = SealedBarrierZ[i] = false;
             }
         }
 
@@ -302,11 +306,11 @@ namespace Tsunami
             float[] baseline = alongX ? staticBarrierX : staticBarrierZ;
             if (top <= baseline[i]) return;
             baseline[i] = top;
-            if (top > (alongX ? BarrierX[i] : BarrierZ[i])) ApplyEffective(new BarrierFaceKey(x, z, alongX), top);
+            RecomputeFace(new BarrierFaceKey(x, z, alongX));
         }
 
         /// <summary>Adds one owner contribution. An owner can cover multiple faces and is removed atomically.</summary>
-        public bool SetOwnedBarrier(int owner, int x, int z, bool alongX, float top)
+        public bool SetOwnedBarrier(int owner, int x, int z, bool alongX, float top, bool impermeable = false)
         {
             if (owner <= 0 || !ValidFace(x, z, alongX)) return false;
             var key = new BarrierFaceKey(x, z, alongX);
@@ -319,13 +323,14 @@ namespace Tsunami
             {
                 OwnedBarrier existing = ownerFaces[i];
                 if (!existing.face.Equals(key)) continue;
-                if (top <= existing.top) return true;
-                existing.top = top;
+                if (top <= existing.top && existing.impermeable == impermeable) return true;
+                existing.top = MathF.Max(top, existing.top);
+                existing.impermeable = impermeable;
                 RecomputeFace(key);
                 return true;
             }
 
-            var contribution = new OwnedBarrier { owner = owner, face = key, top = top };
+            var contribution = new OwnedBarrier { owner = owner, face = key, top = top, impermeable = impermeable };
             ownerFaces.Add(contribution);
             if (!barriersByFace.TryGetValue(key, out List<OwnedBarrier> faceOwners))
             {
@@ -333,8 +338,7 @@ namespace Tsunami
                 barriersByFace.Add(key, faceOwners);
             }
             faceOwners.Add(contribution);
-            int index = z * Size + x;
-            if (top > (alongX ? BarrierX[index] : BarrierZ[index])) ApplyEffective(key, top);
+            RecomputeFace(key);
             return true;
         }
 
@@ -374,14 +378,17 @@ namespace Tsunami
         {
             int i = key.z * Size + key.x;
             float top = key.alongX ? staticBarrierX[i] : staticBarrierZ[i];
+            bool impermeable = false;
             if (barriersByFace.TryGetValue(key, out List<OwnedBarrier> owners))
-                for (int k = 0; k < owners.Count; k++) if (owners[k].top > top) top = owners[k].top;
-            ApplyEffective(key, top);
+                for (int k = 0; k < owners.Count; k++)
+                { if (owners[k].top > top) top = owners[k].top; impermeable |= owners[k].impermeable; }
+            ApplyEffective(key, top, impermeable);
         }
 
-        void ApplyEffective(BarrierFaceKey key, float top)
+        void ApplyEffective(BarrierFaceKey key, float top, bool impermeable = false)
         {
             int i = key.z * Size + key.x;
+            (key.alongX ? SealedBarrierX : SealedBarrierZ)[i] = impermeable;
             if (key.alongX)
             {
                 BarrierX[i] = top;
@@ -629,6 +636,7 @@ namespace Tsunami
                     float zL = eL - hL, zR = eR - hR;
                     float crest = zL > zR ? zL : zR;
                     if (wall > crest) crest = wall;
+                    if (k > 0 && k < n && SealedBarrierX[row + k - 1]) crest = float.PositiveInfinity;
                     float hLs = eL - crest; if (hLs < 0f) hLs = 0f;
                     float hRs = eR - crest; if (hRs < 0f) hRs = 0f;
                     Hll(g, hLs, uL, vL, hRs, uR, vR, out float fm, out float fn, out float ft);
@@ -673,6 +681,7 @@ namespace Tsunami
                     float zL = eL - hL, zR = eR - hR;
                     float crest = zL > zR ? zL : zR;
                     if (wall > crest) crest = wall;
+                    if (k > 0 && k < n && SealedBarrierZ[(k - 1) * n + x]) crest = float.PositiveInfinity;
                     float hLs = eL - crest; if (hLs < 0f) hLs = 0f;
                     float hRs = eR - crest; if (hRs < 0f) hRs = 0f;
                     Hll(g, hLs, uL, vL, hRs, uR, vR, out float fm, out float fn, out float ft);

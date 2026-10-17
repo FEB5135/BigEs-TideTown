@@ -111,6 +111,51 @@ namespace IdleTown.Tests
         }
 
         [Test]
+        public void AllWallTiersHaveSolidFacesAcrossBoardsMortarAndJointEnds()
+        {
+            using var art = new WallArt();
+            foreach (WallTier tier in new[] { WallTier.Timber, WallTier.Stone, WallTier.Reinforced })
+            {
+                var visual = new GameObject("Solid face probe");
+                visual.transform.SetParent(root.transform);
+                var collider = visual.AddComponent<MeshCollider>();
+                collider.sharedMesh = art.Panel(tier, .117f);
+                Physics.SyncTransforms();
+                foreach (float y in new[] { -.48f, -.2f, .2f, .48f })
+                    foreach (float z in new[] { -.48f, -.2f, .2f, .48f })
+                        Assert.That(collider.Raycast(new Ray(new Vector3(-2,y,z), Vector3.right), out _, 4),
+                            Is.True, $"{tier}: opening at y={y}, z={z}");
+                Object.DestroyImmediate(visual);
+            }
+        }
+
+        [Test]
+        public void ShortGrassGroundAllowsWallsButAdjacentBuildingTileStillBlocks()
+        {
+            var world = root.GetComponent<World>();
+            typeof(World).GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .Invoke(world, null);
+            var groundTile = new GameObject("ground_1"); groundTile.transform.SetParent(root.transform);
+            var houseTile = new GameObject("house_1"); houseTile.transform.SetParent(root.transform);
+            var ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ground.transform.SetParent(root.transform); ground.transform.position = new Vector3(8,.1f,8);
+            ground.transform.localScale = new Vector3(16,.2f,16);
+            var map = ground.AddComponent<MapView>();
+            var settings = new UnityEditor.SerializedObject(map);
+            settings.FindProperty("world").objectReferenceValue = world;
+            var modules = settings.FindProperty("modules"); modules.arraySize = 2;
+            modules.GetArrayElementAtIndex(0).FindPropertyRelative("Id").intValue = 0;
+            modules.GetArrayElementAtIndex(0).FindPropertyRelative("Prefab").objectReferenceValue = groundTile;
+            modules.GetArrayElementAtIndex(1).FindPropertyRelative("Id").intValue = 7;
+            modules.GetArrayElementAtIndex(1).FindPropertyRelative("Prefab").objectReferenceValue = houseTile;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(controller.TryBuild(new Vector2Int(2,2), new Vector2Int(3,2), out var reason), Is.True, reason);
+            world.Set(2,3,7);
+            Assert.That(controller.TryBuild(new Vector2Int(2,4), new Vector2Int(3,4), out _), Is.False);
+            Assert.That(controller.Walls.Count, Is.EqualTo(1));
+        }
+
+        [Test]
         public void NEntersDemolitionFromBothModesAndIgnoresRepeat()
         {
             controller.SetConstructionMode(false);
@@ -283,7 +328,7 @@ namespace IdleTown.Tests
                 {
                     Assert.That(Mathf.Abs(vertex.x), Is.LessThanOrEqualTo(.501f));
                     Assert.That(Mathf.Abs(vertex.y), Is.LessThanOrEqualTo(.501f));
-                    Assert.That(Mathf.Abs(vertex.z), Is.LessThanOrEqualTo(.384f));
+                    Assert.That(Mathf.Abs(vertex.z), Is.LessThanOrEqualTo(.501f));
                 }
             }
             Assert.That(art.Palette(WallTier.Stone)[0].color, Is.Not.EqualTo(art.Palette(WallTier.Timber)[0].color));
