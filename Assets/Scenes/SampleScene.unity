@@ -7653,6 +7653,11 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  villager: 1
+  wanderRadius: 5
+  wanderPause: {x: 1.5, y: 4}
+  pushDistance: 2
+  needsPusher: 0
 --- !u!23 &347427875
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -18125,6 +18130,7 @@ GameObject:
   - component: {fileID: 784009417}
   - component: {fileID: 784009416}
   - component: {fileID: 784009418}
+  - component: {fileID: 784009419}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -18264,6 +18270,25 @@ MonoBehaviour:
   duration: 3.2
   blurInMenu: 1
   blurFadePortion: 0.55
+--- !u!114 &784009419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 784009412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e5344b033d545040b374bcad1858cad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleTown.Runtime::VillagerPicker
+  openHand: {fileID: 2800000, guid: 389c8ee3551c5bb45a63d6ce7371b485, type: 3}
+  closedHand: {fileID: 2800000, guid: 8f79a8eb9ac9f4f498cf6b511cd335cc, type: 3}
+  hotspot: {x: 22, y: 10}
+  maxRayDistance: 400
+  holdHeight: 3
+  forestRadius: 6
+  quarryRadius: 12
 --- !u!1 &787119430
 GameObject:
   m_ObjectHideFlags: 0
@@ -22153,6 +22178,11 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  villager: 1
+  wanderRadius: 5
+  wanderPause: {x: 1.5, y: 4}
+  pushDistance: 2
+  needsPusher: 0
 --- !u!23 &929072202
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -25673,6 +25703,11 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  villager: 1
+  wanderRadius: 5
+  wanderPause: {x: 1.5, y: 4}
+  pushDistance: 2
+  needsPusher: 0
 --- !u!23 &1046114095
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -68678,6 +68713,11 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  villager: 1
+  wanderRadius: 5
+  wanderPause: {x: 1.5, y: 4}
+  pushDistance: 2
+  needsPusher: 0
 --- !u!23 &2070435451
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -69826,6 +69866,11 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  villager: 1
+  wanderRadius: 5
+  wanderPause: {x: 1.5, y: 4}
+  pushDistance: 2
+  needsPusher: 0
 --- !u!23 &2120344315
 MeshRenderer:
   m_ObjectHideFlags: 0

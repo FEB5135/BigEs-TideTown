@@ -1,11 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 // Idle toplayıcı: kaynağa gider, toplar, kuyuya getirip içine atar. Sonsuz döngü.
 // Ev kaynağı verilirse (vagonun ocağı) yalnız oraya gider; verilmezse en yakın boş kaynağı arar (oduncu).
 // Sahnede NavigationBaker varsa engellerin etrafından dolaşır, yoksa düz çizgide yürür.
-public enum GathererActivity { Idle, Walking, Harvesting }
+// Köylü (villager) işaretliyse işi verilene kadar köyde dolaşır; oyuncu onu tutup ormana bırakınca oduncu olur,
+// ocağa bırakınca o ocağın vagonunu iter (VillagerPicker). Vagon (needsPusher) iten biri yokken bekler.
+public enum GathererActivity { Idle, Walking, Harvesting, Pushing }
 
 public class Gatherer : MonoBehaviour
 {
@@ -28,17 +31,91 @@ public class Gatherer : MonoBehaviour
     [Tooltip("Zemine yapışmak için aşağı doğru atılan ışının çarpacağı katmanlar.")]
     [SerializeField] LayerMask groundMask = ~0;
 
+    [Header("Köylü")]
+    [Tooltip("Oyuncunun tutup işe koyabileceği köylü. İşi verilene kadar bulunduğu yerin çevresinde dolaşır.")]
+    [SerializeField] bool villager;
+    [SerializeField] float wanderRadius = 5f;
+    [SerializeField] Vector2 wanderPause = new(1.5f, 4f);
+    [Tooltip("Vagonu iterken vagonun merkezinin bu kadar arkasında durur.")]
+    [SerializeField] float pushDistance = 2f;
+
+    [Header("Vagon")]
+    [Tooltip("Yalnız bir köylü iterken ilerler.")]
+    [SerializeField] bool needsPusher;
+
     const float PathStopDistance = 0.1f;
+
+    static readonly List<Gatherer> villagers = new();
+    // Sahnedeki (etkin) köylüler.
+    public static IReadOnlyList<Gatherer> Villagers => villagers;
 
     readonly RaycastHit[] groundHits = new RaycastHit[8];
     readonly List<Vector3> corners = new();
     float heightOffset;
+    bool ready;
+    Coroutine routine;
+    ResourceNode claimed;
+    Gatherer pushedCart;
+    Gatherer reservedBy; // Vagon: ona doğru yürüyen ya da onu iten köylü.
 
     public ResourceType Type => resourceType;
     public GathererActivity Activity { get; private set; }
     public ResourceNode CurrentTarget { get; private set; }
+    public bool IsVillager => villager;
+    public bool HasJob { get; private set; }
+    // Vagonu iten köylü (vagonda) ya da itilen vagon (köylüde).
+    public Gatherer Pusher { get; private set; }
+    public Gatherer PushedCart => pushedCart;
+    public bool NeedsPusher { get => needsPusher; set => needsPusher = value; }
+    public bool IsReserved => reservedBy != null;
 
     public void SetHome(ResourceNode node) => home = node;
+
+    void Awake()
+    {
+        if (villager)
+            EnsurePickCollider();
+    }
+
+    void OnEnable()
+    {
+        if (villager && !villagers.Contains(this))
+            villagers.Add(this);
+    }
+
+    void OnDisable() => villagers.Remove(this);
+
+    // Köylü imleçle tutulabilsin diye görselinin boyunda tetikleyici kapsül (zemin ve tıklama ışınlarını etkilemez).
+    void EnsurePickCollider()
+    {
+        foreach (var collider in GetComponents<Collider>())
+            if (collider.isTrigger)
+                return;
+        Bounds? bounds = null;
+        foreach (var renderer in GetComponentsInChildren<Renderer>())
+        {
+            if (!renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                continue;
+            if (bounds is Bounds b)
+            {
+                b.Encapsulate(renderer.bounds);
+                bounds = b;
+            }
+            else
+                bounds = renderer.bounds;
+        }
+        if (bounds is not Bounds box)
+            return;
+        var capsule = gameObject.AddComponent<CapsuleCollider>();
+        capsule.isTrigger = true;
+        var scale = transform.lossyScale;
+        float vertical = Mathf.Max(Mathf.Abs(scale.y), 0.0001f);
+        float horizontal = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z), 0.0001f);
+        capsule.center = transform.InverseTransformPoint(box.center);
+        capsule.height = box.size.y / vertical;
+        // Küçük köylüyü yakalamak kolay olsun diye biraz geniş.
+        capsule.radius = Mathf.Max(box.extents.x, box.extents.z, 0.6f) / horizontal;
+    }
 
     IEnumerator Start()
     {
@@ -49,9 +126,132 @@ public class Gatherer : MonoBehaviour
         // Harita kurulup NavMesh hazır olana kadar beklenir.
         while (NavigationBaker.Exists && !NavigationBaker.Ready)
             yield return null;
+        ready = true;
+        if (routine != null)
+            yield break; // Beklerken iş verildi.
+        if (villager)
+            Wander();
+        else
+            routine = StartCoroutine(WorkLoop());
+    }
 
+    // ---------------------------------------------------------------- Köylünün işleri
+
+    // Bulunduğu yerin çevresinde dolaşır (işsiz).
+    public void Wander()
+    {
+        Stop();
+        HasJob = false;
+        routine = StartCoroutine(WanderLoop(transform.position));
+    }
+
+    // Oduncu olur: en yakın boş ağacı bulur, toplar, kuyuya götürür; sürekli.
+    public void WorkInForest()
+    {
+        Stop();
+        resourceType = ResourceType.Wood;
+        home = null;
+        HasJob = true;
+        routine = StartCoroutine(WorkLoop());
+    }
+
+    // Vagonun arkasına geçip iter: vagon ocağa girip taşla dolar, kuyuya döner; sürekli.
+    public void PushCart(Gatherer cart)
+    {
+        Stop();
+        if (cart == null || (cart.reservedBy != null && cart.reservedBy != this))
+        {
+            Wander();
+            return;
+        }
+        HasJob = true;
+        cart.reservedBy = this;
+        pushedCart = cart;
+        routine = StartCoroutine(PushLoop(cart));
+    }
+
+    // Tutulunca: ne yapıyorsa bırakır (sahiplendiği ağaç, ittiği vagon serbest kalır).
+    public void Stop()
+    {
+        if (routine != null)
+            StopCoroutine(routine);
+        routine = null;
+        if (claimed != null)
+            claimed.Release(this);
+        claimed = null;
+        CurrentTarget = null;
+        if (pushedCart != null && pushedCart.Pusher == this)
+            pushedCart.Pusher = null;
+        if (pushedCart != null && pushedCart.reservedBy == this)
+            pushedCart.reservedBy = null;
+        pushedCart = null;
+        Activity = GathererActivity.Idle;
+        SetCarrying(false);
+    }
+
+    // Tutulup bırakıldıktan sonra yeni yerindeki zemine göre yükseklik farkı korunur.
+    public void SnapToGround()
+    {
+        var position = transform.position;
+        if (TryGetGroundHeight(position, out float groundY))
+            transform.position = new Vector3(position.x, groundY + heightOffset, position.z);
+    }
+
+    IEnumerator WanderLoop(Vector3 anchor)
+    {
+        while (!ready)
+            yield return null;
         while (true)
         {
+            Activity = GathererActivity.Idle;
+            yield return new WaitForSeconds(Random.Range(wanderPause.x, wanderPause.y));
+            var offset = Random.insideUnitCircle * wanderRadius;
+            var target = anchor + new Vector3(offset.x, 0f, offset.y);
+            if (NavMesh.SamplePosition(target, out var hit, 3f, NavMesh.AllAreas))
+                target = hit.position;
+            yield return TravelTo(target, 0.3f);
+        }
+    }
+
+    IEnumerator PushLoop(Gatherer cart)
+    {
+        while (!ready)
+            yield return null;
+        // Vagonun arkasına yürür, sonra vagonla birlikte hareket eder.
+        yield return TravelTo(BehindCart(cart), 0.4f);
+        yield return FaceTarget(cart.transform.position);
+        cart.Pusher = this;
+        Activity = GathererActivity.Pushing;
+        while (cart != null)
+        {
+            var target = BehindCart(cart);
+            if (TryGetGroundHeight(target, out float groundY))
+                target.y = groundY + heightOffset;
+            transform.position = Vector3.Lerp(transform.position, target, 1f - Mathf.Exp(-12f * Time.deltaTime));
+            var forward = cart.transform.position - transform.position;
+            forward.y = 0f;
+            if (forward.sqrMagnitude > 0.01f)
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(forward), turnSpeed * Time.deltaTime);
+            yield return null;
+        }
+    }
+
+    Vector3 BehindCart(Gatherer cart)
+    {
+        var back = -cart.transform.forward;
+        back.y = 0f;
+        return cart.transform.position + back.normalized * pushDistance;
+    }
+
+    // ---------------------------------------------------------------- Toplama döngüsü
+
+    IEnumerator WorkLoop()
+    {
+        while (!ready)
+            yield return null;
+        while (true)
+        {
+            yield return WaitForPusher();
             var well = Well.Instance;
             var node = home != null ? home : ResourceNode.FindNearestFree(resourceType, transform.position);
             CurrentTarget = node;
@@ -73,6 +273,7 @@ public class Gatherer : MonoBehaviour
             }
 
             node.Claim(this);
+            claimed = node;
             if (path.Length > 0)
             {
                 yield return TravelTo(path[0], PathStopDistance);
@@ -102,6 +303,7 @@ public class Gatherer : MonoBehaviour
                 continue;
             int carried = node.Harvest(carryCapacity);
             node.Release(this);
+            claimed = null;
             CurrentTarget = null;
             SetCarrying(carried > 0);
             for (int i = path.Length - 2; i >= 0; i--)
@@ -118,6 +320,16 @@ public class Gatherer : MonoBehaviour
             SetCarrying(false);
             if (well != null)
                 well.Throw(resourceType, carried, transform.position + Vector3.up);
+        }
+    }
+
+    // Vagon: iten köylü yoksa olduğu yerde bekler.
+    IEnumerator WaitForPusher()
+    {
+        while (needsPusher && Pusher == null)
+        {
+            Activity = GathererActivity.Idle;
+            yield return null;
         }
     }
 
@@ -146,6 +358,7 @@ public class Gatherer : MonoBehaviour
     {
         while (true)
         {
+            yield return WaitForPusher();
             var toTarget = target - transform.position;
             toTarget.y = 0f;
             if (toTarget.magnitude <= distance)
@@ -190,7 +403,8 @@ public class Gatherer : MonoBehaviour
             var hit = groundHits[i];
             if (hit.transform.IsChildOf(transform)
                 || hit.collider.GetComponentInParent<ResourceNode>() != null
-                || hit.collider.GetComponentInParent<Well>() != null)
+                || hit.collider.GetComponentInParent<Well>() != null
+                || hit.collider.GetComponentInParent<Gatherer>() != null)
                 continue;
             if (hit.distance < bestDistance)
             {

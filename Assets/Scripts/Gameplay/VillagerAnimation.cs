@@ -24,6 +24,7 @@ public sealed class VillagerAnimation : MonoBehaviour
 
     public bool IsWalking { get; private set; }
     public bool IsChopping { get; private set; }
+    public bool IsPushing { get; private set; }
 
     void Awake() => Initialize();
 
@@ -54,7 +55,8 @@ public sealed class VillagerAnimation : MonoBehaviour
         var delta = transform.position - previousPosition;
         previousPosition = transform.position;
         delta.y = 0f;
-        IsWalking = gatherer.isActiveAndEnabled && gatherer.Activity == GathererActivity.Walking &&
+        IsPushing = gatherer.isActiveAndEnabled && gatherer.Activity == GathererActivity.Pushing;
+        IsWalking = gatherer.isActiveAndEnabled && (gatherer.Activity == GathererActivity.Walking || IsPushing) &&
                     delta.sqrMagnitude > 0.000001f;
         IsChopping = gatherer.isActiveAndEnabled && gatherer.Activity == GathererActivity.Harvesting &&
                      gatherer.Type == ResourceType.Wood && gatherer.CurrentTarget != null &&
@@ -74,15 +76,16 @@ public sealed class VillagerAnimation : MonoBehaviour
         visualRoot.localPosition = Vector3.Lerp(visualRoot.localPosition,
             bodyPosition + Vector3.up * (IsWalking ? Mathf.Abs(Mathf.Sin(walkPhase)) * walkBob : 0f), blend);
         // The supplied model faces local -X and its shoulders run along Z.
-        Pose(leftArm, leftArmRest, IsChopping ? lift : -swing * 0.7f, blend);
-        Pose(rightArm, rightArmRest, IsChopping ? lift : swing * 0.7f, blend);
+        // Vagonu iterken kollar öne uzanır.
+        Pose(leftArm, leftArmRest, IsChopping ? lift : IsPushing ? -80f : -swing * 0.7f, blend);
+        Pose(rightArm, rightArmRest, IsChopping ? lift : IsPushing ? -80f : swing * 0.7f, blend);
         Pose(leftLeg, leftLegRest, swing, blend);
         Pose(rightLeg, rightLegRest, -swing, blend);
     }
 
     void OnDisable()
     {
-        IsWalking = IsChopping = false;
+        IsWalking = IsChopping = IsPushing = false;
         if (!initialized)
             return;
         visualRoot.SetLocalPositionAndRotation(bodyPosition, bodyRest);

@@ -22,6 +22,7 @@ public static class SampleSceneSetup
         {
             VillagerPrefabSetup.UpgradeScene(scene);
             EnsureGridForest(scene);
+            EnsureVillagerJobs(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -73,6 +74,7 @@ public static class SampleSceneSetup
         grid.AddComponent<NavIgnore>();
         VillagerPrefabSetup.UpgradeScene(scene);
         EnsureGridForest(scene);
+        EnsureVillagerJobs(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -186,6 +188,50 @@ public static class SampleSceneSetup
             return tile;
         var original = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Meshes/WorldMeshes/{tile.name.Substring(0, tile.name.Length - 4)}.obj");
         return original != null ? original : tile;
+    }
+
+    // Köylüleri elle işe koyma: oduncular işsiz köylü olarak başlar (köyde dolaşır), oyuncu onları imleçle tutup
+    // ormana (oduncu) ya da maden ocağına (vagonu iter) bırakır. Vagonlar iten köylü olmadan beklemede kalır
+    // (GathererSpawner.needsPusher, varsayılan açık). İmleç dokuları Art/UI/make_menu_sprites.py ile çizilir.
+    const string CursorDir = "Assets/UI/Cursor/";
+
+    public static bool EnsureVillagerJobs(Scene scene)
+    {
+        var camera = Find<IsometricCamera>(scene);
+        if (camera == null)
+            return false;
+        var picker = camera.GetComponent<VillagerPicker>();
+        if (picker == null)
+            picker = camera.gameObject.AddComponent<VillagerPicker>();
+        var settings = new SerializedObject(picker);
+        settings.FindProperty("openHand").objectReferenceValue = CursorTexture("HandOpen.png");
+        settings.FindProperty("closedHand").objectReferenceValue = CursorTexture("HandClosed.png");
+        settings.ApplyModifiedPropertiesWithoutUndo();
+
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (var worker in root.GetComponentsInChildren<Gatherer>(true))
+            {
+                if (worker.Type != ResourceType.Wood || worker.GetComponent<VillagerAnimation>() == null)
+                    continue;
+                var workerSettings = new SerializedObject(worker);
+                workerSettings.FindProperty("villager").boolValue = true;
+                workerSettings.ApplyModifiedPropertiesWithoutUndo();
+            }
+        return true;
+    }
+
+    static Texture2D CursorTexture(string file)
+    {
+        var path = CursorDir + file;
+        if (AssetImporter.GetAtPath(path) is TextureImporter importer && importer.textureType != TextureImporterType.Cursor)
+        {
+            importer.textureType = TextureImporterType.Cursor;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     public static void RestoreTerrainColor()

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // Kaynak kendi toplayıcılarını üretir (örn. her maden ocağı kendi vagonunu). Toplayıcı yalnız bu kaynağa çalışır.
@@ -7,6 +8,21 @@ public class GathererSpawner : MonoBehaviour
 {
     [SerializeField] Gatherer prefab;
     [SerializeField] int count = 1;
+    [Tooltip("Üretilen toplayıcılar (vagonlar) yalnız bir köylü iterken ilerler.")]
+    [SerializeField] bool needsPusher = true;
+
+    readonly List<Gatherer> spawned = new();
+
+    public IReadOnlyList<Gatherer> Spawned => spawned;
+
+    // Kimsenin itmediği ve kimsenin ona yürümediği ilk vagon (yoksa null).
+    public Gatherer FreeCart()
+    {
+        foreach (var cart in spawned)
+            if (cart != null && !cart.IsReserved)
+                return cart;
+        return null;
+    }
 
     void Start()
     {
@@ -24,6 +40,8 @@ public class GathererSpawner : MonoBehaviour
             var gatherer = Instantiate(prefab, start.position - inward.normalized * (i * 2.5f), rotation);
             gatherer.name = $"{prefab.name} ({name})";
             gatherer.SetHome(node);
+            gatherer.NeedsPusher = needsPusher;
+            spawned.Add(gatherer);
         }
     }
 }

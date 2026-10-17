@@ -97,6 +97,37 @@ def scrim(name, w, h):
     img.save(os.path.join(OUT, name))
 
 
+def hand(name, closed, size=48):
+    # Köylüyü tutma imleci: krem el, lacivert kontur. Açık: parmaklar uzun ve aralıklı; kapalı: yumruk.
+    S = size * SS
+    mask = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(mask)
+    u = S / 48
+    d.rounded_rectangle((12 * u, 20 * u, 38 * u, 44 * u), 7 * u, fill=255)  # avuç
+    fingers = [(12, 5), (19, 2), (26, 3), (33, 7)] if not closed else [(12, 15), (19, 13), (26, 13), (33, 15)]
+    for x, top in fingers:
+        d.rounded_rectangle((x * u, top * u, (x + 6) * u, 28 * u), 3 * u, fill=255)
+    if closed:
+        d.rounded_rectangle((6 * u, 24 * u, 17 * u, 32 * u), 4 * u, fill=255)  # içe kıvrık başparmak
+    else:
+        d.polygon([(13 * u, 30 * u), (4 * u, 22 * u), (7 * u, 18 * u), (16 * u, 25 * u)], fill=255)  # açık başparmak
+        d.ellipse((3 * u, 17 * u, 9 * u, 23 * u), fill=255)
+    outline = mask.filter(ImageFilter.MaxFilter(int(5 * u) | 1))
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    img.paste(Image.new("RGBA", (S, S), hex_rgba("0B2A3D")), (0, 0), outline)
+    img.paste(Image.new("RGBA", (S, S), hex_rgba("FFF4DC")), (0, 0), mask)
+    # Parmak araları (kapalı elde boğum çizgileri).
+    lines = ImageDraw.Draw(img)
+    for x, top in fingers[1:]:
+        lines.line((x * u - 0.5 * u, (top + 4) * u, x * u - 0.5 * u, 27 * u), fill=hex_rgba("0B2A3D"), width=int(1.5 * u))
+    img = img.resize((size, size), Image.LANCZOS)
+    os.makedirs(CURSOR_OUT, exist_ok=True)
+    img.save(os.path.join(CURSOR_OUT, name))
+
+
+CURSOR_OUT = os.path.join(os.path.dirname(__file__), "..", "..", "Assets", "UI", "Cursor")
+
+
 def circle(name, size):
     img = canvas(size)
     ImageDraw.Draw(img).ellipse((0, 0, size * SS - 1, size * SS - 1), fill="white")
@@ -197,3 +228,5 @@ if __name__ == "__main__":
     chamfer_sprite("Panel.png", 96, 96, 16, [(0, 96, (255, 255, 255, 255))])
     chamfer_sprite("Bar.png", 64, 20, 5, [(0, 20, (255, 255, 255, 255))])
     scrim("Scrim.png", 128, 128)
+    hand("HandOpen.png", False)
+    hand("HandClosed.png", True)

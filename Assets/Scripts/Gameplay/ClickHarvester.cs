@@ -23,6 +23,9 @@ public class ClickHarvester : MonoBehaviour
         var mouse = Mouse.current;
         if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
             return;
+        // Köylü tutuluyorsa ya da imleç bir köylünün üzerindeyse tıklama onundur.
+        if (VillagerPicker.Busy)
+            return;
         construction ??= FindAnyObjectByType<WallConstructionController>();
         if (construction != null && construction.ConstructionModeActive)
             return;

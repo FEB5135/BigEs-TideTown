@@ -34,6 +34,13 @@ Son güncelleme: 2026-10-17 (14:45)
 
 ## Son durum (yapılanlar)
 
+- **Köylüleri elle işe koyma (2026-10-17, `feature/villager-jobs`, `fix/tree-cell-ground` + güncel main'den; push edilmedi):** Tomodachi Life tarzı.
+  - SampleScene'deki 5 oduncu artık işsiz köylü (`Gatherer.villager`): başta bulunduğu yerin 5 m çevresinde dolaşır.
+  - `Assets/Scripts/Gameplay/VillagerPicker.cs` (Main Camera'da): imleç köylünün üzerine (ya da ekranda ~32 px yakınına; uzaktan küçük göründükleri için) gelince açık el, sol tıkla tutunca kapalı el (`Assets/UI/Cursor/HandOpen/HandClosed.png`, yazılımsal imleç). Tutulan köylü imleci 3 m yukarıda takip eder, sallanır. Bırakınca: bir maden ocağının (kaya ya da ray başı) 12 m yakınındaysa ve ocağın boşta vagonu varsa vagonu iter; bir ağacın 6 m yakınındaysa oduncu olur; yoksa orada dolaşır. Menü açıkken ve inşa modunda kapalı; köylü üzerindeyken tıklayarak toplama çalışmaz (`VillagerPicker.Busy`).
+  - Vagonlar (`GathererSpawner.needsPusher`, varsayılan açık) iten köylü olmadan bekler; köylü vagonun arkasına yürür, vagonla birlikte hareket eder (kollar önde, `GathererActivity.Pushing`), vagon madene girip taşla kuyuya döner, sürekli. Köylü tutulursa vagon olduğu yerde durur. Bir vagonu aynı anda tek köylü sahiplenir.
+  - Gatherer döngüsü yeniden başlatılabilir oldu: `Wander`, `WorkInForest`, `PushCart`, `Stop`.
+  - Play'de doğrulandı: köylü tutulup bırakıldı, ormana bırakılan odun getirdi (5), ocağa bırakılan vagonu itti (8 taş), diğer vagonlar bekledi, konsol temiz. Vagon itme sahnesi yakından gözle incelenmedi.
+
 - **Ocak/vagon renkleri (2026-10-17):** Ekip `29cf5f4 Mountains` ile `palette.png`'nin 5–7 ve bizim 57/59/61. sütunlarımızı (ahşap/sarı/kırmızı) beyaza boyadı; ocak ve vagonlar renksiz kaldı. Bizim modeller artık ekip paletinden bağımsız: `Assets/Textures/EconomyPalette.png` (paletin o sabahki hali) + `Assets/Materials/EconomyFlat.mat`; `Quarry.prefab`, `MineCart.prefab` ve `EconomyPrefabs.cs` bunu kullanır. Ekip paleti değiştirse de bozulmaz. (Not: Blender scriptleri `Art/Blender/shapes.py` hâlâ aynı sütun düzenini kullanıyor; EconomyPalette ile uyumlu.)
 
 - **Ana menü yeniden tasarımı (2026-10-17, `feature/menu-redesign`, main'den; push edilmedi):** Kullanıcıyla konuşulan UI rehberine göre (Crossy Road tarzı). Yalnız `MainMenuSetup` ve sprite'lar değişti, `MainMenu`/`PressableButton` davranışı aynı. SampleScene'de menü yeniden kuruldu.
