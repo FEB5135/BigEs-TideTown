@@ -138,16 +138,50 @@ namespace Tsunami.EditorTools
                 sim.Solver.VelocityZ[i] = 30f;
                 typeof(WaterSimulation).GetMethod("SampleWallLoads", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(sim, new object[] { 1f });
+                Require(wall.Edges.Count == 2 && adapter.WallSegments == 2, "A single impact instantly removed a wall.");
+                var fracture = instance.GetComponent<WallDamageVisual>();
+                Require(fracture != null && fracture.FragmentCount == 12, "Intermediate damage did not reveal cracks/fragments.");
+                // A soft water reset preserves damage; a full scenario reset restores standing walls' visuals.
+                sim.ResetWater();
+                Require(fracture.SourceRenderers.All(r => !r.enabled), "Water-only reset unexpectedly repaired a damaged wall.");
+                Find<TsunamiController>(scene).ResetSimulation();
+                Require(fracture.SourceRenderers.All(r => r.enabled), "Scenario reset did not restore intact wall visuals.");
+                sim.Solver.Depth[i] = 1f;
+                sim.Solver.VelocityZ[i] = 30f;
+                for (int hit = 0; hit < 8; hit++)
+                    typeof(WaterSimulation).GetMethod("SampleWallLoads", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(sim, new object[] { .5f });
                 typeof(TeamMapTsunamiAdapter).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(adapter, null);
                 Require(wall.Edges.Count == 1 && adapter.WallSegments == 1, "Damaged segment did not break independently.");
                 Require(!wall.TryGetWallInstance(edge, out _), "Broken segment is still registered in construction.");
                 Require(float.IsNegativeInfinity(sim.Solver.BarrierZ[i]), "Broken segment left an invisible water barrier.");
                 Require(!float.IsNegativeInfinity(sim.Solver.BarrierZ[i + 1]), "Neighbouring wall barrier was removed.");
-                Require(instance != null && instance.GetComponent<Rigidbody>() != null, "Broken wall did not become physical debris.");
+                Require(UnityEngine.Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None)
+                    .Any(body => body.name.StartsWith("Wall fracture")), "Broken wall did not create physical fragments.");
+                Require(UnityEngine.Object.FindObjectsByType<Rigidbody>(FindObjectsSortMode.None)
+                    .Where(body => body.name.StartsWith("Wall fracture")).All(body => body.isKinematic), "Paused debris continued simulating.");
                 Require(wall.TryBuild(a, b, out reason), "Cannot rebuild broken edge: " + reason);
                 Require(adapter.WallSegments == 2, "Rebuilt segment did not restore the water barrier.");
-                Debug.Log("[CollisionIntegration] RUNTIME PASS: real team map build -> water registration -> sampled load -> damage -> debris -> barrier removal; neighbour preserved; same edge rebuilt.");
+                Require(wall.TryBuild(a, b, 0, WallTier.Reinforced, out reason), reason);
+                Require(adapter.WallSegments == 2, "Tier upgrade leaked a duplicate water registration.");
+                Require(wall.TryBuild(a, b, 1, WallTier.Stone, out reason), reason);
+                Require(wall.TryBuild(a, b, 2, WallTier.Timber, out reason), reason);
+                Require(adapter.WallSegments == 4, "Upper floors were not registered separately.");
+                Require(wall.TryGetWallInstance(edge, 1, out var upper), "Upper-floor instance lookup failed.");
+                for (int hit = 0; hit < 100; hit++)
+                    typeof(WaterSimulation).GetMethod("SampleWallLoads", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(sim, new object[] { .001f });
+                Require(upper.GetComponent<WallDamageVisual>().FragmentCount == 0, "Water below a floor damaged that upper floor.");
+                Require(wall.TryDetachDestroyedWall(edge, 1, out _), "Upper-floor removal failed.");
+                Require(adapter.WallSegments == 2 && wall.Walls.Count == 2, "Removing an upper floor removed its base or left unsupported floors.");
+                Require(!float.IsNegativeInfinity(sim.Solver.BarrierZ[i]), "Upper-floor removal erased the surviving base barrier.");
+                Require(wall.TryBuild(a, b, 1, WallTier.Stone, out reason), reason);
+                Require(wall.TryBuild(a, b, 2, WallTier.Timber, out reason), reason);
+                Require(wall.TryDetachDestroyedWall(edge, 0, out _), "Base removal failed.");
+                Require(adapter.WallSegments == 1 && wall.Walls.Count == 1, "Base collapse left floating floors or removed its neighbour.");
+                Require(float.IsNegativeInfinity(sim.Solver.BarrierZ[i]), "Collapsed stack left a ghost barrier.");
+                Debug.Log("[CollisionIntegration] RUNTIME PASS: staged cracks before failure; bounded physical fragments; build/break/rebuild; timber/stone/reinforced upgrades; separate floor barriers; dry upper floor; top-down support collapse; neighbour preserved.");
                 SessionState.SetBool(SmokeKey, false);
                 EditorApplication.Exit(0);
             }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using IdleTown.Construction;
 using UnityEngine;
@@ -59,15 +60,18 @@ namespace Tsunami
         bool applying;
         Rect mapRectGrid; // World rectangle in grid cell indices
         TsunamiController tsunamiController;
-        readonly Dictionary<WallEdge, SegmentState> segments = new Dictionary<WallEdge, SegmentState>();
+        readonly Dictionary<(WallEdge edge, int floor), SegmentState> segments = new Dictionary<(WallEdge edge, int floor), SegmentState>();
         readonly Dictionary<WallSegmentHandle, SegmentState> segmentsByHandle = new Dictionary<WallSegmentHandle, SegmentState>();
-        readonly List<WallEdge> pendingBreaks = new List<WallEdge>();
-        readonly List<WallEdge> reconcileRemovals = new List<WallEdge>();
+        readonly List<(WallEdge edge, int floor)> pendingBreaks = new List<(WallEdge edge, int floor)>();
+        readonly List<(WallEdge edge, int floor)> reconcileRemovals = new List<(WallEdge edge, int floor)>();
         readonly List<DebrisRecord> debris = new List<DebrisRecord>();
 
         sealed class SegmentState
         {
             public WallEdge edge;
+            public int floor;
+            public WallTier tier;
+            public WallDamageVisual visual;
             public WallSegmentHandle handle;
             public readonly WallDamageState damage = new WallDamageState();
             public WallFaceImpactSample lastImpact;
@@ -112,8 +116,8 @@ namespace Tsunami
                 wallController = world.GetComponentInParent<WallConstructionController>() ??
                                  world.GetComponentInChildren<WallConstructionController>(true);
             if (wallController == null) return;
-            wallController.WallBuilt += OnWallBuilt;
-            wallController.WallRemoved += OnWallRemoved;
+            wallController.WallTierBuilt += OnWallBuilt;
+            wallController.WallTierRemoved += OnWallRemoved;
             simulation.WallLoadSampled += OnWallLoad;
             simulation.WallFaceImpactSampled += OnWallFaceImpact;
             simulation.WallRegistryInvalidated += OnWallRegistryInvalidated;
@@ -128,8 +132,8 @@ namespace Tsunami
         {
             if (subscribed && wallController != null)
             {
-                wallController.WallBuilt -= OnWallBuilt;
-                wallController.WallRemoved -= OnWallRemoved;
+                wallController.WallTierBuilt -= OnWallBuilt;
+                wallController.WallTierRemoved -= OnWallRemoved;
             }
             if (subscribed && simulation != null) simulation.WallLoadSampled -= OnWallLoad;
             if (subscribed && simulation != null) simulation.WallFaceImpactSampled -= OnWallFaceImpact;
@@ -147,9 +151,9 @@ namespace Tsunami
         {
             for (int i = 0; i < pendingBreaks.Count; i++)
             {
-                WallEdge edge = pendingBreaks[i];
-                if (wallController != null && wallController.TryDetachDestroyedWall(edge, out _)) continue;
-                if (segments.TryGetValue(edge, out SegmentState state)) state.breakQueued = false;
+                var key = pendingBreaks[i];
+                if (wallController != null && wallController.TryDetachDestroyedWall(key.edge, key.floor, out _)) continue;
+                if (segments.TryGetValue(key, out SegmentState state)) state.breakQueued = false;
             }
             pendingBreaks.Clear();
 
@@ -312,21 +316,22 @@ namespace Tsunami
             return p;
         }
 
-        void OnWallBuilt(WallEdge edge, GameObject instance)
+        void OnWallBuilt(WallRecord record, GameObject instance)
         {
-            AddWall(edge, instance);
+            AddWall(record, instance);
         }
 
-        bool OnWallRemoved(WallEdge edge, GameObject instance)
+        bool OnWallRemoved(WallRecord record, GameObject instance)
         {
-            if (!segments.TryGetValue(edge, out SegmentState state))
+            var key = (record.Edge, record.Floor);
+            if (!segments.TryGetValue(key, out SegmentState state))
             {
                 if (instance != null) Destroy(instance);
                 return true;
             }
             simulation.RemoveWallSegment(state.handle);
             segmentsByHandle.Remove(state.handle);
-            segments.Remove(edge);
+            segments.Remove(key);
             WallSegments = Mathf.Max(0, WallSegments - 1);
             CreateDebris(instance, state);
             return true;
@@ -336,10 +341,13 @@ namespace Tsunami
         {
             if (!segmentsByHandle.TryGetValue(sample.Handle, out SegmentState state) || state.breakQueued) return;
             state.lastLoad = sample;
-            if (!state.damage.Apply(sample.ImpactForceNewtons, sample.SustainedForceNewtons,
-                    sample.SolverTimestep, wallDamage, out _, out _)) return;
+            var settings = SettingsFor(state.tier);
+            bool broken = state.damage.Apply(sample.ImpactForceNewtons, sample.SustainedForceNewtons,
+                    sample.SolverTimestep, settings, out _, out _);
+            if (state.visual != null) state.visual.SetDamage(state.damage.Damage / settings.durability);
+            if (!broken) return;
             state.breakQueued = true;
-            pendingBreaks.Add(state.edge);
+            pendingBreaks.Add((state.edge, state.floor));
         }
 
         void OnWallFaceImpact(WallFaceImpactSample sample)
@@ -359,54 +367,76 @@ namespace Tsunami
             WallSegments = 0;
             if (!Application.isPlaying || wallController == null) return;
             ReconcileSegmentStates();
-            foreach (WallEdge edge in wallController.Edges)
+            foreach (WallRecord record in wallController.Walls)
             {
-                wallController.TryGetWallInstance(edge, out GameObject instance);
-                AddWall(edge, instance);
+                wallController.TryGetWallInstance(record.Edge, record.Floor, out GameObject instance);
+                AddWall(record, instance);
             }
         }
 
         void ReconcileSegmentStates()
         {
             reconcileRemovals.Clear();
-            foreach (WallEdge tracked in segments.Keys)
+            foreach (var tracked in segments.Keys)
             {
                 bool found = false;
-                foreach (WallEdge live in wallController.Edges)
-                    if (tracked.Equals(live)) { found = true; break; }
+                foreach (WallRecord live in wallController.Walls)
+                    if (tracked.edge.Equals(live.Edge) && tracked.floor == live.Floor) { found = true; break; }
                 if (!found) reconcileRemovals.Add(tracked);
             }
             for (int i = 0; i < reconcileRemovals.Count; i++) segments.Remove(reconcileRemovals[i]);
             reconcileRemovals.Clear();
         }
 
-        void AddWall(WallEdge edge, GameObject instance)
+        void AddWall(WallRecord record, GameObject instance)
         {
+            var edge = record.Edge;
+            var key = (edge, record.Floor);
             float top = world.transform.position.y + fallbackWallHeight;
+            float bottom = world.transform.position.y + record.Floor * fallbackWallHeight;
             if (instance != null)
             {
-                var renderers = instance.GetComponentsInChildren<Renderer>();
+                var existingVisual = instance.GetComponent<WallDamageVisual>();
+                var renderers = existingVisual != null ? existingVisual.SourceRenderers : instance.GetComponentsInChildren<Renderer>();
                 if (renderers.Length > 0)
                 {
                     top = float.NegativeInfinity;
-                    foreach (var r in renderers) top = Mathf.Max(top, r.bounds.max.y);
+                    bottom = float.PositiveInfinity;
+                    foreach (var r in renderers) { top = Mathf.Max(top, r.bounds.max.y); bottom = Mathf.Min(bottom, r.bounds.min.y); }
                 }
             }
-            WallSegmentHandle handle = simulation.AddWallSegment(NodePosition(edge.A), NodePosition(edge.B), top);
+            // Upgrading/rebinding replaces an owner's old barrier rather than leaking a duplicate crest.
+            if (segments.TryGetValue(key, out var previous) && previous.handle.IsValid)
+                simulation.RemoveWallSegment(previous.handle);
+            WallSegmentHandle handle = simulation.AddWallSegment(NodePosition(edge.A), NodePosition(edge.B), top, bottom);
             if (!handle.IsValid) return;
-            if (!segments.TryGetValue(edge, out SegmentState state))
+            if (!segments.TryGetValue(key, out SegmentState state))
             {
-                state = new SegmentState { edge = edge };
-                segments.Add(edge, state);
+                state = new SegmentState { edge = edge, floor = record.Floor, tier = record.Tier };
+                segments.Add(key, state);
             }
             else if (state.handle.IsValid)
             {
                 segmentsByHandle.Remove(state.handle);
             }
             state.handle = handle;
+            if (state.tier != record.Tier) state.damage.Reset();
+            state.tier = record.Tier;
+            if (instance != null)
+            {
+                state.visual = instance.GetComponent<WallDamageVisual>() ?? instance.AddComponent<WallDamageVisual>();
+                state.visual.SetDamage(state.damage.Damage / SettingsFor(state.tier).durability);
+            }
             state.breakQueued = false;
             segmentsByHandle[handle] = state;
-            WallSegments++;
+            WallSegments = segmentsByHandle.Count;
+        }
+
+        WallDamageSettings SettingsFor(WallTier tier)
+        {
+            var settings = wallDamage.Validated();
+            settings.durability *= tier == WallTier.Reinforced ? 3.5f : tier == WallTier.Stone ? 2f : 1f;
+            return settings;
         }
 
         void ResetStandingWallDamage()
@@ -414,6 +444,7 @@ namespace Tsunami
             foreach (SegmentState state in segments.Values)
             {
                 state.damage.Reset();
+                if (state.visual != null) state.visual.SetDamage(0f);
                 state.breakQueued = false;
             }
             pendingBreaks.Clear();
@@ -422,87 +453,40 @@ namespace Tsunami
 
         void CreateDebris(GameObject instance, SegmentState state)
         {
-            if (instance == null || maxDebris <= 0)
-            {
-                if (instance != null) Destroy(instance);
-                return;
-            }
-            while (debris.Count >= maxDebris)
-            {
-                DebrisRecord oldest = debris[0];
-                if (oldest.gameObject != null) Destroy(oldest.gameObject);
-                debris.RemoveAt(0);
-            }
-            Collider[] originalColliders = instance.GetComponentsInChildren<Collider>(true);
-            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
-            bool hasBounds = false;
-            Vector3 localMin = Vector3.zero, localMax = Vector3.zero;
-            for (int i = 0; i < renderers.Length; i++)
-                IncludeWorldBounds(renderers[i].bounds, instance.transform, ref hasBounds, ref localMin, ref localMax);
-            if (!hasBounds)
-            {
-                for (int i = 0; i < originalColliders.Length; i++)
-                    IncludeWorldBounds(originalColliders[i].bounds, instance.transform, ref hasBounds, ref localMin, ref localMax);
-            }
-            for (int i = 0; i < originalColliders.Length; i++) originalColliders[i].enabled = false;
-
-            // Dynamic non-convex MeshColliders are unsupported. Every broken segment gets one cheap conservative
-            // root box; intact static wall colliders are never modified.
-            BoxCollider debrisCollider = instance.GetComponent<BoxCollider>();
-            if (debrisCollider == null) debrisCollider = instance.AddComponent<BoxCollider>();
-            debrisCollider.center = hasBounds ? (localMin + localMax) * 0.5f : Vector3.zero;
-            Vector3 proxySize = hasBounds ? localMax - localMin : Vector3.one;
-            debrisCollider.size = new Vector3(
-                Mathf.Max(0.02f, proxySize.x),
-                Mathf.Max(0.02f, proxySize.y),
-                Mathf.Max(0.02f, proxySize.z));
-            debrisCollider.isTrigger = false;
-            debrisCollider.enabled = true;
-            Rigidbody body = instance.GetComponent<Rigidbody>();
-            if (body == null) body = instance.AddComponent<Rigidbody>();
-            body.isKinematic = false;
-            body.mass = 25f;
-            body.linearDamping = 0.6f;
-            body.angularDamping = 0.8f;
+            if (instance == null) return;
+            if (maxDebris <= 0) { Destroy(instance); return; }
+            // Disable the intact collider immediately; the root is discarded after its pieces detach.
+            foreach (var collider in instance.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
+            var visual = state.visual != null ? state.visual : instance.AddComponent<WallDamageVisual>();
+            var pieces = visual.DetachFragments();
             WallLoadSample load = state.lastLoad;
-            float effectiveLoad = Mathf.Max(load.ImpactForceNewtons, load.SustainedForceNewtons * 0.25f);
-            float impulse = Mathf.Min(18f, effectiveLoad * 0.001f * debrisImpulseScale);
-            Vector3 direction = load.LoadNormal.sqrMagnitude > 0.5f ? load.LoadNormal : instance.transform.right;
-            Vector3 position = load.SolverTimestep > 0f
-                ? load.LoadPosition
-                : (NodePosition(state.edge.A) + NodePosition(state.edge.B)) * 0.5f + Vector3.up * (fallbackWallHeight * 0.5f);
-            body.AddForceAtPosition((direction + Vector3.up * 0.35f) * impulse, position,
-                ForceMode.Impulse);
-            body.AddTorque(new Vector3(direction.z, 0.4f, -direction.x) * impulse * 0.25f,
-                ForceMode.Impulse);
-            debris.Add(new DebrisRecord { gameObject = instance, body = body, remaining = debrisLifetime });
-        }
-
-        static void IncludeWorldBounds(Bounds bounds, Transform root, ref bool hasBounds,
-            ref Vector3 localMin, ref Vector3 localMax)
-        {
-            Vector3 min = bounds.min, max = bounds.max;
-            for (int x = 0; x < 2; x++)
-                for (int y = 0; y < 2; y++)
-                    for (int z = 0; z < 2; z++)
+            float effectiveLoad = Mathf.Max(load.ImpactForceNewtons, load.SustainedForceNewtons * .25f);
+            float impulse = Mathf.Clamp(effectiveLoad * .001f * debrisImpulseScale, .2f, 6f);
+            Vector3 direction = load.LoadNormal.sqrMagnitude > .5f ? load.LoadNormal : instance.transform.right;
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                var piece = pieces[i];
+                if (!piece) continue;
+                while (debris.Count >= maxDebris)
+                {
+                    if (debris[0].gameObject != null)
                     {
-                        Vector3 local = root.InverseTransformPoint(new Vector3(
-                            x == 0 ? min.x : max.x,
-                            y == 0 ? min.y : max.y,
-                            z == 0 ? min.z : max.z));
-                        if (!hasBounds)
-                        {
-                            localMin = localMax = local;
-                            hasBounds = true;
-                        }
-                        else
-                        {
-                            localMin = Vector3.Min(localMin, local);
-                            localMax = Vector3.Max(localMax, local);
-                        }
+                        debris[0].gameObject.SetActive(false);
+                        Destroy(debris[0].gameObject);
                     }
+                    debris.RemoveAt(0);
+                }
+                var body = piece.AddComponent<Rigidbody>();
+                body.mass = 2f;
+                body.linearDamping = .6f;
+                body.angularDamping = .8f;
+                body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                body.AddForce((direction + Vector3.up * (.35f + i % 3 * .12f)) * impulse, ForceMode.Impulse);
+                body.AddTorque(new Vector3(direction.z, .4f, -direction.x) * impulse * (i % 2 == 0 ? .25f : -.25f), ForceMode.Impulse);
+                debris.Add(new DebrisRecord { gameObject = piece, body = body, remaining = debrisLifetime });
+            }
+            Destroy(instance);
         }
-
         void ClearDebris()
         {
             for (int i = 0; i < debris.Count; i++)

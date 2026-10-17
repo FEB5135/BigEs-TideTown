@@ -35634,6 +35634,12 @@ MonoBehaviour:
   obstaclePadding: 0.04
   woodCost: 1
   stoneCost: 1
+  stoneTierWoodCost: 3
+  stoneTierStoneCost: 4
+  reinforcedWoodCost: 6
+  reinforcedStoneCost: 6
+  floorZeroBaseHeight: 0
+  maxFloors: 3
   constructionModeActive: 0
   wallHeight: 1.25
   wallThickness: 0.18
@@ -77415,6 +77421,7 @@ MonoBehaviour:
     impactDamagePerKilonewtonSecond: 0.32
     sustainedThresholdKilonewtons: 12
     sustainedDamagePerKilonewtonSecond: 0.055
+    minimumFailureSeconds: 3
   maxDebris: 20
   debrisLifetime: 8
   debrisImpulseScale: 0.18

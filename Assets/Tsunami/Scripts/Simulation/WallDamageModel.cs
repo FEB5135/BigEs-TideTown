@@ -89,6 +89,7 @@ namespace Tsunami
         public float impactDamagePerKilonewtonSecond;
         public float sustainedThresholdKilonewtons;
         public float sustainedDamagePerKilonewtonSecond;
+        public float minimumFailureSeconds;
 
         public static WallDamageSettings Default => new WallDamageSettings
         {
@@ -96,7 +97,8 @@ namespace Tsunami
             impactThresholdKilonewtons = 6f,
             impactDamagePerKilonewtonSecond = 0.32f,
             sustainedThresholdKilonewtons = 12f,
-            sustainedDamagePerKilonewtonSecond = 0.055f
+            sustainedDamagePerKilonewtonSecond = 0.055f,
+            minimumFailureSeconds = 3f
         };
 
         public WallDamageSettings Validated()
@@ -111,6 +113,7 @@ namespace Tsunami
             value.impactDamagePerKilonewtonSecond = Math.Max(0f, value.impactDamagePerKilonewtonSecond);
             value.sustainedThresholdKilonewtons = Math.Max(0f, value.sustainedThresholdKilonewtons);
             value.sustainedDamagePerKilonewtonSecond = Math.Max(0f, value.sustainedDamagePerKilonewtonSecond);
+            value.minimumFailureSeconds = value.minimumFailureSeconds > 0f ? value.minimumFailureSeconds : 3f;
             return value;
         }
     }
@@ -137,6 +140,14 @@ namespace Tsunami
                            settings.impactDamagePerKilonewtonSecond * solverDt;
             sustainedDamage = Math.Max(0f, sustainedKilonewtons - settings.sustainedThresholdKilonewtons) *
                               settings.sustainedDamagePerKilonewtonSecond * solverDt;
+            float total = impactDamage + sustainedDamage;
+            float limit = settings.durability * solverDt / settings.minimumFailureSeconds;
+            if (total > limit)
+            {
+                float scale = limit / total;
+                impactDamage *= scale;
+                sustainedDamage *= scale;
+            }
             Damage = Math.Min(settings.durability, Damage + impactDamage + sustainedDamage);
             if (Damage < settings.durability) return false;
             Broken = true;

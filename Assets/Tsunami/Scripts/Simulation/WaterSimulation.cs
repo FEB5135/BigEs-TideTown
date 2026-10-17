@@ -142,7 +142,7 @@ namespace Tsunami
         {
             public int id;
             public Vector3 worldA, worldB;
-            public float topLocal;
+            public float topLocal, bottomLocal;
             public readonly List<WallFace> faces = new List<WallFace>(2);
         }
 
@@ -343,7 +343,7 @@ namespace Tsunami
         /// on a grid aligned with this simulation). Diagonal segments become a two-face staircase.
         /// <paramref name="topWorldY"/> is the world height of the wall top; water above it spills over.
         /// </summary>
-        public WallSegmentHandle AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY)
+        public WallSegmentHandle AddWallSegment(Vector3 worldA, Vector3 worldB, float topWorldY, float bottomWorldY = float.NegativeInfinity)
         {
             EnsureInitialized();
             float top = topWorldY - terrain.transform.position.y;
@@ -354,7 +354,8 @@ namespace Tsunami
             var corner = new Vector2Int(b.x, a.y);
             int id = nextWallHandle++;
             if (nextWallHandle <= 0) nextWallHandle = 1;
-            var wall = new RegisteredWall { id = id, worldA = worldA, worldB = worldB, topLocal = top };
+            var wall = new RegisteredWall { id = id, worldA = worldA, worldB = worldB, topLocal = top,
+                bottomLocal = bottomWorldY - terrain.transform.position.y };
             WallAlongX(a.y, a.x, corner.x, top, wall);      // horizontal leg a -> corner
             WallAlongZ(corner.x, corner.y, b.y, top, wall); // vertical leg corner -> b
             if (wall.faces.Count == 0) return default;
@@ -431,8 +432,10 @@ namespace Tsunami
                     float highInto = face.alongX ? -solver.VelocityX[high] : -solver.VelocityZ[high];
                     float lowDepth = solver.Depth[low], highDepth = solver.Depth[high];
                     float lowSurface = bed[low] + lowDepth, highSurface = bed[high] + highDepth;
-                    float lowWet = Mathf.Min(lowDepth, Mathf.Max(0f, wall.topLocal - bed[low]));
-                    float highWet = Mathf.Min(highDepth, Mathf.Max(0f, wall.topLocal - bed[high]));
+                    float lowBottom = Mathf.Max(bed[low], wall.bottomLocal);
+                    float highBottom = Mathf.Max(bed[high], wall.bottomLocal);
+                    float lowWet = Mathf.Clamp(lowSurface - lowBottom, 0f, Mathf.Max(0f, wall.topLocal - lowBottom));
+                    float highWet = Mathf.Clamp(highSurface - highBottom, 0f, Mathf.Max(0f, wall.topLocal - highBottom));
                     float lowSpeed = Mathf.Max(0f, lowInto), highSpeed = Mathf.Max(0f, highInto);
                     WallFaceLoad load = WallFaceLoad.Calculate(WaterDensity, gravity, solver.CellSize,
                         lowWet, lowSpeed, highWet, highSpeed);

@@ -62,7 +62,10 @@ internal static class Program
     static void BreakIsReportedOnce()
     {
         var state = new WallDamageState();
-        Assert(state.Apply(100_000f, 0f, 1f, TestSettings, out _, out _), "wall did not break at capacity");
+        Assert(!state.Apply(100_000_000f, 0f, 0.02f, TestSettings, out _, out _), "a single strong impact instantly broke a wall");
+        Assert(state.Damage > 0f && state.Damage < 1f, "damage cap did not preserve progressive stages");
+        for (int i = 0; i < 150; i++) state.Apply(100_000f, 0f, 0.02f, TestSettings, out _, out _);
+        Assert(state.Broken, "sustained impacts did not eventually break the wall");
         Assert(!state.Apply(100_000f, 0f, 1f, TestSettings, out _, out _), "wall broke more than once");
     }
 
