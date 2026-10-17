@@ -16,7 +16,7 @@ Son güncelleme: 2026-10-17 (10:55)
 
 - `main`: Ekibin ortak branch'i. Son merge edilen commit: `22f7139 Simple Grid Worldmodel` (harita grid sistemi, `well.obj`, ProBuilder).
 - `feature/resource-gathering`: Bizim çalışmamız (kaynak toplama). Push etmeden önce kullanıcıya sor.
-- `feature/main-menu`: `feature/resource-gathering`'den açıldı. Ana menü burada. Push edilmedi.
+- `feature/main-menu`: `feature/resource-gathering`'den açıldı. Ana menü burada. GitHub'a push edildi (2026-10-17).
 - `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
 
 ## ⚠ Yarım kalan iş (önce bunu bitir)
