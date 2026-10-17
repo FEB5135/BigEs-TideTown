@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
+Son güncelleme: 2026-10-17 (feature/storm-warning: tsunami öncesi fırtına)
 
 ## Bağlam
 
@@ -15,6 +15,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
 ## Branch'ler
 
 - `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi. Ardından `collision-main-merge` (tsunami, duvar çarpışması, katlı inşa) da fast-forward ile main'e alındı.
+- `feature/storm-warning` (yerelde, **aktif dal**, main'den): tsunami öncesi fırtına bulutları/şimşek, 2-3 dk sonra kendiliğinden gelen tsunami, uzaktan gelen dalga kabarması, "Anında Etkinleştir" butonu. Push edilmedi.
 - `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
 - `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
@@ -24,7 +25,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
 
 ## Aktif çalışma
 
-- Dal: `main` (yeni iş için ondan dal açılır). Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
+- Dal: `feature/storm-warning` (main'den). Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
 - ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
 - Kullanıcı dağ/tepe düzeni için "tam böyle olmayacak, şimdilik beklesin" dedi; odun kesme animasyonu için "hâlâ garip ama şimdilik kalsın".
@@ -32,6 +33,15 @@ Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Tsunami öncesi fırtına (2026-10-17, `feature/storm-warning`):** Kullanıcı isteği: tsunami geleceğini parçalı bulutlar haber versin; bulutlar yaklaştıkça kararsın, şimşek çaksın; tsunami 2-3 dk içinde rastgele gelsin; test için panelde "Anında Etkinleştir"; dalga kameranın gidemediği/göremediği yerden gelsin.
+  - `TsunamiController`: `autoRelease` (SampleScene'de açık), `releaseDelayMin/Max` 120/180 sn. Sayaç `MainMenu.GameStarted` ile başlar (menüsüz sahnede Start'ta), bitince `Play()` (uyarı + kabarma). `StormProgress` 0→1 (uyarı/koşu sırasında 1). Sıfırla yeni rastgele sayaç başlatır. `ReleaseNow()` sayacı atlar (koşan tsunamiyi sıfırlayıp yeniden gönderir). Uyarı süresi 4→12 sn; oyun senaryosunun kaynağı kıyıdan 70→100 m (su grid'i ~120 m'ye izin veriyor).
+  - Dalganın yönü zaten her oyunda değişiyor: WFC haritası rastgele, `TeamMapTsunamiAdapter` en açık koridoru seçiyor (konsolda "Wave approach: …°"). Bulutlar ve kabarma bu yönden gelir.
+  - `TsunamiStorm` ("Tsunami/Storm"): 18 low-poly bulut (kodla üretilen düz gölgeli icosphere parçaları), sakinken kıyıdan 560 m açıkta beyaz; ilerledikçe 80 m'ye yaklaşır, büyür, koyu griye döner. Güneş ışığı, ortam ışığı ve gökyüzü pozlaması kararır (skybox'ın kopyası; asset değişmez). İlerleme %55'ten sonra şimşek (LineRenderer + ışık parlaması, bulut aydınlanır), sıklığı 7 sn'den 1.2 sn'ye çıkar. Malzemeler: `Assets/Tsunami/Materials/Storm_Cloud.mat`, `Storm_Lightning.mat`.
+  - `TsunamiSwell` ("Tsunami/Incoming Swell"): uyarı süresince kaynaktan 520 m açıkta beliren su sırtı (Water_Ocean malzemesinin kopyası, okyanustan sonra çizilir; yoksa saydam okyanus üstüne boyuyordu), sabit hızla kaynağa gelir, tepesi açık renk ve köpüklü; varınca simülasyon devralır, sırt 0.6 sn'de söner. Simülasyon grid'i büyütülmedi (performans).
+  - Panel: "Anında Etkinleştir" (kırmızı, panel 388 px). Durum satırı sayacı gösterir: "Fırtına yaklaşıyor - tsunamiye 2:13".
+  - Kurulum: `TsunamiTeamMapSetup` yeni kurulumda hepsini ekler; var olan sahne için menü "Tsunami > Add Storm And Release Button To Open Scene" (fırtına ve kabarmayı her seferinde yeniden kurar). SampleScene buna göre güncellendi.
+  - Play'de doğrulandı: menüde ve oyun başında ufukta beyaz bulutlar; sayaç 20 sn'ye indirilerek bulutların yaklaşıp karardığı, sayaç bitince uyarının kendiliğinden başladığı, şimşek, kabarmanın ufuktan gelip simülasyona devrettiği ve dalganın kıyıyı bastığı görüldü; Anında Etkinleştir ve Sıfırla çalışıyor; konsol temiz. Gerçek 2-3 dk'lık bekleme baştan sona izlenmedi. Bulutlar kameranın 45° oyun bakışında ancak yakınlaşınca/denize bakınca belirgin; ses (gök gürültüsü) yok.
 
 - **Tsunami WFC arazisi + otomatik dalga yönü (17 Ekim 2026, `collision-main-merge`):** Oyun başlayınca WFC haritası kurulduktan 2 kare sonra `TeamMapTsunamiAdapter`, `MapView` parçalarını (eğim, düzlük, tepe, dağ: karo 1–4 ve 6–9) su arazisine çiziyor; ağaç karoları (5) atlanıyor, su aralarından akıyor. Sonra köyden harita kenarına 16 yöndeki koridorları tepe yüksekliğine göre puanlayıp dalgayı en açık koridordan getiriyor, okyanusu o tarafa taşıyor. Editörde arazi düz kalır (WFC yalnız oyunda çalışır). Unity'de geçici Play Mode testiyle doğrulandı: 1907 tepe karosunun hepsi araziye girdi (en yüksek 8.9 m), yön 270° (batı), 25 sn'de köyde 1.26 m su, geçersiz derinlik yok. EditMode 1696 geçti, 13 başarısız (önceki gibi: 3'ü eksik FinottiGames paketi, 10'u URP paket testleri).
 
@@ -140,6 +150,7 @@ Son güncelleme: 2026-10-17 (collision-main-merge main'e birleştirildi)
 
 ## Sıradaki işler / açık konular
 
+- [ ] `feature/storm-warning`'i kullanıcı denesin; beğenirse commit/push ve main'e birleştirme. İstenirse: gök gürültüsü sesi (indirme izni gerekir), yağmur, bulutların oyun bakışında daha görünür olması.
 - [ ] Collision devir kontrolü: `COLLISION_HANDOFF.md` listesindeki düşük/yüksek dalga, bloklama/taşma/kırık boşluk, yatay/dikey/çapraz, pause/reset ve uzun çalışma sınırlarını Unity 6000.6.6f1 Play Mode'da doğrula.
 - [ ] Tsunami: SampleScene'de kurulum komutunu yeniden çalıştırıp Play'de test etmek (shader'lar, panel ve dalga yüksekliği kaydırıcısı, FPS). Ardından `Terrain-1`'i push etmek (kullanıcıya sorulacak).
 - [ ] Tsunami: Ekibin duvarları 1.25 m. Oyundaki 10 m'lik dalgayı durduramıyorlar; duvar yüksekliği ya da dalga gücü ekipçe dengelenmeli.

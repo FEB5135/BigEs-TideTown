@@ -47,7 +47,7 @@ namespace Tsunami
                 {
                     name = "Vadi Tsunamisi (Oyun)",
                     description = "Oyunun dalgası: açık denizde büyük bir kabarma vadiye yönelir, dağların arasından geçip köyü vurur.",
-                    amplitude = 10f, lengthRadius = 18f, widthRadius = 70f, offshoreDistance = 70f,
+                    amplitude = 10f, lengthRadius = 18f, widthRadius = 70f, offshoreDistance = 100f,
                     profile = SourceProfile.Gaussian, motion = SourceMotion.Directional, bathymetry = deep
                 },
                 new TsunamiScenario

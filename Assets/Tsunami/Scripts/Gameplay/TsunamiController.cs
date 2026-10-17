@@ -36,9 +36,15 @@ namespace Tsunami
         [SerializeField] int scenarioIndex;
 
         [Header("Gameplay")]
-        [Tooltip("Show a countdown before the tsunami is released (gameplay). Restart skips it.")]
+        [Tooltip("Show a countdown before the tsunami is released (gameplay). Restart skips it. During the countdown the " +
+                 "incoming swell (TsunamiSwell) travels in from the open sea to the source.")]
         [SerializeField] bool useWarning = true;
-        [SerializeField, Range(0f, 15f)] float warningDuration = 4f;
+        [SerializeField, Range(0f, 30f)] float warningDuration = 4f;
+        [Tooltip("Release the tsunami by itself a random time after the game starts (MainMenu.GameStarted, or Start " +
+                 "when the scene has no main menu). The storm clouds approach during this time.")]
+        [SerializeField] bool autoRelease;
+        [SerializeField, Min(0f)] float releaseDelayMin = 120f;
+        [SerializeField, Min(0f)] float releaseDelayMax = 180f;
 
         [Header("Fallback placement (scenes without a map adapter)")]
         [SerializeField] Vector3 fallbackSourcePosition = new Vector3(0f, 0f, -90f);
@@ -51,9 +57,31 @@ namespace Tsunami
         float timer;
         BathymetryProfile appliedBathymetry;
         bool appliedBathymetryValid;
+        bool gameStarted;
+        bool releaseScheduled;
+        float releaseDelay;
+        float releaseRemaining;
 
         public TsunamiState State { get; private set; } = TsunamiState.Idle;
         public float WarningRemaining => State == TsunamiState.Warning ? Mathf.Max(0f, timer) : 0f;
+        public float WarningDuration => warningDuration;
+        /// <summary>True while the automatic release is counting down.</summary>
+        public bool ReleaseScheduled => releaseScheduled && State == TsunamiState.Idle;
+        /// <summary>Seconds until the automatic release, or 0 when none is scheduled.</summary>
+        public float ReleaseRemaining => ReleaseScheduled ? Mathf.Max(0f, releaseRemaining) : 0f;
+        /// <summary>
+        /// How close the tsunami is: 0 = calm (nothing scheduled), rising to 1 at the automatic release, 1 while a
+        /// tsunami is announced, running or paused. Drives the storm.
+        /// </summary>
+        public float StormProgress
+        {
+            get
+            {
+                if (State != TsunamiState.Idle) return 1f;
+                if (!releaseScheduled || releaseDelay <= 0f) return 0f;
+                return Mathf.Clamp01(1f - releaseRemaining / releaseDelay);
+            }
+        }
         public WaterSimulation Simulation => simulation;
         public TeamMapTsunamiAdapter MapAdapter => mapAdapter;
         public TsunamiScenario[] Scenarios => scenarios;
@@ -90,6 +118,15 @@ namespace Tsunami
         public event Action ScenarioChanged;
         public event Action ParametersChanged;
 
+        void OnEnable() => MainMenu.GameStarted += OnGameStarted;
+        void OnDisable() => MainMenu.GameStarted -= OnGameStarted;
+
+        void OnGameStarted()
+        {
+            gameStarted = true;
+            ScheduleRelease();
+        }
+
         void Start()
         {
             if (simulation == null)
@@ -103,13 +140,43 @@ namespace Tsunami
             ApplyBathymetryIfNeeded(true);
             simulation.Paused = true;
             SimulationReset?.Invoke();
+            // Without a main menu the game starts right away.
+            if (!gameStarted && FindAnyObjectByType<MainMenu>() == null) OnGameStarted();
         }
 
         void Update()
         {
+            if (State == TsunamiState.Idle && releaseScheduled)
+            {
+                releaseRemaining -= Time.deltaTime;
+                if (releaseRemaining <= 0f) Play();
+                return;
+            }
             if (State != TsunamiState.Warning) return;
             timer -= Time.deltaTime;
             if (timer <= 0f) BeginRun();
+        }
+
+        /// <summary>Starts a new random countdown to the automatic release (when enabled and the game has started).</summary>
+        public void ScheduleRelease()
+        {
+            releaseScheduled = false;
+            if (!autoRelease || !gameStarted || State != TsunamiState.Idle) return;
+            float min = Mathf.Min(releaseDelayMin, releaseDelayMax), max = Mathf.Max(releaseDelayMin, releaseDelayMax);
+            releaseDelay = releaseRemaining = UnityEngine.Random.Range(min, max);
+            releaseScheduled = true;
+            Debug.Log($"[TsunamiController] Tsunami in {releaseDelay:0} s.", this);
+        }
+
+        /// <summary>
+        /// Skips the storm countdown (testing): the tsunami sets off now, with its warning / incoming swell. A
+        /// tsunami already running is reset and sent again.
+        /// </summary>
+        public void ReleaseNow()
+        {
+            if (!enabled || State == TsunamiState.Warning) return;
+            if (State != TsunamiState.Idle) ResetSimulation();
+            Play();
         }
 
         // ------------------------------------------------------------------ playback
@@ -124,6 +191,7 @@ namespace Tsunami
                 case TsunamiState.Running:
                 case TsunamiState.Warning: return;
             }
+            releaseScheduled = false;
             if (useWarning && warningDuration > 0f)
             {
                 timer = warningDuration;
@@ -142,6 +210,7 @@ namespace Tsunami
             else if (State == TsunamiState.Warning)
             {
                 SetState(TsunamiState.Idle); // cancel the pending release
+                ScheduleRelease();
             }
         }
 
@@ -170,6 +239,7 @@ namespace Tsunami
             timer = 0f;
             SetState(TsunamiState.Idle);
             SimulationReset?.Invoke();
+            ScheduleRelease();
         }
 
         /// <summary>Reset and immediately release the tsunami (no countdown).</summary>
@@ -195,6 +265,7 @@ namespace Tsunami
             LastSourceVolume = simulation.AddSource(SourcePosition, TravelDirection, s.amplitude, s.lengthRadius,
                 s.widthRadius, s.profile, s.motion);
             HasPendingChanges = false;
+            releaseScheduled = false;
             simulation.Paused = false;
             SetState(TsunamiState.Running);
         }
