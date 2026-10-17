@@ -67,10 +67,11 @@ namespace IdleTown.Tests
                 Assert.That(mesh.sharedMesh, Is.Not.Null, path + "/" + mesh.name);
         }
 
-        [Test]
-        public void ResourceScene_KeepsForestQuarriesAndConstructionReferences()
+        [TestCase("Assets/Scenes/ResourceTest.unity")]
+        [TestCase("Assets/Scenes/SampleScene.unity")]
+        public void ResourceScene_KeepsForestQuarriesAndConstructionReferences(string scenePath)
         {
-            var scene = EditorSceneManager.OpenScene("Assets/Scenes/ResourceTest.unity", OpenSceneMode.Additive);
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
             try
             {
                 Transform forest = null;

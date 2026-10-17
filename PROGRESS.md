@@ -12,22 +12,21 @@ Son güncelleme: 2026-10-17
 - **Unity:** 6000.6.6f1, URP 17.6.0, Input System (yalnız yeni sistem açık). TextMeshPro içe aktarılmadı; arayüzde UGUI `Text` kullanılıyor.
 - **Repo:** https://github.com/FEB5135/BigEs (şu an private, teslimde public olmalı).
 
-## Branch'ler
+## Branch ve ana sahne
 
-- `main`: Ekibin ortak branch'i. Son merge edilen commit: `22f7139 Simple Grid Worldmodel` (harita grid sistemi, `well.obj`, ProBuilder).
-- `feature/resource-gathering`: Bizim çalışmamız. Push edilmemiş commit'ler var; push etmeden önce kullanıcıya sor.
-- `backup/resource-gathering-before-rewrite`: Sadece yerelde. İçinde Asset Store ağaç paketi var, **asla push etme**. İş bitince silinebilir.
-
-## ⚠ Yarım kalan iş (önce bunu bitir)
-
-**Maden ocakları + taş toplayan vagonlar** kodlandı, derlendi (hata yok), sahne kuruldu (3 ocak + 3 vagon) ve commit edildi. **Play'de henüz test edilmedi.**
-- İlgili dosyalar: `Assets/Scripts/Economy/ResourceNode.cs` (`maxGatherers`: bir kaynakta birden fazla toplayıcı), `Assets/Scripts/Editor/ResourceTestSetup.cs` (`BuildQuarries`, `BuildMineCarts`, köyde ocak yönüne ±24° yol boşluğu).
-- Tasarım: Ekranın sağında, kasabanın dışında (TownRadius+9) 3 ocak, girişleri kasabaya bakıyor. Her ocak bir Stone `ResourceNode` (kapasite 200, yenilenme 15 sn, en fazla 3 vagon); tıklayınca taş kuyuya atılır. 3 vagon (`Gatherer`, Stone, 8 taş, hız 4, girişin 5 m önünde durur) taşı kuyuya götürüp atar.
-- Yapılacaklar: Play'de vagonların ocağa gidip taş getirdiğini, kuyuya attığını ve ocağa tıklayınca taş sayısının arttığını test et. Sorun yoksa bu bölümü "Son durum"a taşı.
+- Aktif dal: `ContructionMechanics`; proje konumu: `C:\Projects\BigEs`.
+- Son birleştirilen main: `7afe46b` (Wave Collapse Function).
+- **Ortak geliştirme sahnesi `Assets/Scenes/SampleScene.unity`**. Kaynak, ekonomi, inşa ve harita geliştirmeleri burada sürdürülür; Build Settings'te ilk sahnedir.
+- `ResourceTest.unity` eski bağımsız test sahnesi olarak korunur. Oradaki değişiklikler SampleScene'e otomatik aktarılmaz.
+- Asset Store ağaç paketi Git dışında kalır; diğer bilgisayarda aynı paket kurulmalıdır.
 
 ## Son durum (yapılanlar)
 
-- **Güncel main grid (7afe46b):** GitHub'dan yeniden fetch edildi ve `Wave Collapse Function` commiti birleştirildi. Grid/WFC kurulumu `Assets/Scenes/SampleScene.unity` içindedir (32x32 dünya, altı model); `ResourceTest` ayrı kaynak/inşa test sahnesidir. MapView ağırlıklı görsel varyant seçimini içerir. ProBuilder ayar çakışması main değerleri korunarak çözüldü. Yeni sahne bağlantı testi dahil 35/35 EditMode testi başarılı.
+- **Yeşil zemin geri yüklendi:** SampleScene MapView, model paleti Flat.mat yerine ayrı TerrainGround.mat kullanır. Eski zemin rengi (0.35, 0.55, 0.3) korunur; kuyu/ev/maden malzemeleri değişmez. Play görünümünde yeşil arazi ve çalışan grid doğrulandı. Yeni sahne kurulumu da bu malzemeyi atar.
+
+- **SampleScene ortak oynanış:** ResourceTest içindeki çalışan kuyu/depo, 40 ev, 34 ağaç, 5 oduncu, 3 maden ve vagon üreticileri, HUD, kamera ve navigasyon taşındı. Ayrı inşa World kaldırılıp controller mevcut WFC World bileşenine bağlandı. Grid 32x32, hücre 6 m, köken (-96,0,-96); modeller hücre boyutuna ölçeklenir ve arazi collider üretir. Köy/kaynaklar ve bağlantı yollarının altı başlangıç WFC hücreleriyle düz tutulur. Eski örnek platform ve görsel kuyu yerine çalışan kuyu kullanılır. Arazi WFC sonrasında, toplayıcılar başlamadan önce oluşturulur. Son kontrol: 38/38 test başarılı; Play testi normal toplamayla odun/taş kazanıp aynı kuyudan harcayarak dört duvar kurdu. SampleSceneSetup menüsü bir defalık taşıma içindir, kurulu sahneyi tekrar yazmaz.
+
+- **Güncel main grid (7afe46b):** GitHub'dan yeniden fetch edildi ve `Wave Collapse Function` commiti birleştirildi. Grid/WFC kurulumu `Assets/Scenes/SampleScene.unity` içindedir (32x32 dünya, altı model); `ResourceTest` bu aşamada ayrıydı; sonraki SampleScene aktarımıyla oynanış birleştirildi. MapView ağırlıklı görsel varyant seçimini içerir. ProBuilder ayar çakışması main değerleri korunarak çözüldü. Yeni sahne bağlantı testi dahil 35/35 EditMode testi başarılı.
 
 - **Uzak construction dalıyla uzlaştırma:** Pull sonrası 232 add/add çakışması çözüldü. 225 paket meta dosyasında Unity 6000.6.6f1 kurulumuyla eşleşen uzak kimlikler, 5 UI meta dosyasında özgün sprite ayarları korundu. ResourceTest sahnesindeki inşa/kuyu entegrasyonu ve main WFC kodu korundu. URP ayarlarındaki eski bir dosya kimliği doğru değere bağlandı. Yinelenen GUID yok; `MergedAssetIntegrationTests` dahil 34/34 EditMode testi geçti. Push yapılmadı.
 
@@ -69,6 +68,8 @@ Son güncelleme: 2026-10-17
 
 ## Sıradaki işler / açık konular
 
+- [ ] Yeni oynanış ve harita düzenlemelerini SampleScene üzerinde sürdür; ResourceTest kurucusunu ana sahneyi yenilemek için kullanma.
+
 - [ ] Maden modelini arkadaşa gösterip stil onayı almak. İsteğe bağlı: taş alınınca toz efekti; ocaklar 16 m aralıkla birbirine değiyor, gerekirse aralık açılabilir.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (ne yapacakları henüz kararlaştırılmadı).
 - [x] Duvar sistemini `Well.TrySpend` ile bağlamak; ResourceHUD aynı bakiye olaylarını izliyor.
@@ -80,7 +81,7 @@ Son güncelleme: 2026-10-17
 
 ## Çalışma notları (oturumlar arası)
 
-- **Sahneyi değiştirmek:** `ResourceTestSetup.cs` düzenlenir. Mevcut sahneye uygulamak için tek seferlik bir `Assets/Scripts/Editor/RebuildResourceTestOnce.cs` yazılır: `[InitializeOnLoad]` + `delayCall` kökü siler, menüyü çalıştırır, sahneyi kaydeder ve kendini siler.
+- **Sahneyi değiştirmek:** Doğrudan `Assets/Scenes/SampleScene.unity` içinde düzenle ve kaydet. `ResourceTestSetup` eski test sahnesini kurar; ana sahne için yeniden çalıştırılmaz. `SampleSceneSetup` tek seferlik aktarım menüsüdür ve kurulu sahneyi yeniden oluşturmaz.
 - **Derleme:** Unity ancak penceresi öne gelince derler. Play modundayken derlemez. Sonuç `Logs/Editor.log`'dan (`Tundra build success`, `error CS`) okunur.
 - **Ekran kontrolü:** Kullanıcının Unity düzeni değişebiliyor (Game görünümü üstte küçük). Fare/klavye ile test etmeden önce tam pencere görüntüsü alınmalı. Unity önde değilse kullanıcı bilgisayarı kullanıyordur; dokunulmaz.
 - **İndirme:** Her dosya indirmesi için kullanıcıdan izin alınır. Yalnız CC0 ya da repoya konabilir lisanslar repoya girer; Asset Store paketleri `.gitignore`'a eklenir ve `THIRD_PARTY.md`'ye yazılır.

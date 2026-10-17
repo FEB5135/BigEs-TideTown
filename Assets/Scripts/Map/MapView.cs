@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+[DefaultExecutionOrder(-25)]
 public class MapView : MonoBehaviour
 {
     [SerializeField] World world;
     [SerializeField] Material material;
     [SerializeField] Module[] modules;
+    [SerializeField] bool createColliders;
 
     readonly Dictionary<int, List<Variant>> variants = new();
     readonly Dictionary<Vector2Int, GameObject> instances = new();
@@ -78,6 +80,14 @@ public class MapView : MonoBehaviour
         var half = world.CellSize * 0.5f;
         var origin = world.CellCenter(x, y) + yaw * new Vector3(-half, 0f, half);
         var instance = Instantiate(prefab, origin, yaw, transform);
+        // Authored tiles cover one unit; their footprint must match the logical cell size.
+        instance.transform.localScale *= world.CellSize;
+        if (createColliders)
+        {
+            foreach (var filter in instance.GetComponentsInChildren<MeshFilter>())
+                if (filter.sharedMesh != null && filter.GetComponent<Collider>() == null)
+                    filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+        }
         if (material != null)
         {
             foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
