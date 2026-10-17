@@ -1,0 +1,11 @@
+{
+    "name": "IdleTown.Editor",
+    "rootNamespace": "IdleTown.Editor",
+    "references": [
+        "IdleTown.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "autoReferenced": true
+}

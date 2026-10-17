@@ -1,0 +1,14 @@
+{
+    "name": "IdleTown.EditModeTests",
+    "rootNamespace": "IdleTown.Tests",
+    "references": [
+        "IdleTown.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "autoReferenced": false
+}
