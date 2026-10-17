@@ -28,11 +28,13 @@ Son güncelleme: 2026-10-17 (11:55)
 
 ## Aktif çalışma
 
-- Dal: `villageranimations` (main 0a0d7c2 tabanı).
+- Dal: `main`. `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
 - Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
 - Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
+
+- **Animasyon merge (2026-10-17):** Yürüyüş/odun kesme animasyonları, köylü prefabları ve SampleScene kaynak toplama düzeni main'e çakışmasız birleştirildi. Birleşmiş main sürümünde 37/37 Unity testi başarılı (0 hata); yürüyüş, ağaca yönelme, kol/mesh animasyonu ve odun/taş teslimi doğrulandı. Rapor: Logs/main-villager-merge-tests.xml.
 
 - **villageranimations — köylü hareketleri:** Kullanıcının `Assets/Prefabs/villager.prefab` kaynağı iç içe prefab olarak kullanılır; `Woodcutter.prefab` ve `VillagerVisual.prefab` ayrı üretilir. Mevcut köylü Gatherer bileşenleri/tuning korunup görselleri yerinde yükseltilir. Yürüyüşte görsel kök ±15 derece sallanır, kollar/bacaklar hafifçe salınır; ağaca dönüp odun toplarken omuzlar 45–125 derece kaldırılıp indirilir. Pozlar durunca yumuşakça normale döner; animasyon yön bulma kökünü oynatmaz. Scriptler: VillagerAnimation, GathererActivity; kurulum: VillagerPrefabSetup. Son Unity kontrolü: 37/37 test başarılı; Play testinde yürüyüş, ağaç yönüne dönme, omuz/mesh hareketi, odun taşıma ve 20 odun/8 taş teslimi doğrulandı.
 
@@ -89,6 +91,9 @@ Son güncelleme: 2026-10-17 (11:55)
 - **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
 ## Sıradaki işler / açık konular
+
+- [x] Köylü animasyonlarını ve SampleScene düzenini main'e birleştir.
+- [ ] Yerel main değişikliklerini paylaşmak için push (henüz yapılmadı).
 
 - [ ] Ana menü: oyunun adı/logosu belli olunca `Main Menu/Main Page/Logo` değiştirilecek (yazı yerine görsel konabilir).
 - [ ] Ana menü: skorun tanımı (kurtarılan ev sayısı, dayanılan dalga...) belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
