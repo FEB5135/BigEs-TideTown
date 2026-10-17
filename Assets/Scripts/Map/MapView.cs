@@ -5,9 +5,10 @@ using UnityEngine;
 public class MapView : MonoBehaviour
 {
     [SerializeField] World world;
+    [SerializeField] Material material;
     [SerializeField] Module[] modules;
 
-    readonly Dictionary<int, GameObject> prefabs = new();
+    readonly Dictionary<int, List<Variant>> variants = new();
     readonly Dictionary<Vector2Int, GameObject> instances = new();
     GameObject defaultPrefab;
 
@@ -27,7 +28,17 @@ public class MapView : MonoBehaviour
                     continue;
 
                 defaultPrefab ??= module.Prefab;
-                prefabs[module.Id] = module.Prefab;
+                if (!variants.TryGetValue(module.Id, out var list))
+                {
+                    list = new List<Variant>();
+                    variants.Add(module.Id, list);
+                }
+
+                list.Add(new Variant
+                {
+                    Prefab = module.Prefab,
+                    Weight = module.Weight > 0 ? module.Weight : 1
+                });
             }
         }
 
@@ -58,14 +69,48 @@ public class MapView : MonoBehaviour
 
         world.Get(x, y, out var id, out var rotation);
 
-        if (!prefabs.TryGetValue(id, out var prefab))
-            prefab = defaultPrefab;
+        var prefab = Pick(id, x, y);
 
         if (prefab == null)
             return;
 
-        var rotationY = Quaternion.Euler(0f, rotation * 90f, 0f);
-        instances[key] = Instantiate(prefab, world.CellCenter(x, y), world.transform.rotation * rotationY, transform);
+        var yaw = world.transform.rotation * Quaternion.Euler(0f, rotation * 90f, 0f);
+        var half = world.CellSize * 0.5f;
+        var origin = world.CellCenter(x, y) + yaw * new Vector3(-half, 0f, half);
+        var instance = Instantiate(prefab, origin, yaw, transform);
+        if (material != null)
+        {
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
+                renderer.sharedMaterial = material;
+        }
+
+        instances[key] = instance;
+    }
+
+    GameObject Pick(int id, int x, int y)
+    {
+        if (!variants.TryGetValue(id, out var list) || list.Count == 0)
+            return defaultPrefab;
+
+        var total = 0;
+        foreach (var variant in list)
+            total += variant.Weight;
+
+        var roll = new System.Random(x * 73856093 ^ y * 19349663 ^ id * 83492791).Next(total);
+        foreach (var variant in list)
+        {
+            roll -= variant.Weight;
+            if (roll < 0)
+                return variant.Prefab;
+        }
+
+        return list[list.Count - 1].Prefab;
+    }
+
+    struct Variant
+    {
+        public GameObject Prefab;
+        public int Weight;
     }
 
     [Serializable]
@@ -73,5 +118,7 @@ public class MapView : MonoBehaviour
     {
         public int Id;
         public GameObject Prefab;
+        [Tooltip("How often this prefab is chosen among entries with the same id. 0 counts as 1.")]
+        public int Weight;
     }
 }
