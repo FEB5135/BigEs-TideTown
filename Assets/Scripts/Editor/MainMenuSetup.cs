@@ -7,12 +7,13 @@ using UnityEngine.UI;
 // Menü: Tools > BigEs > Ana Menüyü Kur (varsa silip yeniden kurar).
 // Butonlar düz yüzlü, sert alt kalınlıklı ve kesik köşeli (low-poly); sprite'lar Art/UI/make_menu_sprites.py ile
 // çizilir. Renkler: canlı yeşil zemine karşı mercan (Oyna), okyanus mavisi (ikincil), hayalet (Çıkış), lacivert panel.
-// Yazı tipi Baloo 2 ExtraBold.
+// Yazı tipi Rubik: yazılar Bold, logo Black (köşeleri hafif yuvarlak geometrik, low-poly'ye uyuyor).
 public static class MainMenuSetup
 {
     const string RootName = "Main Menu";
     const string SpriteDir = "Assets/UI/Menu/";
-    const string FontPath = "Assets/UI/Fonts/Baloo2-ExtraBold.ttf";
+    const string FontPath = "Assets/UI/Fonts/Rubik-Bold.ttf";
+    const string TitleFontPath = "Assets/UI/Fonts/Rubik-Black.ttf";
     const string ClickPath = "Assets/Audio/UI/Click.ogg";
 
     // Palet: su/tsunami teması, canlı yeşil zemine karşı.
@@ -35,6 +36,7 @@ public static class MainMenuSetup
     const float Margin = 64f;
 
     static Font font;
+    static Font titleFont;
     static AudioClip click;
 
     [MenuItem("Tools/BigEs/Ana Menüyü Kur")]
@@ -76,6 +78,9 @@ public static class MainMenuSetup
             Debug.LogWarning($"Menü yazı tipi bulunamadı: {FontPath}. Unity'nin varsayılanı kullanılıyor.");
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
+        titleFont = AssetDatabase.LoadAssetAtPath<Font>(TitleFontPath);
+        if (titleFont == null)
+            titleFont = font;
         click = AssetDatabase.LoadAssetAtPath<AudioClip>(ClickPath);
 
         var root = new GameObject(RootName, typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup), typeof(AudioSource));
@@ -149,7 +154,8 @@ public static class MainMenuSetup
         waves.anchoredPosition = new Vector2(0f, 118f);
         AddShadow(waves.GetComponent<Image>(), Navy, 4f, 1f);
 
-        var title = NewText(logo, "Title", "BigEs", 160, Color.white);
+        var title = NewText(logo, "Title", "BigEs", 150, Color.white);
+        title.font = titleFont;
         title.rectTransform.sizeDelta = new Vector2(900f, 176f);
         title.rectTransform.anchoredPosition = new Vector2(0f, 14f);
         var outline = title.gameObject.AddComponent<Outline>();

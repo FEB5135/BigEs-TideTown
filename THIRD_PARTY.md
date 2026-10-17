@@ -17,7 +17,8 @@ Bu projede ekip dışından alınan hazır kaynaklar ve yapay zekâ kullanımı 
 
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
-| Baloo 2 (ExtraBold) — Ek Type | https://fonts.google.com/specimen/Baloo+2 | [SIL Open Font License 1.1](https://openfontlicense.org) (`Assets/UI/Fonts/Baloo2-OFL.txt`) | Ana menünün yazı tipi (`Assets/UI/Fonts/Baloo2-ExtraBold.ttf`). Değiştirilmedi. | Evet |
+| Rubik (Bold, Black) — The Rubik Project Authors | https://fonts.google.com/specimen/Rubik | [SIL Open Font License 1.1](https://openfontlicense.org) (`Assets/UI/Fonts/Rubik-OFL.txt`) | Ana menünün yazı tipi: yazılar Bold, logo Black (`Assets/UI/Fonts/Rubik-Bold.ttf`, `Rubik-Black.ttf`). Değiştirilmedi. | Evet |
+| Baloo 2 (ExtraBold) — Ek Type | https://fonts.google.com/specimen/Baloo+2 | [SIL Open Font License 1.1](https://openfontlicense.org) (`Assets/UI/Fonts/Baloo2-OFL.txt`) | Ana menünün ilk sürümünün yazı tipi (`Assets/UI/Fonts/Baloo2-ExtraBold.ttf`); artık yalnız `ResourceTest` test sahnesindeki eski menüde. Değiştirilmedi. | Evet |
 
 ### Ses
 
