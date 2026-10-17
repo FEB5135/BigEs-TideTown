@@ -14,30 +14,33 @@ public sealed class WelcomeParty : MonoBehaviour
     static readonly Color Red = new(0.91f, 0.32f, 0.29f);
 
     static readonly string[] Titles = {
-        "Köyün sana emanet",
-        "Topla, taşı, biriktir",
-        "Kaynaklarını savunmaya dönüştür",
-        "Haritaya hâkim ol"
+        "Köyünü koru", "Orman: odun kaynağın", "Maden: taş kaynağın", "Kuyu: ortak depon", "Duvarlarla savun"
     };
     static readonly string[] Descriptions = {
-        "Vadiden gelecek tsunamiye karşı köyü koru. Hazırlığın temeli odun ve taş toplamak, ardından köyün çevresine savunma duvarları kurmak.",
-        "Oduncular ağaçlardan odun, maden vagonları ocaklardan taş toplar. Çalışanlar kaynakları kendileri merkezdeki kuyuya taşır.",
-        "B tuşuyla İnşa moduna geç. Başlangıç düğümüne sol tıkla, sonra fareyi bitiş noktasına götürerek duvar yolunu ön izle.",
-        "Fare tekerleğiyle yakınlaş veya uzaklaş. Sağ tuşa basılı tutup sürükleyerek köyü, ormanı ve madenleri incele."
+        "Vadiden gelecek tsunamiye karşı bu köyü koruyacaksın. Önce kaynak biriktir, sonra savunmanı kur.",
+        "Oduncular bu ağaçlardan odun toplar. Toplama modunda sen de ağaçlara sol tıklayarak yardım edebilirsin.",
+        "Vagonlar bu ocaklardan taş çıkarıp kuyuya taşır. Taş, odunla birlikte duvar inşa etmek için kullanılır.",
+        "Toplanan odun ve taş burada birikir. Kaynak kuyuya ulaştığında sol alttaki sayaçlara eklenir.",
+        "B ile İnşa moduna geç. Bir düğüme tıkla, fareyle duvar yolunu ön izle. İkinci tık veya Enter ile inşa et."
     };
     static readonly string[] Tips = {
-        "İlk hedefin\nKaynakları biriktir → duvarlarını planla → köyü koru.",
-        "Sen de yardım edebilirsin\nToplama modunda ağaçlara veya madenlere sol tıkla. Kaynak kuyuya ulaşınca sol alttaki sayaç artar.",
-        "İnşa etmeden önce kontrol et\nMaliyet panelde görünür. İkinci sol tık, Enter veya İnşa Et ile onayla; kaynaklar o anda harcanır. Sağ tık / Esc iptal eder. B ile toplamaya dön.",
-        "Hazırsın!\nÖnce kaynakları gözle, sonra B ile duvarlarını kur. Bu rehberi sağ üstteki ? Rehber düğmesinden istediğin zaman tekrar açabilirsin."
+        "Birlikte köyü kısa bir turla tanıyalım.",
+        "Odun → oduncu → kuyu → duvar",
+        "Taş → vagon → kuyu → duvar",
+        "Duvar maliyeti bu ortak depodan karşılanır.",
+        "Sağ tık / Esc: iptal   •   B: toplama modu"
     };
+    static readonly string[] TargetNames = { "KÖYÜN", "ORMAN / ODUN", "MADEN / TAŞ", "KUYU / DEPO", "SAVUNMA ALANI" };
 
     readonly List<(Behaviour behaviour, bool enabled)> blockedBehaviours = new();
     readonly List<(IsometricCamera camera, bool input)> blockedCameras = new();
     GameObject uiRoot, modal;
     Button help, back, next;
-    Text title, description, tip, tipHeading, counter, nextLabel;
-    readonly Image[] steps = new Image[4];
+    Text title, description, tip, counter, nextLabel, targetName;
+    readonly Image[] shades = new Image[4];
+    readonly RectTransform[] brackets = new RectTransform[8];
+    RectTransform targetFrame, marker;
+    WelcomeMapTour mapTour;
     Sprite roundedSprite;
     Image progress;
     Font font;
@@ -72,6 +75,9 @@ public sealed class WelcomeParty : MonoBehaviour
             Block(construction);
         help.gameObject.SetActive(false);
         modal.SetActive(true);
+        if (mapTour == null)
+            mapTour = gameObject.AddComponent<WelcomeMapTour>();
+        mapTour.Begin();
         RefreshPage();
     }
 
@@ -110,6 +116,8 @@ public sealed class WelcomeParty : MonoBehaviour
         if (!IsOpen)
             return;
         IsOpen = false;
+        if (mapTour != null)
+            mapTour.End();
         Time.timeScale = previousTimeScale;
         foreach (var saved in blockedCameras)
             if (saved.camera != null)
@@ -176,17 +184,66 @@ public sealed class WelcomeParty : MonoBehaviour
     {
         title.text = Titles[PageIndex];
         description.text = Descriptions[PageIndex];
-        var hint = Tips[PageIndex].Split(new[] { '\n' }, 2);
-        tipHeading.text = hint[0];
-        tip.text = hint[1];
-        for (int i = 0; i < steps.Length; i++)
-            steps[i].color = i <= PageIndex ? Red : new Color(0.85f, 0.80f, 0.71f);
-        counter.text = $"KÖY REHBERİ   /   {PageIndex + 1} — {PageCount}";
+        tip.text = Tips[PageIndex];
+        targetName.text = TargetNames[PageIndex];
+        counter.text = $"KÖY TURU   /   {PageIndex + 1} — {PageCount}";
         back.interactable = PageIndex > 0;
-        nextLabel.text = PageIndex == PageCount - 1 ? "Köyü korumaya başla" : "Devam et  →";
-        float width = 996f * (PageIndex + 1f) / PageCount;
-        progress.rectTransform.sizeDelta = new Vector2(width, 6);
-        progress.rectTransform.anchoredPosition = new Vector2(-498f + width / 2f, -322);
+        nextLabel.text = PageIndex == PageCount - 1 ? "Başlayalım  →" : "Sıradaki  →";
+        float width = 516f * (PageIndex + 1f) / PageCount;
+        progress.rectTransform.sizeDelta = new Vector2(width, 4);
+        progress.rectTransform.anchoredPosition = new Vector2(-258f + width / 2f, -180);
+        mapTour.SelectStep(PageIndex);
+    }
+
+    // Kamerayla birlikte hareket eden açık pencere, anlatılan alanın üzerini kapatmaz.
+    void LateUpdate()
+    {
+        if (!IsOpen || uiRoot == null || mapTour == null || mapTour.ViewCamera == null)
+            return;
+        var root = (RectTransform)uiRoot.transform;
+        var screen = root.rect;
+        Vector2 min = new(float.MaxValue, float.MaxValue), max = new(float.MinValue, float.MinValue);
+        bool visible = false;
+        foreach (var point in WelcomeMapTour.Corners(mapTour.FocusBounds))
+        {
+            var projected = mapTour.ViewCamera.WorldToScreenPoint(point);
+            if (projected.z <= 0)
+                continue;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(root, projected, null, out var local);
+            min = Vector2.Min(min, local);
+            max = Vector2.Max(max, local);
+            visible = true;
+        }
+        if (!visible)
+            return;
+        min = Vector2.Max(min - Vector2.one * 22, screen.min + Vector2.one * 24);
+        max = Vector2.Min(max + Vector2.one * 22, screen.max - Vector2.one * 24);
+        // Hedef geçişte ekran dışında kalsa da ters/negatif boyut oluşturma.
+        min.x = Mathf.Clamp(min.x, screen.xMin + 24, screen.xMax - 25);
+        min.y = Mathf.Clamp(min.y, screen.yMin + 24, screen.yMax - 25);
+        max = Vector2.Max(max, min + Vector2.one);
+        SetArea(shades[0].rectTransform, new Vector2(screen.xMin, screen.yMin), new Vector2(min.x, screen.yMax));
+        SetArea(shades[1].rectTransform, new Vector2(max.x, screen.yMin), screen.max);
+        SetArea(shades[2].rectTransform, new Vector2(min.x, screen.yMin), new Vector2(max.x, min.y));
+        SetArea(shades[3].rectTransform, new Vector2(min.x, max.y), new Vector2(max.x, screen.yMax));
+        targetFrame.anchoredPosition = (min + max) * 0.5f;
+        targetFrame.sizeDelta = max - min;
+        for (int i = 0; i < 4; i++)
+        {
+            float x = (i & 1) == 0 ? -1 : 1;
+            float y = (i & 2) == 0 ? -1 : 1;
+            var corner = new Vector2(x * (max.x - min.x) / 2, y * (max.y - min.y) / 2);
+            brackets[i * 2].anchoredPosition = corner - new Vector2(x * 15, 0);
+            brackets[i * 2 + 1].anchoredPosition = corner - new Vector2(0, y * 15);
+        }
+        marker.anchoredPosition = new Vector2(Mathf.Clamp((min.x + max.x) / 2, screen.xMin + 144, screen.xMax - 144),
+            Mathf.Clamp(max.y + 34, screen.yMin + 44, screen.yMax - 40));
+    }
+
+    static void SetArea(RectTransform rect, Vector2 min, Vector2 max)
+    {
+        rect.anchoredPosition = (min + max) * 0.5f;
+        rect.sizeDelta = Vector2.Max(max - min, Vector2.zero);
     }
 
     void EnsureUI()
@@ -214,35 +271,44 @@ public sealed class WelcomeParty : MonoBehaviour
         helpRect.anchoredPosition = new Vector2(-24, -24);
         help.gameObject.SetActive(false);
 
-        var backdrop = Panel(uiRoot.transform, "Guide Modal", new Color(0.06f, 0.08f, 0.10f, 0.78f), Vector2.zero, Vector2.zero, 0);
+        var backdrop = Rect(uiRoot.transform, "Guide Modal", Vector2.zero, Vector2.zero);
         Stretch(backdrop);
+        // Saydam tıklama perdesi; dünya tıklamaları ayrıca kapalı tutulur.
+        backdrop.gameObject.AddComponent<Image>().color = Color.clear;
         modal = backdrop.gameObject;
-        // Katmanlı, düşük opaklıklı gölge kartı zeminden ayırır.
-        Panel(backdrop, "Soft Shadow", new Color(0, 0, 0, 0.10f), new Vector2(1172, 792), new Vector2(0, -15), 42);
-        Panel(backdrop, "Near Shadow", new Color(0, 0, 0, 0.15f), new Vector2(1152, 772), new Vector2(0, -8), 36);
-        Panel(backdrop, "Card Border", new Color(0.66f, 0.52f, 0.36f), new Vector2(1144, 764), Vector2.zero, 34);
-        var card = Panel(backdrop, "Guide Card", Cream, new Vector2(1140, 760), Vector2.zero, 32);
-        counter = Label(card, "Step", "", 23, Wood, new Vector2(800, 44), new Vector2(-98, 301));
-        for (int i = 0; i < steps.Length; i++)
-            steps[i] = Panel(card, $"Step {i + 1}", Red, new Vector2(14, 14), new Vector2(406 + i * 28, 301), 7).GetComponent<Image>();
-        title = Label(card, "Title", "", 52, Ink, new Vector2(996, 104), new Vector2(0, 207));
-        description = Label(card, "Description", "", 31, new Color(0.39f, 0.30f, 0.22f), new Vector2(996, 150), new Vector2(0, 83));
-        var tipPanel = Panel(card, "Tip Panel", new Color(0.98f, 0.89f, 0.68f), new Vector2(996, 184), new Vector2(0, -105), 22);
-        tipHeading = Label(tipPanel, "Tip Heading", "", 25, Wood, new Vector2(916, 42), new Vector2(0, 48));
-        tip = Label(tipPanel, "Tip", "", 27, Ink, new Vector2(916, 102), new Vector2(0, -22));
-        back = MakeButton(card, "Previous", "←  Geri", Wood, new Vector2(180, 68), new Vector2(-408, -264), PreviousPage);
-        back.GetComponent<Image>().color = new Color(0.91f, 0.86f, 0.77f);
+        for (int i = 0; i < shades.Length; i++)
+            shades[i] = Panel(backdrop, $"Grey Veil {i}", new Color(0.30f, 0.32f, 0.35f, 0.38f), Vector2.zero, Vector2.zero, 0).GetComponent<Image>();
+        targetFrame = Rect(backdrop, "Target Frame", Vector2.zero, Vector2.zero);
+        for (int i = 0; i < 4; i++)
+        {
+            brackets[i * 2] = Panel(targetFrame, $"Corner {i} Horizontal", new Color(1f, 0.93f, 0.73f, 0.9f), new Vector2(30, 3), Vector2.zero, 1.5f);
+            brackets[i * 2 + 1] = Panel(targetFrame, $"Corner {i} Vertical", new Color(1f, 0.93f, 0.73f, 0.9f), new Vector2(3, 30), Vector2.zero, 1.5f);
+        }
+        marker = Panel(backdrop, "Map Label", new Color(0.24f, 0.20f, 0.16f, 0.86f), new Vector2(260, 52), Vector2.zero, 18);
+        targetName = Label(marker, "Target Name", "", 23, Cream, new Vector2(236, 46), Vector2.zero);
+        targetName.alignment = TextAnchor.MiddleCenter;
+
+        var callout = Rect(backdrop, "Map Callout", new Vector2(580, 380), Vector2.zero);
+        callout.anchorMin = callout.anchorMax = Vector2.one;
+        callout.pivot = Vector2.one;
+        callout.anchoredPosition = new Vector2(-28, -28);
+        // Sağ üstteki küçük kart haritanın büyük bölümünü görünür bırakır.
+        Panel(callout, "Shadow", new Color(0, 0, 0, 0.16f), new Vector2(592, 392), new Vector2(0, -6), 28);
+        var card = Panel(callout, "Guide Card", new Color(Cream.r, Cream.g, Cream.b, 0.94f), new Vector2(580, 380), Vector2.zero, 24);
+        counter = Label(card, "Step", "", 20, Wood, new Vector2(516, 38), new Vector2(0, 151));
+        title = Label(card, "Title", "", 35, Ink, new Vector2(516, 66), new Vector2(0, 105));
+        description = Label(card, "Description", "", 26, Ink, new Vector2(516, 134), new Vector2(0, 12));
+        tip = Label(card, "Tip", "", 22, Wood, new Vector2(516, 54), new Vector2(0, -80));
+        back = MakeButton(card, "Previous", "←", Wood, new Vector2(84, 54), new Vector2(-216, -143), PreviousPage);
+        back.GetComponent<Image>().color = new Color(0.90f, 0.85f, 0.76f);
         back.GetComponentInChildren<Text>().color = Ink;
-        var skip = MakeButton(card, "Skip", "Rehberi geç", Wood, new Vector2(220, 68), new Vector2(-170, -264), Complete);
-        skip.GetComponent<Image>().color = Cream;
+        var skip = MakeButton(card, "Skip", "Geç", Wood, new Vector2(118, 54), new Vector2(-83, -143), Complete);
+        skip.GetComponent<Image>().color = Color.clear;
         skip.GetComponentInChildren<Text>().color = Wood;
-        Panel(card, "Next Shadow", new Color(0.67f, 0.20f, 0.18f), new Vector2(398, 68), new Vector2(299, -269), 17);
-        next = MakeButton(card, "Next", "", Red, new Vector2(398, 68), new Vector2(299, -264), NextPage);
+        next = MakeButton(card, "Next", "", Red, new Vector2(234, 54), new Vector2(141, -143), NextPage);
         nextLabel = next.GetComponentInChildren<Text>();
-        Panel(card, "Progress Track", new Color(0.88f, 0.83f, 0.74f), new Vector2(996, 6), new Vector2(0, -322), 3);
-        progress = Panel(card, "Progress", Red, new Vector2(996, 6), new Vector2(0, -322), 3).GetComponent<Image>();
-        var keyboardHint = Label(card, "Keyboard Hint", "← →  adımlar arasında       Esc  rehberi kapatır", 18, new Color(0.56f, 0.46f, 0.35f), new Vector2(996, 40), new Vector2(0, -350));
-        keyboardHint.alignment = TextAnchor.MiddleCenter;
+        Panel(card, "Progress Track", new Color(0.86f, 0.81f, 0.72f), new Vector2(516, 4), new Vector2(0, -180), 2);
+        progress = Panel(card, "Progress", Red, new Vector2(516, 4), new Vector2(0, -180), 2).GetComponent<Image>();
         if (modal != null)
             modal.SetActive(false);
     }

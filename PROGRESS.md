@@ -28,13 +28,15 @@ Son güncelleme: 2026-10-17 (14:45)
 
 ## Aktif çalışma
 
-- **welcomeparty:** Güncel origin/main 96be1c7 tabanından açıldı. Oyna/kamera geçişi sonrası dört adımlı Türkçe rehber: köyü tsunamiden koruma, kaynak döngüsü, duvar inşası, kamera. Okurken oyun ve dünya kontrolleri durur; bitir/geç sonrası GameStarted bir kez çağrılır. Sağ üst ? Rehber ile tekrar açılır.
+- **welcomeparty:** Güncel origin/main 96be1c7 tabanından açıldı. Oyna/kamera geçişi sonrası beş duraklı harita turu: köy, gerçek orman, gerçek madenler, kuyu ve savunma alanı. Büyük merkez menüsü yerine küçük kenar kartı ve gri saydam perde içinden açık kalan hedef alanı kullanılır. Okurken oyun ve dünya kontrolleri durur; bitir/geç sonrası GameStarted bir kez çağrılır. Sağ üst ? Rehber ile tekrar açılır.
 
 - Önceki çalışma: `villageranimations` çalışması `133f068` ile kaydedilip `2a502c1` merge commit'iyle main'e birleştirildi (taban ve doğrulanan origin/main: `0a0d7c2`). Push yapılmadı.
 - Kullanıcının son kararı: kaynak toplama, ana menü ve animasyonlu köylülerle **SampleScene** ana sahne. Kurulum: Tools > BigEs > SampleScene Kaynak ve Koylu Kurulumu.
 - Mevcut 128x128 WFC/chunk yapısı ve zemin varyantları korunur; hücre 2 m, köken (-128,0,-128). Köy/kaynak yolları düz başlangıç hücrelerine ayrılır. Chunk collider ve üçgen bazlı arazi NavMesh kaynağı kullanılır. TerrainGround.mat eski yeşil zemin rengini (0.35,0.55,0.3) korur; Flat.mat ve model paleti değişmez. Eski demo nesneleri inaktif Legacy Demo Objects altında; ResourceTest dosyası özgün haliyle durur.
 
 ## Son durum (yapılanlar)
+
+- **Harita üzerinde tanıtım:** WelcomeMapTour kaynak noktalarının ve kuyunun gerçek sınırlarını bulur; kamera duraklar arasında oyun duraklatılmışken de yumuşakça ilerler. WelcomeParty küçük sağ üst kart, hedef etiketi, köşe işaretleri ve hedefin üzerini kapatmayan gri saydam perde kullanır. Geç/bitir/disable eski kamera duruşunu geri getirir. Unity: 38/38 test başarılı (Logs/welcome-map-tour-tests.xml); kaynak hedefleri, kadraj ve yarım kalan kamera hareketinin güvenle geri alınması doğrulandı.
 
 - **Rehber tasarımı (welcomeparty):** Yuvarlak kart, düğme ve ipucu paneli; ince çerçeve, katmanlı gölge, krem/ahşap/mercan renk düzeni, noktalı adım göstergeleri ve ayrı ipucu başlığı eklendi. Küçük bir yuvarlak yüzey dokusu çalışma anında ortak üretilir ve sahne kapanışında temizlenir; dış asset eklenmedi. Dört sayfa canlı Play'de kontrol edildi; metinler ve düğmeler sığıyor, derleme/çalışma hatası yok.
 
@@ -99,6 +101,8 @@ Son güncelleme: 2026-10-17 (14:45)
 - **Duvar/kaynak entegrasyonu:** `Well` artık duvar sisteminin `IWallResourceStore` uygulamasıdır; odun+taş harcaması tek atomik işlemde yapılır ve hatalı olay dinleyicileri commit'i bozamaz. Eksik/bozuk serialize edilmiş bakiye dizileri edit-time erişimde de güvenle normalize edilir. `ResourceTest` kurucusu 240×240 m, negatif dünya koordinatlarını kapsayan inşa gridini ve controller'ı hazırlar fakat mevcut bakiyeyi değiştirmez; kaynaklar normal oynanışla toplanır. Yeni ve yükseltilen sahneler Toplama modunda başlar; B/panel ile İnşa–Toplama modu değiştirilir ve UI tıklamaları iki sol-tık sistemine de aktarılmaz. Yalnız ayrı duvar demosu `Well` deposunu 60/30 ile başlatır. Başarı/yetersizlik/geçersiz yol/observer ve bozuk bakiye dizisi EditMode testleri yazıldı; statik kontroller geçti, Unity bulunmadığı için testlerin çalıştırılması bekliyor.
 
 ## Sıradaki işler / açık konular
+
+- [x] Büyük tanıtım menüsünü kaynakları gösteren küçük harita turuna dönüştür.
 
 - [x] Karşılama rehberinin köşelerini yuvarlat ve görsel düzenini iyileştir.
 
