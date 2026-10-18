@@ -110,7 +110,7 @@ public class MapView : MonoBehaviour
 
         if (ruins != null)
             foreach (var ruin in ruins)
-                if (ruin.Intact != null && ruin.Ruined != null)
+                if (ruin.Intact != null && ruin.Ruined != null && !IsLandscape(ruin.Intact.name))
                     ruinOf[ruin.Intact] = ruin.Ruined;
 
         cells = new CellDraw[world.Width * world.Height];
@@ -195,7 +195,7 @@ public class MapView : MonoBehaviour
             if (!world.InBounds(cell.x, cell.y) || ruinedCells.Contains(cell.y * world.Width + cell.x))
                 continue;
             var draw = cells[cell.y * world.Width + cell.x];
-            if (draw.Prefab == null)
+            if (draw.Prefab == null || !ruinOf.ContainsKey(draw.Prefab))
                 continue;
             foreach (var filter in draw.Prefab.GetComponentsInChildren<MeshFilter>())
                 if (filter.sharedMesh != null && filter.sharedMesh.isReadable)
@@ -214,6 +214,11 @@ public class MapView : MonoBehaviour
         foreach (var cell in structure)
         {
             if (!world.InBounds(cell.x, cell.y))
+                continue;
+            // House cell lists can outlive a regenerated map. Only registered house models may change.
+            world.Get(cell.x, cell.y, out var id, out _);
+            var intact = Pick(id, cell.x, cell.y);
+            if (intact == null || !ruinOf.ContainsKey(intact))
                 continue;
             var index = cell.y * world.Width + cell.x;
             if (ruined ? ruinedCells.Add(index) : ruinedCells.Remove(index))
