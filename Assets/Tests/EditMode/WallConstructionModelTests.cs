@@ -394,18 +394,29 @@ namespace IdleTown.Tests
         [Test]
         public void ConstructionPanelHitTest_ConvertsInputCoordinatesAndUsesExclusiveMaxEdges()
         {
+            var root = new GameObject("Responsive construction HUD test");
+            try
+            {
+            var controller = root.AddComponent<WallConstructionController>();
+            var hud = root.AddComponent<WallConstructionHUD>();
+            hud.Initialize(controller);
+            Canvas.ForceUpdateCanvases();
+            var panel = WallConstructionController.PanelRect;
+            Assert.That(panel.width, Is.GreaterThan(0));
             Assert.That(
                 WallConstructionController.IsPointerOverConstructionPanel(
-                    new Vector2(16f, Screen.height - 16f)),
+                    new Vector2(panel.xMin, Screen.height - panel.yMin)),
                 Is.True);
             Assert.That(
                 WallConstructionController.IsPointerOverConstructionPanel(
-                    new Vector2(486f, Screen.height - 16f)),
+                    new Vector2(panel.xMax, Screen.height - panel.yMin)),
                 Is.False);
             Assert.That(
                 WallConstructionController.IsPointerOverConstructionPanel(
-                    new Vector2(16f, Screen.height - 406f)),
+                    new Vector2(panel.xMin, Screen.height - panel.yMax)),
                 Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
         }
 
         [Test]
@@ -877,6 +888,99 @@ namespace IdleTown.Tests
                 Assert.That(walls[i].GetComponentInChildren<Renderer>().enabled, Is.True);
                 Assert.That(walls[i].GetComponentInChildren<Collider>(), Is.Not.Null);
             }
+        }
+
+        [Test]
+        public void AutoHeight_RepeatedPathPreviewsAndBuildsNextFloorWithoutDrifting()
+        {
+            var root = new GameObject("Automatic wall height");
+            try
+            {
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(root.AddComponent<World>(), null);
+                controller.SetResourceStore(new FakeResourceStore(100, 100));
+                Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out _), Is.True);
+                controller.HandleNodeClick(Vector2Int.zero);
+                for (int i = 0; i < 5; i++) controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.SelectedFloor, Is.EqualTo(1));
+                controller.RefreshPreview(Vector2Int.up);
+                Assert.That(controller.SelectedFloor, Is.Zero, "Moving to fresh ground should return to the base floor.");
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.ConfirmHoveredPreview(), Is.True);
+                Assert.That(controller.Walls, Has.Count.EqualTo(2));
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.SelectedFloor, Is.EqualTo(2));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void AutoHeight_ManualFloorAndDisabledAutoAreRespected()
+        {
+            var root = new GameObject("Manual wall height");
+            try
+            {
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(root.AddComponent<World>(), null);
+                controller.SetResourceStore(new FakeResourceStore(100, 100));
+                controller.TryBuild(Vector2Int.zero, Vector2Int.right, out _);
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+                controller.SetSelectedFloor(0);
+                Assert.That(controller.SelectedFloor, Is.Zero);
+                Assert.That(controller.CanConfirm, Is.False);
+                controller.SetAutomaticHeight(false);
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.SelectedFloor, Is.Zero);
+                controller.SetAutomaticHeight(true);
+                Assert.That(controller.SelectedFloor, Is.EqualTo(1));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void AutoHeight_PreservesMaterialUpgradeAndRejectsUnsupportedMixedPath()
+        {
+            var root = new GameObject("Wall height support");
+            try
+            {
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(root.AddComponent<World>(), null);
+                controller.SetResourceStore(new FakeResourceStore(100, 100));
+                controller.TryBuild(Vector2Int.zero, Vector2Int.right, out _);
+                controller.SetSelectedTier(WallTier.Stone);
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.SelectedFloor, Is.Zero, "Stronger materials should still upgrade the existing wall.");
+                Assert.That(controller.ConfirmHoveredPreview(), Is.True);
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(new Vector2Int(2, 0));
+                Assert.That(controller.SelectedFloor, Is.Zero, "A partly supported line must not jump to a floating upper floor.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void AutoHeight_FullStackStopsAtTwentyMetresWithoutSpending()
+        {
+            var root = new GameObject("Wall height limit");
+            try
+            {
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(root.AddComponent<World>(), null);
+                var resources = new FakeResourceStore(100, 100);
+                controller.SetResourceStore(resources);
+                for (int floor = 0; floor < 10; floor++)
+                    Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, floor, WallTier.Timber, out _), Is.True);
+                int before = resources.SpendCalls;
+                controller.HandleNodeClick(Vector2Int.zero);
+                controller.RefreshPreview(Vector2Int.right);
+                Assert.That(controller.SelectedFloor, Is.EqualTo(9));
+                Assert.That(controller.ConfirmHoveredPreview(), Is.False);
+                Assert.That(resources.SpendCalls, Is.EqualTo(before));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
         }
 
         sealed class FakeResourceStore : IWallResourceStore

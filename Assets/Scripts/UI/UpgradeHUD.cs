@@ -59,6 +59,7 @@ public class UpgradeHUD : MonoBehaviour
 
     // Tutorial'ın gösterdiği İşçi butonu (henüz kurulmadıysa null).
     public RectTransform WorkerButton => workerButton != null ? (RectTransform)workerButton.transform : null;
+    public RectTransform ResourceCardTemplate => template;
 
     void Start()
     {
@@ -259,6 +260,10 @@ public class UpgradeHUD : MonoBehaviour
     // kamera arkasındayken gizlenir.
     void LateUpdate()
     {
+        construction ??= FindAnyObjectByType<WallConstructionController>();
+        bool inConstruction = construction != null && construction.isActiveAndEnabled && construction.ConstructionModeActive;
+        if (workerButton != null) workerButton.gameObject.SetActive(!inConstruction);
+        if (speedButton != null) speedButton.gameObject.SetActive(!inConstruction);
         if (cam == null)
         {
             var iso = FindAnyObjectByType<IsometricCamera>();

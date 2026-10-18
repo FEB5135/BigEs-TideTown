@@ -237,10 +237,11 @@ public class TutorialHints : MonoBehaviour
         {
             title = "DUVAR ÖR",
             body = "Fırtına yaklaşıyor! B ile inşa moduna geç, başlangıç ve bitiş noktasına sol tıkla. "
-                + "1 / 2 / 3: ahşap, taş, güçlü. Sağ tık: iptal.",
+                + "1 / 2 / 3: tahta, taş, güçlü. ↑ / ↓ ile katı değiştir (her kat 2 m, en çok 20 m). "
+                + "Aynı hattı yeniden seçersen üst kata otomatik çıkılır. N: silme, sağ tık: iptal.",
             releasesTsunami = true,
             done = () => construction == null || wallBuilt,
-            // Soldaki duvar paneli IMGUI ile karartmanın üstüne çizilir, ayrıca göstermeye gerek yok.
+            spots = list => AddUiSpot(list, WallConstructionHUD.Toolbar),
             resume = () => construction.ConstructionModeActive || LeftPressed(),
         },
         new Step
@@ -538,7 +539,7 @@ public class TutorialHints : MonoBehaviour
         dimTexture.Apply(false);
     }
 
-    // Kart soldaki duvar panelinin (IMGUI, ekranla ölçeklenmez) ve sağ üstteki tsunami panelinin arasına sığdırılır:
+    // The construction HUD lives above the bottom resource bar; only reserve left space if it reaches this card.
     // yer varsa ortada durur, dar ekranda kayar ve daralır; metin alt satıra geçer, kart uzar.
     void Layout()
     {
@@ -547,7 +548,7 @@ public class TutorialHints : MonoBehaviour
             return;
         float width = Screen.width / scale;
         float left = Margin;
-        if (construction != null && construction.isActiveAndEnabled)
+        if (construction != null && construction.isActiveAndEnabled && WallConstructionController.PanelRect.yMin < 210f * scale)
             left = WallConstructionController.PanelRect.xMax / scale + Margin;
         float right = width - rightReserve;
         float cardWidth = Mathf.Clamp(right - left, MinCardWidth, CardWidth);

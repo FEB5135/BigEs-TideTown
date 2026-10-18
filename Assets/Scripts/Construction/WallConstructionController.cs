@@ -11,9 +11,7 @@ namespace IdleTown.Construction
 {
     public sealed class WallConstructionController : MonoBehaviour
     {
-        static readonly Rect ConstructionPanelRect = new(16f, 16f, 470f, 390f);
-        // Panelin ekran pikseli cinsinden yeri (IMGUI, ölçeklenmez); tutorial kartı onu örtmesin diye.
-        internal static Rect PanelRect => ConstructionPanelRect;
+        internal static Rect PanelRect => WallConstructionHUD.VisibleRect;
 
         [Header("Scene references")]
         [SerializeField] World world;
@@ -67,7 +65,7 @@ namespace IdleTown.Construction
         readonly Dictionary<(Vector2Int node, int floor), GameObject> jointPosts = new();
         Material ghostMaterial;
         Collider[] overlapBuffer = new Collider[32];
-        GUIStyle titleStyle, labelStyle, buttonStyle, statusStyle;
+        WallConstructionHUD hud;
         bool upArrowHeld, downArrowHeld;
         bool demolitionMode;
         bool demolitionKeyHeld;
@@ -84,6 +82,9 @@ namespace IdleTown.Construction
         int previewStone;
         bool buildInProgress;
         int selectedFloor;
+        int requestedFloor;
+        bool manualFloorForSelection;
+        bool automaticHeight = true;
         WallTier selectedTier;
         bool hasPreviewEndpoint;
         Vector2Int previewEndpoint;
@@ -97,6 +98,13 @@ namespace IdleTown.Construction
         public IReadOnlyCollection<WallRecord> Walls => model.Walls;
         public int SelectedFloor => selectedFloor;
         public int MaxFloors => maxFloors;
+        public bool AutomaticHeight => automaticHeight;
+        public void SetAutomaticHeight(bool active)
+        {
+            automaticHeight = active;
+            manualFloorForSelection = false;
+            RefreshPreviewForSelectionChange();
+        }
         public void ConfigureTerrain(WallTerrainSurface surface, int floors = 10)
         {
             terrainSurface = surface;
@@ -105,6 +113,17 @@ namespace IdleTown.Construction
         }
         public WallTier SelectedTier => selectedTier;
         public bool ConstructionModeActive => constructionModeActive;
+        internal string BuildStatus => status;
+        internal string ConfirmationStatus => confirmationStatus;
+        internal bool HasSelection => hasStart;
+        internal bool CanConfirm => hasStart && hasLastValidPreviewEndpoint && (!hasPreviewEndpoint || previewValid);
+        internal bool InvalidPreview => hasStart && !previewValid;
+        internal string PreviewSummary => hasStart
+            ? $"{previewPath.Count} parça · {CostText(previewWood, previewStone)}"
+            : "Başlangıç ve bitiş noktalarını seç";
+        internal string StockSummary => resourceStore != null
+            ? $"{resourceStore.Wood} odun   /   {resourceStore.Stone} taş"
+            : "Depo bağlı değil";
         public LayerMask ObstacleLayers
         {
             get => obstacleLayers;
@@ -139,6 +158,11 @@ namespace IdleTown.Construction
             NormalizeConfiguration();
             ResolveReferences();
             CreatePreviewLine();
+            if (Application.isPlaying)
+            {
+                hud = gameObject.AddComponent<WallConstructionHUD>();
+                hud.Initialize(this);
+            }
         }
 
         void OnValidate()
@@ -246,95 +270,6 @@ namespace IdleTown.Construction
             if ((input.type == EventType.KeyDown || input.type == EventType.KeyUp) &&
                 HandleFloorKey(input.keyCode, input.type == EventType.KeyDown))
                 input.Use();
-            EnsureStyles();
-            var oldColor = GUI.color;
-            var oldBackground = GUI.backgroundColor;
-            var oldContent = GUI.contentColor;
-            GUI.color = new Color(.075f, .12f, .14f, .96f);
-            GUI.DrawTexture(ConstructionPanelRect, Texture2D.whiteTexture);
-            GUI.color = new Color(.82f, .65f, .36f);
-            GUI.DrawTexture(new Rect(16, 16, 470, 3), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUILayout.BeginArea(new Rect(30, 28, 442, 366));
-            GUILayout.Label("DUVAR ATÖLYESİ", titleStyle);
-            if (GUILayout.Button(constructionModeActive ? "İNŞA MODU    ·    B: toplamaya geç" : "TOPLAMA MODU    ·    B: inşaata geç", buttonStyle))
-                SetConstructionMode(!constructionModeActive);
-            if (!constructionModeActive)
-            {
-                GUILayout.Label("Kaynaklara sol tıkla. N: silme moduna geç.", labelStyle);
-                GUILayout.EndArea();
-                GUI.backgroundColor = oldBackground;
-                GUI.contentColor = oldContent;
-                GUI.color = oldColor;
-                return;
-            }
-            if (GUILayout.Button(demolitionMode ? "SİLME MODU AÇIK · N: inşa moduna dön" : "SİLME MODUNU AÇ · N", buttonStyle))
-                SetDemolitionMode(!demolitionMode);
-            if (demolitionMode)
-            {
-                GUILayout.Label("Sarı çerçeveli duvarı silmek için sol tıkla.", labelStyle);
-                GUILayout.Label("Bağlı üst katlar da kalkar. Kaynak iadesi yok.", labelStyle);
-                GUILayout.Label(status, statusStyle);
-                GUILayout.EndArea();
-                GUI.backgroundColor = oldBackground;
-                GUI.contentColor = oldContent;
-                GUI.color = oldColor;
-                return;
-            }
-            GUILayout.Label("Sol tık: başlangıç / bitiş   ·   Enter: inşa et", labelStyle);
-            GUILayout.Label("Sağ tık / Esc: iptal   ·   ↑ ↓: kat   ·   1 2 3: seviye", labelStyle);
-            GUILayout.Space(5);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("↓", buttonStyle, GUILayout.Width(48)))
-                SetSelectedFloor(selectedFloor - 1);
-            GUILayout.Label($"KAT {selectedFloor + 1} / {maxFloors}     {FloorBaseHeight(selectedFloor):0.##} m", labelStyle);
-            if (GUILayout.Button("↑", buttonStyle, GUILayout.Width(48)))
-                SetSelectedFloor(selectedFloor + 1);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            DrawTierButton(WallTier.Timber, "1 Ahşap");
-            DrawTierButton(WallTier.Stone, "2 Taş");
-            DrawTierButton(WallTier.Reinforced, "3 Güçlendirilmiş");
-            GUILayout.EndHorizontal();
-            if (resourceStore != null)
-                GUILayout.Label($"DEPO      {resourceStore.Wood} odun     ·     {resourceStore.Stone} taş", labelStyle);
-            else
-                GUILayout.Label("Kaynak deposu bağlı değil.", labelStyle);
-
-            GUILayout.Label($"{model.Walls.Count} duvar parçası    ·    {TierName(selectedTier)}", labelStyle);
-            if (hasStart)
-                GUILayout.Label($"Ön izleme: {previewPath.Count} parça  /  {CostText(previewWood, previewStone)}", labelStyle);
-            else
-                GUILayout.Label("Başlangıç noktasını seçerek bir duvar çiz.", labelStyle);
-
-            var wasEnabled = GUI.enabled;
-            GUI.enabled = hasStart && hasLastValidPreviewEndpoint && (!hasPreviewEndpoint || previewValid);
-            var buildButtonLabel = hasLastValidPreviewEndpoint
-                ? $"İNŞA ET   ·   {lastValidPreviewCount} parça / {CostText(lastValidPreviewWood, lastValidPreviewStone)}"
-                : "İNŞA ET   ·   Geçerli bir yol seç";
-            GUI.backgroundColor = new Color(.4f, .77f, .61f);
-            if (GUILayout.Button(buildButtonLabel, buttonStyle))
-                ConfirmLastValidPreview();
-            GUI.enabled = wasEnabled;
-            GUI.backgroundColor = oldBackground;
-            GUI.contentColor = hasStart && !previewValid ? new Color(1f, .47f, .4f) : new Color(.6f, .92f, .74f);
-            GUILayout.Label(status, statusStyle);
-            GUI.contentColor = new Color(.67f, .74f, .76f);
-            GUILayout.Label(confirmationStatus, statusStyle);
-            GUI.contentColor = oldContent;
-            GUILayout.EndArea();
-            GUI.color = oldColor;
-        }
-
-        void EnsureStyles()
-        {
-            if (titleStyle != null) return;
-            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, fixedHeight = 30 };
-            titleStyle.normal.textColor = new Color(.92f, .79f, .54f);
-            labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fixedHeight = 21 };
-            labelStyle.normal.textColor = new Color(.86f, .9f, .88f);
-            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 15, fixedHeight = 26 };
-            statusStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true };
         }
 
         public void Configure(World targetWorld, MonoBehaviour resources, Camera camera = null)
@@ -493,6 +428,8 @@ namespace IdleTown.Construction
         public void SetSelectedFloor(int floor)
         {
             var clamped = Mathf.Clamp(floor, 0, Mathf.Max(1, maxFloors) - 1);
+            requestedFloor = clamped;
+            manualFloorForSelection = hasStart;
             if (selectedFloor == clamped)
                 return;
             selectedFloor = clamped;
@@ -672,6 +609,7 @@ namespace IdleTown.Construction
         {
             if (!hasStart)
             {
+                manualFloorForSelection = false;
                 hasStart = true;
                 startNode = node;
                 hasPreviewEndpoint = false;
@@ -695,6 +633,7 @@ namespace IdleTown.Construction
             }
 
             var path = WallConstructionModel.CreateSnappedPath(startNode, endpoint);
+            selectedFloor = InteractiveFloor(path);
             if (!Validate(path, selectedFloor, selectedTier, out var reason, out var spentWood, out var spentStone))
             {
                 status = reason;
@@ -774,6 +713,7 @@ namespace IdleTown.Construction
 
         void CancelSelection()
         {
+            manualFloorForSelection = false;
             ClearDemolitionPreview();
             hasStart = false;
             previewPath.Clear();
@@ -833,6 +773,7 @@ namespace IdleTown.Construction
 
             previewEndpoint = hoveredNode.Value;
             previewPath.AddRange(WallConstructionModel.CreateSnappedPath(startNode, hoveredNode.Value));
+            selectedFloor = InteractiveFloor(previewPath);
             previewValid = Validate(
                 previewPath,
                 selectedFloor,
@@ -858,6 +799,20 @@ namespace IdleTown.Construction
             DrawPreview();
         }
 
+        int InteractiveFloor(IReadOnlyList<WallEdge> path)
+        {
+            int floor = Mathf.Clamp(requestedFloor, 0, maxFloors - 1);
+            if (!automaticHeight || manualFloorForSelection || path.Count == 0) return floor;
+            // Skip a complete occupied layer, but preserve material upgrades and reject unsupported mixed paths.
+            while (floor < maxFloors - 1)
+            {
+                foreach (var edge in path)
+                    if (!model.TryGet(edge, floor, out var wall) || wall.Tier < selectedTier) return floor;
+                floor++;
+            }
+            return floor;
+        }
+
         void RevalidateCachedEndpoint()
         {
             if (!hasLastValidPreviewEndpoint)
@@ -866,7 +821,7 @@ namespace IdleTown.Construction
             var cachedPath = WallConstructionModel.CreateSnappedPath(startNode, lastValidPreviewEndpoint);
             if (!Validate(
                     cachedPath,
-                    selectedFloor,
+                    InteractiveFloor(cachedPath),
                     selectedTier,
                     out _,
                     out lastValidPreviewWood,
@@ -886,7 +841,7 @@ namespace IdleTown.Construction
         {
             // Input System screen coordinates start at bottom-left; IMGUI starts at top-left.
             var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
-            return ConstructionPanelRect.Contains(guiPosition);
+            return PanelRect.Contains(guiPosition);
         }
 
         public static bool IsPointerOverConstructionUi(Vector2 screenPosition)
@@ -1291,21 +1246,11 @@ namespace IdleTown.Construction
             }
         }
 
-        void DrawTierButton(WallTier tier, string label)
-        {
-            var oldColor = GUI.backgroundColor;
-            if (selectedTier == tier)
-                GUI.backgroundColor = new Color(.88f, .72f, .43f);
-            if (GUILayout.Button(label, buttonStyle))
-                SetSelectedTier(tier);
-            GUI.backgroundColor = oldColor;
-        }
-
         float FloorBaseHeight(int floor) => floorZeroBaseHeight + floor * wallHeight;
 
         static string CostText(int wood, int stone) => wood == 0 ? $"{stone} taş" : stone == 0 ? $"{wood} odun" : $"{wood} odun · {stone} taş";
 
-        WallCost CostFor(WallTier tier)
+        internal WallCost CostFor(WallTier tier)
         {
             return tier switch
             {
