@@ -8,7 +8,8 @@ namespace Tsunami
     /// <summary>
     /// Ends the game after the tsunami. Lose: the moment loseHouses houses have fallen (by default the first one:
     /// the village has to be walled off completely). Win: the wave has passed without that, i.e. the tsunami has run for minWaveSeconds of simulation
-    /// time and no house has fallen for calmSeconds (or maxWaveSeconds is over). The end card shows the standing and
+    /// time and no house has fallen for calmSeconds (or maxWaveSeconds is over). When the tsunami comes as a sequence
+    /// of waves (TsunamiController.UsesWaves), the game is won only once the last wave is over (WavesFinished). The end card shows the standing and
     /// destroyed houses and the score (standing houses x pointsPerHouse, saved to HighScore), then stops the game;
     /// "Tekrar Oyna" reloads the scene straight into play, "Ana Menü" reloads it to the menu.
     /// Needs no scene setup: like TsunamiVillageAlarm it adds itself to any scene with a TsunamiController.
@@ -73,6 +74,7 @@ namespace Tsunami
             if (controller != null)
             {
                 controller.StateChanged += OnStateChanged;
+                controller.WavesFinished += OnWavesFinished;
                 OnStateChanged(controller.State);
             }
             var hints = FindAnyObjectByType<TutorialHints>();
@@ -88,7 +90,10 @@ namespace Tsunami
         void OnDestroy()
         {
             if (controller != null)
+            {
                 controller.StateChanged -= OnStateChanged;
+                controller.WavesFinished -= OnWavesFinished;
+            }
             if (ended)
                 Time.timeScale = 1f;
         }
@@ -112,6 +117,13 @@ namespace Tsunami
             }
         }
 
+        // With waves, every wave fended off lets the game go on; it is won when the last one is over.
+        void OnWavesFinished()
+        {
+            if (!ended && (Houses.All.Count == 0 || Houses.DestroyedCount < loseHouses))
+                StartCoroutine(End(true, 0f));
+        }
+
         void OnHouseDestroyed(Houses.House house)
         {
             if (running)
@@ -132,6 +144,8 @@ namespace Tsunami
                 return;
             }
 
+            if (controller.UsesWaves)
+                return; // won in OnWavesFinished
             double now = SimTime;
             double elapsed = now - runStart;
             if ((elapsed >= minWaveSeconds && now - lastFall >= calmSeconds) || elapsed >= maxWaveSeconds)
