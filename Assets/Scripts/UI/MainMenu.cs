@@ -11,12 +11,17 @@ public class MainMenu : MonoBehaviour
 {
     // Kamera oyuna indiğinde, oyuncu kontrolü aldığı anda çağrılır.
     public static event Action GameStarted;
+    public static event Action TutorialReady;
     public static bool IsOpen { get; private set; }
     // "Tekrar Oyna" ile sahne yeniden yüklenince menü beklemeden oyun başlar.
     public static bool PlayOnLoad { get; set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => PlayOnLoad = false; // Domain reload kapalı: Play'ler arasında kalmasın.
+    static void ResetStatics()
+    {
+        PlayOnLoad = false;
+        TutorialReady = null;
+    }
 
     [SerializeField] CameraIntro cameraIntro;
     [Tooltip("Menünün tamamı (kaybolurken kullanılır).")]
@@ -124,7 +129,76 @@ public class MainMenu : MonoBehaviour
         foreach (var behaviour in gameplayBehaviours)
             if (behaviour != null)
                 behaviour.enabled = true;
+        StartCoroutine(ShowPreparationNotice());
         GameStarted?.Invoke();
+    }
+
+    IEnumerator ShowPreparationNotice()
+    {
+        var root = new GameObject("Preparation Notice", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(CanvasGroup));
+        var canvas = root.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 35;
+        var scaler = root.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+        var group = root.GetComponent<CanvasGroup>();
+        group.interactable = group.blocksRaycasts = false;
+        var tutorial = FindAnyObjectByType<TutorialHints>();
+        var font = tutorial != null ? tutorial.CardFont : highScoreText != null ? highScoreText.font : null;
+        if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var card = new GameObject("Card", typeof(RectTransform), typeof(Image));
+        card.transform.SetParent(root.transform, false);
+        var rect = (RectTransform)card.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.58f);
+        rect.sizeDelta = new Vector2(900f, 180f);
+        var background = card.GetComponent<Image>();
+        background.color = new Color(0.043f, 0.165f, 0.239f, 0.94f);
+        background.raycastTarget = false;
+        if (tutorial != null && tutorial.CardSprite != null)
+        {
+            background.sprite = tutorial.CardSprite;
+            background.type = Image.Type.Sliced;
+        }
+        AddLine("Title", "Tsunamiye Hazırlan", 48, new Color(1f, 0.824f, 0.247f), 28f, 70f);
+        AddLine("Goal", "Kaynak topla, işçi görevlendir ve köyünü duvarlarla koru.", 28, Color.white, -38f, 60f);
+        try
+        {
+            for (float time = 0f; time < 3f; time += Time.unscaledDeltaTime)
+            {
+                group.alpha = Mathf.Min(Mathf.Clamp01(time / 0.3f), Mathf.Clamp01((3f - time) / 0.5f));
+                rect.localScale = Vector3.one * Mathf.Lerp(0.96f, 1f, EaseOutCubic(time / 0.3f));
+                yield return null;
+            }
+        }
+        finally
+        {
+            if (root != null)
+            {
+                root.SetActive(false);
+                Destroy(root);
+            }
+        }
+        TutorialReady?.Invoke();
+
+        void AddLine(string name, string message, int size, Color color, float y, float height)
+        {
+            var line = new GameObject(name, typeof(RectTransform), typeof(Text));
+            line.transform.SetParent(card.transform, false);
+            var text = line.GetComponent<Text>();
+            text.font = font;
+            text.text = message;
+            text.fontSize = size;
+            text.color = color;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.raycastTarget = false;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 20;
+            text.resizeTextMaxSize = size;
+            text.rectTransform.sizeDelta = new Vector2(840f, height);
+            text.rectTransform.anchoredPosition = new Vector2(0f, y);
+        }
     }
 
     void Quit()

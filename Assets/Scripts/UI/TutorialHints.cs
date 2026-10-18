@@ -9,8 +9,7 @@ using UnityEngine.UI;
 
 // Oyun başında ekranın üst ortasında çıkan ipucu kartları. Oyunu durdurmaz: oyuncu söyleneni yapınca sıradaki
 // adıma geçilir, zaten yaptıysa adım hiç gösterilmez. Bilgi adımları birkaç saniye sonra kendiliğinden geçer.
-// "ATLA" hepsini kapatır. Bitince ya da atlanınca PlayerPrefs'e yazılır, sonraki oyunlarda çıkmaz
-// (Tools > BigEs > Tutorial'ı Sıfırla).
+// "ATLA" o oyun için kapatır. Her yeni oyunda hazırlık mesajından sonra yeniden gösterilir.
 // Tutorial sürerken tsunami sayacı başlamaz (HoldsTsunami): duvar adımı gelince ya da atlanınca TsunamiAllowed
 // çağrılır ve TsunamiController sayacı başlatır.
 // Oyuncu ilk dalgada vakit kaybetmesin diye her eylem adımı açılınca oyun zamanı durur (Time.timeScale = 0),
@@ -35,10 +34,6 @@ public class TutorialHints : MonoBehaviour
     [SerializeField] float infoDuration = 9f;
     [Tooltip("Bir adım bitince sıradakinin gelmesine kadar bekleme (sn).")]
     [SerializeField] float stepGap = 0.6f;
-    [Tooltip("Test: PlayerPrefs'e bakmadan her oyunda göster.")]
-    [SerializeField] bool alwaysShow;
-    [Tooltip("Sağ üstteki tsunami panelinin kapladığı genişlik (1920 referans pikseli). Kart onun soluna sığdırılır.")]
-    [SerializeField] float rightReserve = 510f;
     [Tooltip("Zaman durunca ekranın göze görünen kararma miktarı (0-1).")]
     [SerializeField, Range(0f, 1f)] float dimAlpha = 0.55f;
 
@@ -125,14 +120,14 @@ public class TutorialHints : MonoBehaviour
 
     void Awake()
     {
-        active = alwaysShow || PlayerPrefs.GetInt(DonePref, 0) == 0;
+        active = true;
         HoldsTsunami = active;
         steps = CreateSteps();
         BuildCard();
     }
 
-    void OnEnable() => MainMenu.GameStarted += OnGameStarted;
-    void OnDisable() => MainMenu.GameStarted -= OnGameStarted;
+    void OnEnable() => MainMenu.TutorialReady += OnGameStarted;
+    void OnDisable() => MainMenu.TutorialReady -= OnGameStarted;
 
     void Start()
     {
@@ -395,8 +390,6 @@ public class TutorialHints : MonoBehaviour
         card.GetWorldCorners(corners);
         if (screen.y > corners[0].y - 20f * scale)
             return true;
-        if (screen.x > Screen.width - rightReserve * scale && screen.y > Screen.height - 440f * scale)
-            return true;
         if (screen.y < 140f * scale)
             return true;
         if (construction != null && construction.isActiveAndEnabled
@@ -550,7 +543,7 @@ public class TutorialHints : MonoBehaviour
         float left = Margin;
         if (construction != null && construction.isActiveAndEnabled && WallConstructionController.PanelRect.yMin < 210f * scale)
             left = WallConstructionController.PanelRect.xMax / scale + Margin;
-        float right = width - rightReserve;
+        float right = width - Margin;
         float cardWidth = Mathf.Clamp(right - left, MinCardWidth, CardWidth);
         float minX = left + cardWidth * 0.5f - width * 0.5f;
         float maxX = right - cardWidth * 0.5f - width * 0.5f;
@@ -620,8 +613,6 @@ public class TutorialHints : MonoBehaviour
     void Finish()
     {
         AllowTsunami();
-        PlayerPrefs.SetInt(DonePref, 1);
-        PlayerPrefs.Save();
         running = false;
         routine = null;
         Unfreeze();

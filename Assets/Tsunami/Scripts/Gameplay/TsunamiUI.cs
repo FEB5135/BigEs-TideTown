@@ -43,6 +43,9 @@ namespace Tsunami
 
         void Awake()
         {
+            // Keep wave alerts, remove the developer control panel from gameplay.
+            var controls = transform.Find("Control Panel");
+            if (controls != null) controls.gameObject.SetActive(false);
             if (startButton != null) startLabel = startButton.GetComponentInChildren<Text>();
             if (stopButton != null) stopLabel = stopButton.GetComponentInChildren<Text>();
             visibility = GetComponent<CanvasGroup>();

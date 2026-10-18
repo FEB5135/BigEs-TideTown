@@ -3942,7 +3942,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: e46aec4382d64ee4c96df9ccdf2db343, type: 3}
-    m_FontSize: 150
+    m_FontSize: 120
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
@@ -3953,7 +3953,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: BigEs
+  m_Text: Tide Town
 --- !u!222 &455038514
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -5689,8 +5689,6 @@ MonoBehaviour:
   panelSprite: {fileID: 21300000, guid: 0de1c9bb912f47c44b6a7660670392f5, type: 3}
   infoDuration: 9
   stepGap: 0.6
-  alwaysShow: 0
-  rightReserve: 510
   dimAlpha: 0.55
 --- !u!4 &595395691
 Transform:

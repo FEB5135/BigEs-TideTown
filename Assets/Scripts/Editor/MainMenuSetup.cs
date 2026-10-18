@@ -154,7 +154,7 @@ public static class MainMenuSetup
         waves.anchoredPosition = new Vector2(0f, 118f);
         AddShadow(waves.GetComponent<Image>(), Navy, 4f, 1f);
 
-        var title = NewText(logo, "Title", "BigEs", 150, Color.white);
+        var title = NewText(logo, "Title", "Tide Town", 120, Color.white);
         title.font = titleFont;
         title.rectTransform.sizeDelta = new Vector2(900f, 176f);
         title.rectTransform.anchoredPosition = new Vector2(0f, 14f);
