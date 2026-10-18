@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`feature/storm-warning`, `feature/upgrades`'e birleştirildi)
+Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç güncellemesi, THIRD_PARTY.md)
 
 ## Bağlam
 
@@ -74,6 +74,7 @@ Son güncelleme: 2026-10-18 (`feature/storm-warning`, `feature/upgrades`'e birle
   - Panel: "Anında Etkinleştir" (kırmızı, panel 388 px). Durum satırı sayacı gösterir: "Fırtına yaklaşıyor - tsunamiye 2:13".
   - Kurulum: `TsunamiTeamMapSetup` yeni kurulumda hepsini ekler; var olan sahne için menü "Tsunami > Add Storm And Release Button To Open Scene" (fırtına ve kabarmayı her seferinde yeniden kurar). SampleScene buna göre güncellendi.
   - Play'de doğrulandı: menüde ve oyun başında ufukta beyaz bulutlar; sayaç 20 sn'ye indirilerek bulutların yaklaşıp karardığı, sayaç bitince uyarının kendiliğinden başladığı, şimşek, kabarmanın ufuktan gelip simülasyona devrettiği ve dalganın kıyıyı bastığı görüldü; Anında Etkinleştir ve Sıfırla çalışıyor; konsol temiz. Gerçek 2-3 dk'lık bekleme baştan sona izlenmedi. Bulutlar kameranın 45° oyun bakışında ancak yakınlaşınca/denize bakınca belirgin; ses (gök gürültüsü) yok. Geri bildirim sonrası Play'de: ada aydınlık kaldı, bulutlar uyarı boyunca üstten yavaşça gelip griye döndü, uzak deniz koyulaştı, şimşek nesnesi oluştu (yıldırım kısa sürdüğü için ekran görüntüsüne denk gelmedi), konsol temiz.
+- **İmleç (18 Ekim 2026):** `VillagerPicker` `Assets/UI/Cursor` kökündeki yeni `cursor_default`, `cursor_open` ve `cursor_clenched` dokularını kullanıyor (48 px). Eski üçlü `Cursor/New Folder` altında duruyor. Varsayılan imleç her zaman görünür; köylünün üstünde açık el, tutarken yumruk. Tıklama noktası parmak ucu (yumrukta yumruğun üstü).
 
 - **Eski Forest SampleScene'den silindi (17 Ekim 2026, `fix/remove-old-forest`; main'e fast-forward ile birleştirilip push edildi):** Kullanıcının OneDrive'daki kopyasında FinottiGames paketi yok; SampleScene açılınca `Gameplay/Forest` altındaki kapalı ağaçlar için "Missing Prefab" hataları çıkıyordu (Tree 11/12/30, üç GUID). Kullanıcı isteğiyle kapalı `Gameplay/Forest` Unity'de silinip sahne kaydedildi; SampleScene'de FinottiGames referansı kalmadı, oyundaki orman zaten `GridForest`'tan geliyor. Unity kaydederken tsunami adaptörünün yeni alanlarını ve birkaç UI anchor'ını da yazdı (değer değişikliği yok). `MergedAssetIntegrationTests`: 34 ağaçlı Forest artık yalnız ResourceTest'te beklenir, SampleScene'de olmaması beklenir. Unity Console temiz; testler bu değişiklikten sonra çalıştırılmadı. ResourceTest hâlâ FinottiGames'e bağlı (paket yoksa orada aynı hata çıkar).
 

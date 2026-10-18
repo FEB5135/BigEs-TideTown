@@ -9349,9 +9349,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0e5344b033d545040b374bcad1858cad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::VillagerPicker
-  openHand: {fileID: 2800000, guid: 389c8ee3551c5bb45a63d6ce7371b485, type: 3}
-  closedHand: {fileID: 2800000, guid: 8f79a8eb9ac9f4f498cf6b511cd335cc, type: 3}
-  hotspot: {x: 22, y: 10}
+  defaultCursor: {fileID: 2800000, guid: 4c3b7278e0ab61f4ab3d68048bd97250, type: 3}
+  openHand: {fileID: 2800000, guid: e157382e99e00664fa829f6ca653ba30, type: 3}
+  closedHand: {fileID: 2800000, guid: 86ac6defde1b1ce458bdc8cfe465338e, type: 3}
+  defaultHotspot: {x: 18, y: 4}
+  openHotspot: {x: 25, y: 1}
+  closedHotspot: {x: 24, y: 12}
   maxRayDistance: 400
   pickRadius: 32
   holdHeight: 3
