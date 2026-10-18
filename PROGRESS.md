@@ -40,6 +40,8 @@ Son güncelleme: 2026-10-18 (`feature/waves`: 3 dalga, rastgele köşe, suların
 
 ## Son durum (yapılanlar)
 
+- **Ev yıkılma sesi (18 Ekim 2026):** `houseBreak.wav`, bina bütün olarak yıkılınca bir kez binanın ortasında çalar (`GameAudio.houseBreak`, `MapView.Collapse`). Diğer kısa sesler gibi kameraya yaklaştıkça duyulur.
+
 - **Dalga sistemi (18 Ekim 2026, `feature/waves`):** Kullanıcı: "3 dalga olacak: 15, 20, 25 m; ilki 3 dakika, diğer ikisi 2 dakika sonra gelsin. Kazanma/kaybetme ekranını arkadaş yapacak, oraya dokunma." Ekran yapılmadı, yalnız olaylar eklendi.
   - `TsunamiController.waves` (Inspector'da düzenlenebilir: yükseklik + gecikme): 1. dalga oyun başlayınca 180 sn, sonrakiler bir öncekinin **bırakılmasından** 120 sn sonra (sayaç dalga sürerken de işler, Duraklat'ta durur). Rastgele 120–180 sn yerine bu kullanılır (`autoRelease` açık ve liste doluysa). Tutorial ilk sayacı eskisi gibi bekletir.
   - Yeni dalga gelince su denizde durgunluğa döner ve dalga yine açık denizden gelir (`BeginIncoming`); köy sıfırlanmaz: yıkık evler yıkık kalır. Not: `SimulationReset` olayı yüzünden ayakta kalan duvarların hasarı her dalgada sıfırlanıyor (TeamMapTsunamiAdapter), yıkılan duvarlar geri gelmiyor.

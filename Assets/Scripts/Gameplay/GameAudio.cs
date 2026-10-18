@@ -15,6 +15,7 @@ public class GameAudio : MonoBehaviour
 
     [Header("Maden")]
     public AudioClip[] stoneHit;
+    public AudioClip[] houseBreak;
     public AudioClip cartRoll;
     public AudioClip[] cartClank;
 

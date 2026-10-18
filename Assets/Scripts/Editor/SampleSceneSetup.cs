@@ -521,6 +521,7 @@ public static class SampleSceneSetup
         audio.treeThud = Clips("impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002");
         // Kullanıcının Pixabay "heavy rock rolling" kaydından kendi kestiği tok, kıtırtılı taş sesi.
         audio.stoneHit = new[] { AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "RockBreak.mp3") }.Where(c => c != null).ToArray();
+        audio.houseBreak = new[] { AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "houseBreak.wav") }.Where(c => c != null).ToArray();
         audio.cartRoll = AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + "CartRoll.wav");
         audio.cartClank = Clips("impactMetal_light_000", "impactMetal_light_001", "impactMetal_light_002");
         EditorUtility.SetDirty(audio);

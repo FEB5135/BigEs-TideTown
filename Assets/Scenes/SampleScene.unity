@@ -4477,6 +4477,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 618f664878bef54468d2ee72140f50a7, type: 3}
   stoneHit:
   - {fileID: 8300000, guid: 2c821ce41aaaf5b4790c63becd767d1d, type: 3}
+  houseBreak:
+  - {fileID: 8300000, guid: 6ed7606ea6aaf3245a46be2ab4c7bb89, type: 3}
   cartRoll: {fileID: 8300000, guid: 8112d4ad3ea07004a98c40d20a2db4d6, type: 3}
   cartClank:
   - {fileID: 8300000, guid: 26288bf1ce7e89044abfc5fad5a2a522, type: 3}
