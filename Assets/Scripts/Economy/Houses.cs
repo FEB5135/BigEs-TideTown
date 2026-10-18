@@ -5,8 +5,8 @@ using UnityEngine;
 // (11, 13) birleşip uzun sıra evler de olabilir. Birbirine değen ev hücreleri bir bina; bina, her 4 hücresi için bir
 // ev sayılır ve her evin bir kapısı (binanın yanındaki düz zemin hücrelerinden biri) olur: işçi orada doğar, tsunamide
 // oraya koşup içeri girer. Harita her oyunda rastgele olduğu için ev sayısı (işçi sınırı) da her oyunda farklıdır.
-// Ev ya ayaktadır ya yıkıktır: su değen ev yıkılır (VillageFloodTracker karar verir), binadaki bütün evlerle birlikte;
-// MapView evi parçalayıp karolarını batık modelle değiştirir. Tsunami sıfırlanınca evler yeniden ayağa kalkar.
+// Ev ya ayaktadır ya yıkıktır. Su değen karodan başlanır; kuralların (dönüş dahil) hâlâ birleştirdiği bütün ev
+// karoları birlikte batık modele geçer. Yalnızca kenarları değen ama kurallara göre ayrı olan evler ayrı kalır.
 public static class Houses
 {
     public static event System.Action<House> Destroyed;
@@ -32,15 +32,19 @@ public static class Houses
         {
             if (IsDestroyed)
                 return;
-            foreach (var home in building ?? new List<House> { this })
+
+            var mates = Mates();
+            foreach (var home in mates)
             {
-                if (home.IsDestroyed)
-                    continue;
                 home.IsDestroyed = true;
                 home.Impact = impact;
-                Destroyed?.Invoke(home);
             }
+
+            // One notice for the whole house. MapView walks every cell the rules still join to this one.
+            Destroyed?.Invoke(this);
         }
+
+        List<House> Mates() => building ?? new List<House> { this };
 
         public void Repair()
         {
@@ -139,16 +143,19 @@ public static class Houses
         var world = Object.FindAnyObjectByType<World>();
         if (world == null || world == builtFor)
             return;
-        builtFor = world;
         all.Clear();
 
         int width = world.Width, height = world.Height;
         var seen = new bool[width * height];
         var stack = new Stack<Vector2Int>();
+        var solver = Object.FindAnyObjectByType<WfcSolver>();
+        var anyHouse = false;
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
             {
                 world.Get(x, y, out var id, out _);
+                if (IsHouse(id))
+                    anyHouse = true;
                 if (seen[y * width + x] || !IsHouse(id))
                     continue;
 
@@ -169,6 +176,10 @@ public static class Houses
                         world.Get(next.x, next.y, out var nextId, out _);
                         if (IsHouse(nextId))
                         {
+                            // Same building only when the solved tiles accept each other at these rotations.
+                            // Two houses that merely touch, but would not join under the rules, stay apart.
+                            if (solver != null && !solver.Connects(cell.x, cell.y, next.x, next.y))
+                                continue;
                             if (!seen[next.y * width + next.x])
                             {
                                 seen[next.y * width + next.x] = true;
@@ -218,6 +229,55 @@ public static class Houses
                     owner.CellCenters.Add(center);
                 }
             }
+
+        if (anyHouse)
+            builtFor = world;
+    }
+
+    // Cells of the house that contains (x, y): the start cell, then every house tile the rules
+    // still accept beside one already in the set. Rotation is part of that check.
+    public static void CollectStructure(World world, int x, int y, List<Vector2Int> into, HashSet<int> seen)
+    {
+        if (world == null || !world.InBounds(x, y))
+            return;
+
+        var width = world.Width;
+        if (!seen.Add(y * width + x))
+            return;
+
+        world.Get(x, y, out var id, out _);
+        if (!IsHouse(id))
+            return;
+
+        var solver = UnityEngine.Object.FindAnyObjectByType<WfcSolver>();
+        var stack = new Stack<Vector2Int>();
+        var start = new Vector2Int(x, y);
+        stack.Push(start);
+        into.Add(start);
+        while (stack.Count > 0)
+        {
+            var cell = stack.Pop();
+            foreach (var step in Steps)
+            {
+                var next = cell + step;
+                if (!world.InBounds(next.x, next.y))
+                    continue;
+
+                var index = next.y * width + next.x;
+                if (seen.Contains(index))
+                    continue;
+
+                world.Get(next.x, next.y, out var nextId, out _);
+                if (!IsHouse(nextId))
+                    continue;
+                if (solver != null && !solver.Connects(cell.x, cell.y, next.x, next.y))
+                    continue;
+
+                seen.Add(index);
+                stack.Push(next);
+                into.Add(next);
+            }
+        }
     }
 
     // Kapıları binanın çevresinde sırayla dizmek için: kapıların ortasına göre açı.
