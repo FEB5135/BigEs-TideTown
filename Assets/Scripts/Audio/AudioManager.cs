@@ -24,7 +24,7 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Köy inşa ve kaynak toplama fazında çalacak parça (Örn: Townie_Loop)")]
     [SerializeField] private AudioClip idlePhaseMusic;
 
-    [Tooltip("Tsunami dalgası yaklaşırken çalacak parça (Örn: Glorious_Morning veya Volatile_Reaction)")]
+    [Tooltip("Tsunami dalgası yaklaşırken çalacak parça (Volatile_Reaction)")]
     [SerializeField] private AudioClip tsunamiPhaseMusic;
 
     [Tooltip("Ana menüde çalacak parça (Opsiyonel)")]
@@ -397,7 +397,7 @@ public class AudioManager : MonoBehaviour
     {
         if (tsunamiPhaseMusic == null)
         {
-            tsunamiPhaseMusic = FindAudioClipAsset("Glorious_Morning") ?? FindAudioClipAsset("Volatile_Reaction");
+            tsunamiPhaseMusic = FindAudioClipAsset("Volatile_Reaction");
         }
 
         if (idlePhaseMusic == null)

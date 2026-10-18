@@ -496,7 +496,7 @@ public static class SampleSceneSetup
         return pairs.Count > 0;
     }
 
-    // Müzik: dalgalar arasında sakin inşa parçası (Townie Loop), dalga gelirken tehlike parçası (Glorious Morning).
+    // Müzik: afetten önce ve dalgalar arasında sakin inşa parçası (Townie Loop), dalga gelince tehlike parçası (Volatile Reaction).
     // Kayıt yükseklikleri farklı: ikisi ölçülen ortalama gürlüklerine (RMS) göre eşitlenir, sakin olan biraz kısık çalar.
     public static string EnsureMusic(Scene scene)
     {
@@ -508,7 +508,7 @@ public static class SampleSceneSetup
             manager = host.AddComponent<AudioManager>();
         }
         var calm = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Townie_Loop.mp3");
-        var danger = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Glorious_Morning.mp3");
+        var danger = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Volatile_Reaction.mp3");
         float calmRms = Rms(calm), dangerRms = Rms(danger);
         float quieter = Mathf.Min(calmRms, dangerRms);
         float dangerGain = dangerRms > 0f ? quieter / dangerRms : 1f;
