@@ -25,6 +25,7 @@ Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç g
 
 ## Aktif çalışma
 
+- 2026-10-18: main'in imleç güncellemesi (`0567b41`, yeni `cursor_*` dokuları) ve THIRD_PARTY.md düzenlemesi (`67cce63`) `feature/upgrades`'e birleştirildi (`041a14d`). THIRD_PARTY.md'de main'in tablosu alındı, bu daldaki WFC harita üretimi için "Kod (Harita Üretimi)" satırı eklendi. Unity'de sahne diskten yeniden yüklendi; Play'de yeni imleç, ağaçsız kuyu çevresi ve İşçi Hızı butonu görüldü.
 - Dal: `feature/upgrades` (main'den; 2026-10-18'de kullanıcı isteğiyle `feature/storm-warning` içine birleştirildi, merge `fa0e041`, içinde güncel main de var). Ardından main'in `04170d0` "New Icons" commit'i (odun/taş ikonları, SampleScene) çakışmasız bu dala alındı (`651a132`; merge mesajı yanlışlıkla "into feature/storm-warning" diyor). Yükseltmeler, işçi üretme, işçi hızı + fırtına, Anında Etkinleştir, gelen dalga birlikte bu dalda. Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
 - ResourceTest artık oynanmıyor (eski test sahnesi); `ResourceTestSetup.cs` yalnız o sahne için.
