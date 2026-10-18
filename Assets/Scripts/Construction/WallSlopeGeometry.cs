@@ -37,37 +37,20 @@ namespace IdleTown.Construction
             return Mathf.Lerp(heights[lower], heights[lower + 1], index - lower);
         }
 
-        // A cliff can jump several metres within the final few centimetres of a tile. Spread that
-        // jump over a supporting ramp instead of stretching the artwork into a thin spike. The upper
-        // hull never cuts into terrain, keeps shared endpoints fixed and leaves ordinary hills alone.
-        public static float[] SmoothCliffProfile(float[] heights)
+        // On a cliff the wall is a retaining section: a level two-metre panel above the higher
+        // ground, with solid vertical infill to the lower ground. Do not shear it between grid nodes.
+        // Ordinary slopes keep their terrain-following profile.
+        public static float[] FillCliffProfile(float[] heights)
         {
             bool cliff = false;
+            float low = heights[0], high = heights[0];
+            foreach (float height in heights) { low = Mathf.Min(low, height); high = Mathf.Max(high, height); }
             for (int i = 1; i < heights.Length; i++) cliff |= Mathf.Abs(heights[i] - heights[i - 1]) > .5f;
+            cliff |= high - low > 1f; // More than one full storey within a single grid edge.
             if (!cliff) return heights;
-            var hull = new List<int>();
-            for (int i = 0; i < heights.Length; i++)
-            {
-                while (hull.Count > 1)
-                {
-                    int a = hull[hull.Count - 2], b = hull[hull.Count - 1];
-                    if ((heights[b] - heights[a]) / (b - a) >= (heights[i] - heights[b]) / (i - b)) break;
-                    hull.RemoveAt(hull.Count - 1);
-                }
-                hull.Add(i);
-            }
-            var smooth = (float[])heights.Clone();
-            bool changed = false;
-            for (int part = 1; part < hull.Count; part++)
-            {
-                int a = hull[part - 1], b = hull[part];
-                for (int i = a + 1; i < b; i++)
-                {
-                    smooth[i] = Mathf.Max(heights[i], Mathf.Lerp(heights[a], heights[b], (i - a) / (float)(b - a)));
-                    changed |= smooth[i] - heights[i] > .002f;
-                }
-            }
-            return changed ? smooth : heights;
+            var filled = new float[heights.Length];
+            for (int i = 0; i < filled.Length; i++) filled[i] = high;
+            return filled;
         }
 
         public void Configure(MeshFilter filter, Mesh mesh, float normalizedRise, bool solid,

@@ -61,6 +61,7 @@ namespace IdleTown.Construction
         readonly WallArt art = new();
         readonly List<GameObject> previewGhosts = new();
         readonly HashSet<Vector2Int> previewNodes = new();
+        readonly Dictionary<Vector2Int, float> previewNodeFill = new();
         readonly Dictionary<(Vector2Int node, int floor), GameObject> jointPosts = new();
         Material ghostMaterial;
         Collider[] overlapBuffer = new Collider[32];
@@ -1016,11 +1017,18 @@ namespace IdleTown.Construction
             if (previewMaterial.HasProperty("_BaseColor")) previewMaterial.SetColor("_BaseColor", color);
             if (ghostMaterial.HasProperty("_BaseColor")) ghostMaterial.SetColor("_BaseColor", ghostColor);
             previewLine.widthMultiplier = wallThickness * .16f;
-            previewLine.positionCount = previewPath.Count + 1;
             var previewHeight = FloorBaseHeight(selectedFloor) + wallHeight + 0.05f;
-            previewLine.SetPosition(0, NodePosition(previewPath[0].A, previewHeight));
-            for (var i = 0; i < previewPath.Count; i++)
-                previewLine.SetPosition(i + 1, NodePosition(previewPath[i].B, previewHeight));
+            var capPoints = new List<Vector3>();
+            foreach (var edge in previewPath)
+            {
+                var profile = TerrainProfile(edge, out _);
+                var a = NodePosition(edge.A, previewHeight) + world.transform.up * EndpointFill(edge, profile, false);
+                var b = NodePosition(edge.B, previewHeight) + world.transform.up * EndpointFill(edge, profile, true);
+                if (capPoints.Count == 0 || (capPoints[capPoints.Count - 1] - a).sqrMagnitude > .0001f) capPoints.Add(a);
+                capPoints.Add(b);
+            }
+            previewLine.positionCount = capPoints.Count;
+            previewLine.SetPositions(capPoints.ToArray());
             DrawGhosts();
         }
 
@@ -1146,6 +1154,7 @@ namespace IdleTown.Construction
         {
             int used = 0;
             previewNodes.Clear();
+            previewNodeFill.Clear();
             for (int i = 0; i < previewPath.Count; i++)
             {
                 var ghost = GetGhost(used++);
@@ -1165,6 +1174,9 @@ namespace IdleTown.Construction
                     var slope = ghost.GetComponent<WallSlopeGeometry>();
                     if (slope == null) slope = ghost.AddComponent<WallSlopeGeometry>();
                     var profile = TerrainProfile(edge, out var ground);
+                    float fillA = EndpointFill(edge, profile, false), fillB = EndpointFill(edge, profile, true);
+                    previewNodeFill.TryGetValue(edge.A, out var oldA); previewNodeFill.TryGetValue(edge.B, out var oldB);
+                    previewNodeFill[edge.A] = Mathf.Max(oldA, fillA); previewNodeFill[edge.B] = Mathf.Max(oldB, fillB);
                     slope.Configure(filter, panel, Vector3.Dot(b - a, world.transform.up) / wallHeight, false,
                         profile, selectedFloor == 0 ? ground : null);
                 }
@@ -1175,8 +1187,11 @@ namespace IdleTown.Construction
                 var ghost = GetGhost(used++);
                 ghost.SetActive(true);
                 ghost.GetComponent<MeshFilter>().sharedMesh = art.Post;
-                ghost.GetComponent<WallPreviewMotion>().SetTarget(NodePosition(node, FloorBaseHeight(selectedFloor) + wallHeight * .5f),
-                    world.transform.rotation, new Vector3(JointHalfWidth * 2.035f, wallHeight * 1.015f, JointHalfWidth * 2.035f));
+                previewNodeFill.TryGetValue(node, out var fill);
+                float postHeight = wallHeight + (selectedFloor == 0 ? fill : 0);
+                float postOffset = selectedFloor == 0 ? fill * .5f : fill;
+                ghost.GetComponent<WallPreviewMotion>().SetTarget(NodePosition(node, FloorBaseHeight(selectedFloor) + wallHeight * .5f) + world.transform.up * postOffset,
+                    world.transform.rotation, new Vector3(JointHalfWidth * 2.035f, postHeight * 1.015f, JointHalfWidth * 2.035f));
             }
             for (int i = used; i < previewGhosts.Count; i++) previewGhosts[i].SetActive(false);
         }
@@ -1198,15 +1213,18 @@ namespace IdleTown.Construction
         {
             // Exactly one post per node and floor, even where several walls or separate builds meet.
             var wanted = new Dictionary<(Vector2Int node, int floor), WallTier>();
+            var fills = new Dictionary<(Vector2Int node, int floor), float>();
             foreach (var record in model.Walls)
             {
-                Include(record.Edge.A, record.Floor, record.Tier);
-                Include(record.Edge.B, record.Floor, record.Tier);
+                var profile = TerrainProfile(record.Edge, out _);
+                Include(record.Edge.A, record.Floor, record.Tier, EndpointFill(record.Edge, profile, false));
+                Include(record.Edge.B, record.Floor, record.Tier, EndpointFill(record.Edge, profile, true));
             }
-            void Include(Vector2Int node, int floor, WallTier tier)
+            void Include(Vector2Int node, int floor, WallTier tier, float fill)
             {
                 var key = (node, floor);
                 if (!wanted.TryGetValue(key, out var old) || tier > old) wanted[key] = tier;
+                fills.TryGetValue(key, out float previous); fills[key] = Mathf.Max(previous, fill);
             }
             var removed = new List<(Vector2Int, int)>();
             foreach (var pair in jointPosts)
@@ -1226,9 +1244,12 @@ namespace IdleTown.Construction
                     post.GetComponent<MeshFilter>().sharedMesh = art.Post;
                     jointPosts[pair.Key] = post;
                 }
+                float fill = fills[pair.Key];
+                float postHeight = wallHeight + (pair.Key.floor == 0 ? fill : 0);
+                float postOffset = pair.Key.floor == 0 ? fill * .5f : fill;
                 post.transform.SetPositionAndRotation(NodePosition(pair.Key.node,
-                        FloorBaseHeight(pair.Key.floor) + wallHeight * .5f), world.transform.rotation);
-                post.transform.localScale = new Vector3(JointHalfWidth * 2, wallHeight, JointHalfWidth * 2);
+                        FloorBaseHeight(pair.Key.floor) + wallHeight * .5f) + world.transform.up * postOffset, world.transform.rotation);
+                post.transform.localScale = new Vector3(JointHalfWidth * 2, postHeight, JointHalfWidth * 2);
                 post.GetComponent<MeshRenderer>().sharedMaterials = art.Palette(pair.Value);
             }
         }
@@ -1364,9 +1385,16 @@ namespace IdleTown.Construction
                 profile[i] = Vector3.Dot(sample - center, world.transform.up) / wallHeight;
                 curved |= Mathf.Abs(Vector3.Dot(sample - line, world.transform.up)) > .002f;
             }
-            var smooth = WallSlopeGeometry.SmoothCliffProfile(profile);
-            if (!ReferenceEquals(smooth, profile)) { groundProfile = profile; return smooth; }
+            var filled = WallSlopeGeometry.FillCliffProfile(profile);
+            if (!ReferenceEquals(filled, profile)) { groundProfile = profile; return filled; }
             return curved ? profile : null;
+        }
+
+        float EndpointFill(WallEdge edge, float[] profile, bool end)
+        {
+            if (profile == null) return 0;
+            float difference = Vector3.Dot(NodePosition(edge.B, 0) - NodePosition(edge.A, 0), world.transform.up);
+            return Mathf.Max(0, profile[end ? profile.Length - 1 : 0] * wallHeight + (end ? -.5f : .5f) * difference);
         }
 
         static Material CreateColorMaterial(Color color)

@@ -89,8 +89,9 @@ namespace IdleTown.Tests
                 line => line.name == "Demolition Outline"), Has.Length.EqualTo(10));
         }
 
-        [Test]
-        public void CliffConnectionsSpreadTheRiseAndKeepASolidFoundationAndSharedEndpoints()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CliffHeightDifferenceIsFilledWithLevelPanelsAndSolidVerticalSupports(bool reverse)
         {
             var ground = new GameObject("Cliff surface", typeof(MeshCollider)); ground.transform.SetParent(root.transform);
             terrainMesh = new Mesh();
@@ -102,18 +103,21 @@ namespace IdleTown.Tests
             var surface = root.AddComponent<WallTerrainSurface>(); surface.Configure(new Collider[] { ground.GetComponent<MeshCollider>() });
             controller.ConfigureTerrain(surface); Physics.SyncTransforms();
             var a = new Vector2Int(2,2); var b = new Vector2Int(3,2); var c = new Vector2Int(4,2);
-            Assert.That(controller.TryBuild(a,b,out var reason), Is.True, reason);
+            var start = reverse ? b : a; var end = reverse ? a : b;
+            Assert.That(controller.TryBuild(start,end,out var reason), Is.True, reason);
             Assert.That(controller.TryBuild(b,c,out reason), Is.True, reason);
-            Assert.That(controller.TryBuild(a,b,1,WallTier.Timber,out reason), Is.True, reason);
+            Assert.That(controller.TryBuild(start,end,1,WallTier.Timber,out reason), Is.True, reason);
             controller.TryGetWallInstance(new WallEdge(a,b),out var wall);
             controller.TryGetWallInstance(new WallEdge(b,c),out var next);
             controller.TryGetWallInstance(new WallEdge(a,b),1,out var upper);
             var slope = wall.GetComponent<WallSlopeGeometry>();
-            Assert.That(slope.GroundProfile, Is.Not.Null, "The smoothed ramp needs a solid footing to the actual cliff.");
-            Assert.That(slope.Profile[0], Is.EqualTo(slope.GroundProfile[0]).Within(.001f));
-            Assert.That(slope.Profile[slope.Profile.Length-1], Is.EqualTo(slope.GroundProfile[slope.Profile.Length-1]).Within(.001f));
+            Assert.That(slope.GroundProfile, Is.Not.Null, "Height difference needs vertical infill to the actual ground.");
+            int lowEnd = reverse ? slope.Profile.Length - 1 : 0;
+            int highEnd = reverse ? 0 : slope.Profile.Length - 1;
+            Assert.That(slope.Profile[lowEnd] - slope.GroundProfile[lowEnd], Is.EqualTo(3f).Within(.001f), "Fill the full six-metre drop.");
+            Assert.That(slope.Profile[highEnd], Is.EqualTo(slope.GroundProfile[highEnd]).Within(.001f));
             for (int i = 1; i < slope.Profile.Length; i++)
-                Assert.That(Mathf.Abs(slope.Profile[i]-slope.Profile[i-1]), Is.LessThan(.5f), "No needle-shaped last strip.");
+                Assert.That(slope.Profile[i], Is.EqualTo(slope.Profile[0]).Within(.001f), "Cliffs need a level cap, never a diagonal grid connection.");
             var collider = wall.GetComponent<MeshCollider>();
             foreach (var vertex in collider.sharedMesh.vertices)
                 if (vertex.y - slope.BaseHeightOffset(vertex.z) < 0)
@@ -124,7 +128,16 @@ namespace IdleTown.Tests
                 }
             Assert.That(collider.Raycast(new Ray(new Vector3(2.94f,.5f,0),Vector3.forward),out _,4), Is.True,
                 "The low side immediately before the cliff must have no daylight opening under the ramp.");
-            var join = wall.transform.TransformPoint(new Vector3(0,.5f,.5f)); join.y += slope.HeightOffset(.5f)*2;
+            foreach (float x in new[] { 2.1f,2.5f,2.9f })
+                foreach (float y in new[] { .5f,2.5f,4.5f,7.5f })
+                    Assert.That(collider.Raycast(new Ray(new Vector3(x,y,0),Vector3.forward),out _,4), Is.True,
+                        $"The entire height difference must be filled at x={x}, y={y}.");
+            foreach (var post in root.GetComponentsInChildren<MeshFilter>())
+                if (post.name == "Wall Joint" && post.transform.localScale.y > 2.01f &&
+                    Mathf.Abs(post.transform.position.x - 2) < .01f && Mathf.Abs(post.transform.position.z - 2) < .01f)
+                    Assert.That(post.GetComponent<Renderer>().bounds.max.y, Is.EqualTo(8f).Within(.01f), "The low-side joint must reach the level cap.");
+            float joinZ = reverse ? -.5f : .5f;
+            var join = wall.transform.TransformPoint(new Vector3(0,.5f,joinZ)); join.y += slope.HeightOffset(joinZ)*2;
             var nextJoin = next.transform.TransformPoint(new Vector3(0,.5f,-.5f));
             Assert.That(Vector3.Distance(join,nextJoin), Is.LessThan(.01f));
             Assert.That(upper.GetComponent<WallSlopeGeometry>().GroundProfile, Is.Null, "Upper storeys must not duplicate the footing.");
