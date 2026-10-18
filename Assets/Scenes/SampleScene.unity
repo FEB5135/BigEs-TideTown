@@ -1390,6 +1390,9 @@ MonoBehaviour:
   checkInterval: 0.25
   floodDepth: 0.25
   destroyDepth: 1.2
+  houseDestroyDepth: 1
+  houseFlowMinDepth: 0.3
+  houseDestroyFlow: 1.5
   floodedMaterial: {fileID: 2100000, guid: 299b5e79509d14a4680a8b75f258d662, type: 2}
   destroyedMaterial: {fileID: 2100000, guid: 2c51b033a80863246b6e93ebc2ab438e, type: 2}
   statusText: {fileID: 155505860}
@@ -5514,6 +5517,7 @@ MonoBehaviour:
   infoDuration: 9
   stepGap: 0.6
   alwaysShow: 0
+  rightReserve: 510
 --- !u!4 &595395691
 Transform:
   m_ObjectHideFlags: 0
@@ -18200,6 +18204,19 @@ MonoBehaviour:
   - Id: 17
     Prefab: {fileID: 919132149155446097, guid: bf1bf830a28d3cf4583217a13a9f5dde, type: 3}
     Weight: 1
+  ruins:
+  - Intact: {fileID: 919132149155446097, guid: deac77179a5b2654a83c51740dac228e, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: 3d09f5cc85f5c524f8973c62cc795c3f, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: b586c733e6881eb48bd68e674025e32a, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: ac1f718b862177e4eba47d8456cc61ca, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: 8a2a627eee3fe48488d10326e7dc91ee, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: 17b5a716168f2d34aa0e86dc753cba23, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: f3eb92d29645a9e41afeac04d0b63587, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: a54f922abb12dd744a74b239e9ebbda3, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: bc10eeac1c1382346b8c763c38306242, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: b1f35dd1a2a18b24eb76f78ef7fc69d3, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: fc2ff5fec7b9b344cba1c598142d988f, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: 0aa26520171ca3d44a09c83cf016609a, type: 3}
 --- !u!114 &1602157105
 MonoBehaviour:
   m_ObjectHideFlags: 0

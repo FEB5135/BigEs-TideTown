@@ -5,15 +5,10 @@ using UnityEngine;
 // (11, 13) birleşip uzun sıra evler de olabilir. Birbirine değen ev hücreleri bir bina; bina, her 4 hücresi için bir
 // ev sayılır ve her evin bir kapısı (binanın yanındaki düz zemin hücrelerinden biri) olur: işçi orada doğar, tsunamide
 // oraya koşup içeri girer. Harita her oyunda rastgele olduğu için ev sayısı (işçi sınırı) da her oyunda farklıdır.
-// Evlerin canı var: tsunami suyu evi aşındırır (VillageFloodTracker uygular), can bitince ev yıkılır. Yıkılma/çatlama
-// görselleri bu olayları dinler (Damaged, StageChanged, Destroyed, Repaired); bu sınıf yalnız durumu tutar.
+// Ev ya ayaktadır ya yıkıktır: tsunami suyu yeterince derin ya da hızlıysa ev yıkılır (VillageFloodTracker karar
+// verir), MapView evin karolarını yıkık modelle değiştirir. Tsunami sıfırlanınca evler yeniden ayağa kalkar.
 public static class Houses
 {
-    // 0 sağlam, 1 hasarlı, 2 ağır hasarlı, 3 yıkık.
-    public enum DamageStage { Intact, Damaged, HeavilyDamaged, Destroyed }
-
-    public static event System.Action<House, float> Damaged; // ev, bu seferki can kaybı (0-1)
-    public static event System.Action<House> StageChanged;
     public static event System.Action<House> Destroyed;
     public static event System.Action<House> Repaired;
 
@@ -22,38 +17,25 @@ public static class Houses
         public readonly List<Vector3> Doors = new();
         public Vector3 Center;
         public Gatherer Resident;
-        // Bu evin kapladığı ev karoları (World hücresi) ve hücre ortaları; yıkılma görseli bu karoları değiştirebilir.
+        // Bu evin kapladığı ev karoları (World hücresi) ve hücre ortaları; yıkılınca MapView bu karoları değiştirir.
         public readonly List<Vector2Int> Cells = new();
         public readonly List<Vector3> CellCenters = new();
 
-        // 1 tam can, 0 yıkık.
-        public float Health { get; private set; } = 1f;
-        public bool IsDestroyed => Health <= 0f;
-        public DamageStage Stage => Health <= 0f ? DamageStage.Destroyed
-            : Health <= 1f / 3f ? DamageStage.HeavilyDamaged
-            : Health < 1f ? DamageStage.Damaged : DamageStage.Intact;
+        public bool IsDestroyed { get; private set; }
 
-        // Canı düşürür (0-1 arası oran); yıkık eve işlemez.
-        public void Damage(float amount)
+        public void Destroy()
         {
-            if (amount <= 0f || IsDestroyed)
-                return;
-            var stage = Stage;
-            var before = Health;
-            Health = Mathf.Max(0f, Health - amount);
-            Damaged?.Invoke(this, before - Health);
-            if (Stage != stage)
-                StageChanged?.Invoke(this);
             if (IsDestroyed)
-                Destroyed?.Invoke(this);
+                return;
+            IsDestroyed = true;
+            Destroyed?.Invoke(this);
         }
 
         public void Repair()
         {
-            if (Health >= 1f)
+            if (!IsDestroyed)
                 return;
-            Health = 1f;
-            StageChanged?.Invoke(this);
+            IsDestroyed = false;
             Repaired?.Invoke(this);
         }
 
@@ -94,13 +76,16 @@ public static class Houses
 
     public static int Count => All.Count;
 
-    public static int CountIn(DamageStage stage)
+    public static int DestroyedCount
     {
-        var count = 0;
-        foreach (var house in All)
-            if (house.Stage == stage)
-                count++;
-        return count;
+        get
+        {
+            var count = 0;
+            foreach (var house in All)
+                if (house.IsDestroyed)
+                    count++;
+            return count;
+        }
     }
 
     // Kurulmuş evler; listeyi kurmaz (harita henüz çözülmemişken erken kurulup boş kalmasın diye).

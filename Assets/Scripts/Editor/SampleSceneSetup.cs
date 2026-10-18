@@ -28,6 +28,7 @@ public static class SampleSceneSetup
             EnsureWellClearing(scene);
             EnsureNavigation(scene);
             EnsureTutorial(scene);
+            EnsureHouseRuins(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -85,6 +86,7 @@ public static class SampleSceneSetup
         EnsureWellClearing(scene);
         EnsureNavigation(scene);
         EnsureTutorial(scene);
+        EnsureHouseRuins(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -460,6 +462,36 @@ public static class SampleSceneSetup
         settings.FindProperty("panelSprite").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Menu/Panel.png");
         settings.ApplyModifiedPropertiesWithoutUndo();
         return true;
+    }
+
+    // Tsunaminin yıktığı evler MapView'da batık modelleriyle çizilir: her ev karosu (house_*) kendi "f" sürümüyle eşlenir.
+    public static bool EnsureHouseRuins(Scene scene)
+    {
+        var view = Find<MapView>(scene);
+        if (view == null)
+            return false;
+        var settings = new SerializedObject(view);
+        var modules = settings.FindProperty("modules");
+        var pairs = new List<(GameObject intact, GameObject ruined)>();
+        for (int i = 0; i < modules.arraySize; i++)
+        {
+            var intact = modules.GetArrayElementAtIndex(i).FindPropertyRelative("Prefab").objectReferenceValue as GameObject;
+            if (intact == null || !intact.name.StartsWith("house_") || pairs.Any(pair => pair.intact == intact))
+                continue;
+            var ruined = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Meshes/WorldMeshes/{intact.name}f.obj");
+            if (ruined != null)
+                pairs.Add((intact, ruined));
+        }
+        var ruins = settings.FindProperty("ruins");
+        ruins.arraySize = pairs.Count;
+        for (int i = 0; i < pairs.Count; i++)
+        {
+            var ruin = ruins.GetArrayElementAtIndex(i);
+            ruin.FindPropertyRelative("Intact").objectReferenceValue = pairs[i].intact;
+            ruin.FindPropertyRelative("Ruined").objectReferenceValue = pairs[i].ruined;
+        }
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return pairs.Count > 0;
     }
 
     [MenuItem("Tools/BigEs/Tutorial'ı Sıfırla")]
