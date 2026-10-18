@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`feature/house-damage`: su değen bina bütün olarak yıkılıyor, parçalanma animasyonu, batık modelle çiziliyor)
+Son güncelleme: 2026-10-18 (`feature/waves`: 3 dalgalı tsunami (15/20/25 m; 3, 2, 2 dk))
 
 ## Bağlam
 
@@ -26,7 +26,7 @@ Son güncelleme: 2026-10-18 (`feature/house-damage`: su değen bina bütün olar
 
 ## Aktif çalışma
 
-- **Şu anki dal: `feature/house-damage`** (kullanıcı isteğiyle `Wallfix`'ten açıldı, içine güncel main birleştirildi: `5a3dc0c`; çakışmalar yalnız PROGRESS/THIRD_PARTY ve `SampleSceneSetup`'taki `EnsureNavigation` + `EnsureTutorial` satırlarıydı, ikisi de tutuldu). 2026-10-18'de kullanıcı isteğiyle main bu dala fast-forward ile getirildi (`7d96268`); main ve `feature/house-damage` aynı commit'te. Unity'de değişiklik uygulamak/derlemek/Play denemek gerektiğinde Claude Unity'yi bilgisayar kontrolüyle kendisi kullanır (kullanıcıya "öne getir" denmez); sahne değişiklikleri tek seferlik `Assets/Scripts/Editor/Apply...Once.cs` betikleriyle yapılır. Play'de köylüyü fareyle taşımak zor: Gatherer'ın Inspector menüsünde "Test: Ormanda Çalış" / "Test: Vagon İt" var; kaynak için Tools > BigEs > Test: Kuyuya 100 Odun 100 Tas.
+- **Şu anki dal: `feature/waves`** (2026-10-18'de main'den, `315ba1d`; main o an `feature/house-damage` ile aynıydı). Main'e birleştirmek kullanıcıya sorulacak.
 - 2026-10-18: main'in imleç güncellemesi (`0567b41`, yeni `cursor_*` dokuları) ve THIRD_PARTY.md düzenlemesi (`67cce63`) `feature/upgrades`'e birleştirildi (`041a14d`). THIRD_PARTY.md'de main'in tablosu alındı, bu daldaki WFC harita üretimi için "Kod (Harita Üretimi)" satırı eklendi. Unity'de sahne diskten yeniden yüklendi; Play'de yeni imleç, ağaçsız kuyu çevresi ve İşçi Hızı butonu görüldü.
 - Dal: `feature/upgrades` (main'den; 2026-10-18'de kullanıcı isteğiyle `feature/storm-warning` içine birleştirildi, merge `fa0e041`, içinde güncel main de var). Ardından main'in `04170d0` "New Icons" commit'i (odun/taş ikonları, SampleScene) çakışmasız bu dala alındı (`651a132`; merge mesajı yanlışlıkla "into feature/storm-warning" diyor). Yükseltmeler, işçi üretme, işçi hızı + fırtına, Anında Etkinleştir, gelen dalga birlikte bu dalda. Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
@@ -36,6 +36,14 @@ Son güncelleme: 2026-10-18 (`feature/house-damage`: su değen bina bütün olar
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Dalga sistemi (18 Ekim 2026, `feature/waves`):** Kullanıcı: "3 dalga olacak: 15, 20, 25 m; ilki 3 dakika, diğer ikisi 2 dakika sonra gelsin. Kazanma/kaybetme ekranını arkadaş yapacak, oraya dokunma." Ekran yapılmadı, yalnız olaylar eklendi.
+  - `TsunamiController.waves` (Inspector'da düzenlenebilir: yükseklik + gecikme): 1. dalga oyun başlayınca 180 sn, sonrakiler bir öncekinin **bırakılmasından** 120 sn sonra (sayaç dalga sürerken de işler, Duraklat'ta durur). Rastgele 120–180 sn yerine bu kullanılır (`autoRelease` açık ve liste doluysa). Tutorial ilk sayacı eskisi gibi bekletir.
+  - Yeni dalga gelince su denizde durgunluğa döner ve dalga yine açık denizden gelir (`BeginIncoming`); köy sıfırlanmaz: yıkık evler yıkık kalır. Not: `SimulationReset` olayı yüzünden ayakta kalan duvarların hasarı her dalgada sıfırlanıyor (TeamMapTsunamiAdapter), yıkılan duvarlar geri gelmiyor.
+  - Tehlike penceresi: dalga bırakıldıktan sonra `waveDuration` (75 sn) boyunca `InDanger`; köylü alarmı (`TsunamiVillageAlarm`) artık durum yerine `DangerChanged`'ı dinliyor, yani dalgalar arasında köylüler evden çıkıp çalışıyor (önceden tsunami başladıktan sonra oyun boyu içeride kalırlardı). Fırtına da (`SecondsToRelease`) tehlike bitince açılıp sonraki dalganın son dakikasında yeniden geliyor.
+  - Arkadaşın kazan/kaybet ekranı için olaylar: `WaveReleased(index)`, `WavesFinished` (son dalganın tehlike penceresi bitince), `DangerChanged(bool)`; özellikler `WaveCount`, `WavesReleased`, `NextWaveHeight`, `NextReleaseRemaining`, `InDanger`.
+  - Panel: durum satırı "Durum: Fırtına - 1. dalgaya (15 m) 3:00", "Durum: 1. dalga - 2. dalgaya (20 m) 1:56", "Durum: Sakin - 2. dalgaya (20 m) 0:34", "Durum: Son dalga (3/3)", "Durum: Dalgalar bitti"; büyük sayaç "2. DALGA (20 m) / 8". Yükseklik yazısı ve kaydırıcı o anki dalgayı gösterir. Anında Etkinleştir sıradaki dalgayı hemen gönderir (dalgalar bitince her şeyi sıfırlayıp 1. dalgayı); Yeniden Başlat köyü sıfırlayıp 1. dalgayı gönderir; Sıfırla diziyi baştan kurar.
+  - Play'de denendi (Claude Unity'yi kendisi sürdü): başlangıçta 3:00; 1. dalga 15 m (Anında Etkinleştir) 101 evden 23'ünü yıktı; 75 sn sonra "Sakin"; 2. dalga tam 2 dk sonra kendiliğinden geldi (log 13:04:25 → 13:06:25), 20 m, yıkık evler kaldı (toplam 77); 3. dalga 25 m, duvarsız köyün tamamı yıkıldı; 75 sn sonra "Dalgalar bitti"; konsolda hata yok. 3. dalganın kendiliğinden gelişi ve köylülerin dalgalar arasında çıkması (işçi alınmadı) Play'de görülmedi.
 
 - **Tsunamide ev yıkılması (18 Ekim 2026, `feature/house-damage`):** Kullanıcı önce "su gelince hasar alma mekaniği" istedi, sonra "hasarlı olmasın, sadece yıkılma olsun; arkadaşın assetlerini çek, ev yıkılmayı entegre et" dedi. Arkadaşın (Eren) main'e attığı `0082523 Submerged Houses` (batık ev modelleri `Assets/Meshes/WorldMeshes/house_*f.obj`, aynı taban/köken, yalnız gömük; `palette.png`; ProBuilder ayarı) bu dala birleştirildi (`394dfd5`), eskiye dönülmedi.
   - `Houses.House`: ya ayakta ya yıkık (`IsDestroyed`, `Destroy()`, `Repair()`); evin karoları `Cells` / `CellCenters` (binanın hücreleri, ortası en yakın eve dağıtılır). Olaylar: `Houses.Destroyed`, `Houses.Repaired`; `RepairAll()`, `DestroyedCount`, `Built` (listeyi kurmadan). `RandomFree` yıkık evi vermez.
@@ -204,6 +212,7 @@ Son güncelleme: 2026-10-18 (`feature/house-damage`: su değen bina bütün olar
 
 ## Sıradaki işler / açık konular
 
+- [ ] Dalgalar: arkadaşın kazan/kaybet ekranı `WavesFinished` / `WaveReleased` olaylarına bağlanacak (biz dokunmuyoruz). Kazanma ölçütü (ör. ayakta kalan ev oranı) onlarda. Dalgalar arasında ayakta kalan duvar hasarının sıfırlanması istenmiyorsa `TeamMapTsunamiAdapter.ResetStandingWallDamage` yalnız tam sıfırlamada çağrılmalı. Yıkık evin sahibi köylünün alarmda nereye kaçacağı hâlâ açık.
 - [ ] Tutorial: köylüyü fareyle ağaca/ocağa sürükleme adımı elle oynanarak denenmeli; ipucu metinleri ekiple okunup gerekirse kısaltılmalı. Teslim sürümünde "Anında Etkinleştir" test butonunun kalıp kalmayacağı kararlaştırılmalı.
 - [ ] Tsunami kaçışı: kol pozu oyun kamerasından yakından gözle kontrol edilmeli; köylüler evlerine girince sel takipçisi onları sayamıyor.
 - [ ] `VillagerAnimationIntegrationTests` köylüsüz sahneye göre güncellenmeli (SampleScene artık köylüyle başlamıyor; işçi alınır).

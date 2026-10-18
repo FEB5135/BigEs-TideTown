@@ -28,6 +28,8 @@ namespace Tsunami
 
         int shownKey = int.MinValue;
         int shownReleaseSecond = int.MinValue;
+        int shownWaves = int.MinValue;
+        bool shownDanger;
         bool shownPending;
         Text startLabel, stopLabel;
         CanvasGroup visibility;
@@ -118,6 +120,7 @@ namespace Tsunami
         void RefreshWaveHeight()
         {
             shownPending = controller.HasPendingChanges;
+            if (waveHeightSlider != null) waveHeightSlider.SetValueWithoutNotify(controller.WaveHeight);
             if (waveHeightText == null) return;
             string note = shownPending ? "  (yeniden başlatınca)" : string.Empty;
             waveHeightText.text = $"Dalga yüksekliği: {controller.WaveHeight:0.0} m{note}";
@@ -127,16 +130,21 @@ namespace Tsunami
         {
             if (controller == null) return;
             if (controller.HasPendingChanges != shownPending) RefreshWaveHeight();
-            int releaseSecond = controller.ReleaseScheduled ? Mathf.CeilToInt(controller.ReleaseRemaining) : -1;
-            if (releaseSecond != shownReleaseSecond) RefreshStatus();
+            int releaseSecond = controller.NextReleaseScheduled ? Mathf.CeilToInt(controller.NextReleaseRemaining) : -1;
+            if (releaseSecond != shownReleaseSecond || controller.WavesReleased != shownWaves || controller.InDanger != shownDanger)
+            {
+                RefreshStatus();
+                RefreshWaveHeight();
+            }
             if (countdownText == null) return;
             int key = -1;
             if (controller.State == TsunamiState.Warning) key = Mathf.CeilToInt(controller.WarningRemaining);
             else if (controller.State == TsunamiState.Running && controller.Simulation != null && controller.Simulation.SimTime < 6.0) key = 1000;
             if (key == shownKey) return;
             shownKey = key;
-            if (key == 1000) countdownText.text = "TSUNAMİ GELİYOR";
-            else if (key >= 0) countdownText.text = $"TSUNAMİ UYARISI\n{key}";
+            string wave = controller.WaveCount > 0 ? $"{controller.WavesReleased}. DALGA" : "TSUNAMİ";
+            if (key == 1000) countdownText.text = $"{wave} GELİYOR";
+            else if (key >= 0) countdownText.text = controller.WaveCount > 0 ? $"{wave} ({controller.WaveHeight:0} m)\n{key}" : $"TSUNAMİ UYARISI\n{key}";
             else countdownText.text = string.Empty;
         }
 
@@ -153,11 +161,27 @@ namespace Tsunami
 
         void RefreshStatus()
         {
-            shownReleaseSecond = controller.ReleaseScheduled ? Mathf.CeilToInt(controller.ReleaseRemaining) : -1;
+            shownReleaseSecond = controller.NextReleaseScheduled ? Mathf.CeilToInt(controller.NextReleaseRemaining) : -1;
+            shownWaves = controller.WavesReleased;
+            shownDanger = controller.InDanger;
             if (statusText == null) return;
-            statusText.text = shownReleaseSecond >= 0
-                ? $"Durum: Fırtına yaklaşıyor - tsunamiye {shownReleaseSecond / 60}:{shownReleaseSecond % 60:00}"
-                : "Durum: " + Describe(controller.State);
+            string time = $"{shownReleaseSecond / 60}:{shownReleaseSecond % 60:00}";
+            if (controller.WaveCount == 0)
+            {
+                statusText.text = shownReleaseSecond >= 0 && controller.State == TsunamiState.Idle
+                    ? $"Durum: Fırtına yaklaşıyor - tsunamiye {time}"
+                    : "Durum: " + Describe(controller.State);
+                return;
+            }
+            // The wave sequence: what is happening now, and how long until the next wave.
+            int released = controller.WavesReleased, count = controller.WaveCount;
+            string next = shownReleaseSecond >= 0 ? $"{released + 1}. dalgaya ({controller.NextWaveHeight:0} m) {time}" : null;
+            string now;
+            if (controller.State == TsunamiState.Paused) now = Describe(TsunamiState.Paused);
+            else if (released == 0) now = next != null ? "Fırtına" : Describe(controller.State);
+            else if (controller.InDanger) now = released == count ? $"Son dalga ({released}/{count})" : $"{released}. dalga";
+            else now = released == count ? "Dalgalar bitti" : "Sakin";
+            statusText.text = next != null ? $"Durum: {now} - {next}" : $"Durum: {now}";
         }
 
         public static string Describe(TsunamiState state)

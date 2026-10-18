@@ -50,6 +50,28 @@ namespace Tsunami
         [SerializeField, Min(0f)] float releaseDelayMin = 120f;
         [SerializeField, Min(0f)] float releaseDelayMax = 180f;
 
+        [Serializable]
+        public struct Wave
+        {
+            [Tooltip("Crest height (m) of this tsunami.")]
+            public float height;
+            [Tooltip("Seconds after the game starts (first wave) or after the previous wave was released.")]
+            public float delay;
+        }
+
+        [Header("Waves")]
+        [Tooltip("With automatic release on, the game's tsunamis in order. Empty: a single tsunami at a random time " +
+                 "between releaseDelayMin and releaseDelayMax.")]
+        [SerializeField] Wave[] waves =
+        {
+            new Wave { height = 15f, delay = 180f },
+            new Wave { height = 20f, delay = 120f },
+            new Wave { height = 25f, delay = 120f }
+        };
+        [Tooltip("Seconds after its release that a wave counts as in progress: the villagers shelter and the storm " +
+                 "stays. Afterwards they come out until the next wave; after the last one WavesFinished is raised.")]
+        [SerializeField, Min(1f)] float waveDuration = 75f;
+
         [Header("Fallback placement (scenes without a map adapter)")]
         [SerializeField] Vector3 fallbackSourcePosition = new Vector3(0f, 0f, -90f);
         [Tooltip("Travel direction in degrees: 0 = towards +Z (north), 90 = towards +X (east).")]
@@ -66,8 +88,26 @@ namespace Tsunami
         bool gameStarted;
         bool releaseScheduled;
         float releaseRemaining;
+        int wavesReleased;
+        float dangerRemaining;
+        bool dangerShown;
 
         public TsunamiState State { get; private set; } = TsunamiState.Idle;
+        /// <summary>True when the game's tsunamis come as a sequence of waves (see waves).</summary>
+        public bool UsesWaves => autoRelease && waves != null && waves.Length > 0;
+        public int WaveCount => UsesWaves ? waves.Length : 0;
+        /// <summary>How many waves of the sequence have been released so far (the number of the latest one).</summary>
+        public int WavesReleased => wavesReleased;
+        /// <summary>Height (m) of the next wave of the sequence, or 0 when none is left.</summary>
+        public float NextWaveHeight => UsesWaves && wavesReleased < waves.Length ? waves[wavesReleased].height : 0f;
+        /// <summary>True while the next release (first tsunami or next wave) is counting down, in any state.</summary>
+        public bool NextReleaseScheduled => releaseScheduled;
+        public float NextReleaseRemaining => releaseScheduled ? Mathf.Max(0f, releaseRemaining) : 0f;
+        /// <summary>
+        /// A tsunami is announced or in progress: the villagers shelter. With waves, each wave is dangerous from its
+        /// release for waveDuration seconds; in between the village is calm until the next one.
+        /// </summary>
+        public bool InDanger => UsesWaves ? State == TsunamiState.Warning || dangerRemaining > 0f : State != TsunamiState.Idle;
         public float WarningRemaining
         {
             get
@@ -94,7 +134,7 @@ namespace Tsunami
         {
             get
             {
-                if (State != TsunamiState.Idle) return 0f;
+                if (InDanger) return 0f;
                 return releaseScheduled ? Mathf.Max(0f, releaseRemaining) : float.PositiveInfinity;
             }
         }
@@ -133,6 +173,12 @@ namespace Tsunami
         public event Action SimulationReset;
         public event Action ScenarioChanged;
         public event Action ParametersChanged;
+        /// <summary>A wave of the sequence was released (0-based index).</summary>
+        public event Action<int> WaveReleased;
+        /// <summary>The last wave is over (waveDuration after its release): the game can be won or lost.</summary>
+        public event Action WavesFinished;
+        /// <summary>InDanger changed: the villagers shelter (true) or come out (false).</summary>
+        public event Action<bool> DangerChanged;
 
         void OnEnable()
         {
@@ -177,11 +223,26 @@ namespace Tsunami
 
         void Update()
         {
-            if (State == TsunamiState.Idle && releaseScheduled)
+            // The countdown to the next release runs before the first tsunami and, with waves, while one is in
+            // progress (the gap counts from the previous release); a paused tsunami holds it.
+            if (releaseScheduled && State != TsunamiState.Paused)
             {
                 releaseRemaining -= Time.deltaTime;
-                if (releaseRemaining <= 0f) Play();
-                return;
+                if (releaseRemaining <= 0f)
+                {
+                    ReleaseNext();
+                    return;
+                }
+            }
+            if (dangerRemaining > 0f && State != TsunamiState.Paused)
+            {
+                dangerRemaining -= Time.deltaTime;
+                if (dangerRemaining <= 0f)
+                {
+                    dangerRemaining = 0f;
+                    CheckDanger();
+                    if (UsesWaves && wavesReleased >= waves.Length) WavesFinished?.Invoke();
+                }
             }
             if (State != TsunamiState.Warning) return;
             if (incomingRun)
@@ -203,27 +264,98 @@ namespace Tsunami
         {
             releaseScheduled = false;
             if (!autoRelease || !gameStarted || TutorialHints.HoldsTsunami || State != TsunamiState.Idle) return;
-            float min = Mathf.Min(releaseDelayMin, releaseDelayMax), max = Mathf.Max(releaseDelayMin, releaseDelayMax);
-            releaseRemaining = UnityEngine.Random.Range(min, max);
+            if (UsesWaves)
+            {
+                if (wavesReleased >= waves.Length) return;
+                releaseRemaining = Mathf.Max(0f, waves[wavesReleased].delay);
+            }
+            else
+            {
+                float min = Mathf.Min(releaseDelayMin, releaseDelayMax), max = Mathf.Max(releaseDelayMin, releaseDelayMax);
+                releaseRemaining = UnityEngine.Random.Range(min, max);
+            }
             releaseScheduled = true;
             Debug.Log($"[TsunamiController] Tsunami in {releaseRemaining:0} s.", this);
         }
 
         /// <summary>
-        /// Skips the storm countdown (testing): the tsunami sets off now, with its warning / incoming swell. A
-        /// tsunami already running is reset and sent again.
+        /// Skips the countdown (testing): the next wave (or the tsunami) sets off now, with its warning / incoming
+        /// swell. Without waves, or after the last one, the tsunami is reset and sent again.
         /// </summary>
         public void ReleaseNow()
         {
             if (!enabled || State == TsunamiState.Warning) return;
+            if (UsesWaves && wavesReleased < waves.Length)
+            {
+                ReleaseNext();
+                return;
+            }
             if (State != TsunamiState.Idle) ResetSimulation();
-            Play();
+            if (UsesWaves) ReleaseNext();
+            else Play();
+        }
+
+        // Releases the next wave of the sequence at its height (or, without waves, the tsunami) and starts the
+        // countdown to the one after it. A wave released while the last one is still in the water comes in on top
+        // of it: the water is set back to rest at sea, the village keeps its damage.
+        void ReleaseNext()
+        {
+            releaseScheduled = false;
+            if (!UsesWaves || wavesReleased >= waves.Length)
+            {
+                PlayCurrent();
+                return;
+            }
+            int index = wavesReleased++;
+            Current.amplitude = Mathf.Clamp(waves[index].height, MinWaveHeight, MaxWaveHeight);
+            ParametersChanged?.Invoke();
+            if (State == TsunamiState.Idle) PlayCurrent();
+            else SendWave();
+            dangerRemaining = waveDuration;
+            if (wavesReleased < waves.Length)
+            {
+                releaseRemaining = Mathf.Max(0f, waves[wavesReleased].delay);
+                releaseScheduled = true;
+            }
+            Debug.Log($"[TsunamiController] Wave {index + 1}/{waves.Length}: {Current.amplitude:0} m.", this);
+            CheckDanger();
+            WaveReleased?.Invoke(index);
+        }
+
+        // A new wave while one is in progress (or paused): sent in from the open sea like the first.
+        void SendWave()
+        {
+            if (useWarning && warningDuration > 0f && UsesIncomingWave)
+            {
+                BeginIncoming(warningDuration, incomingStartHeight);
+                SetState(TsunamiState.Warning);
+            }
+            else if (UsesIncomingWave)
+            {
+                BeginIncoming(0f, 1f);
+                SetState(TsunamiState.Running);
+            }
+            else StartSource();
         }
 
         // ------------------------------------------------------------------ playback
 
-        /// <summary>Starts the tsunami from the current initial conditions, or resumes when paused.</summary>
+        /// <summary>
+        /// Starts the tsunami from the current initial conditions, or resumes when paused. With waves, starting from
+        /// rest releases the next wave of the sequence.
+        /// </summary>
         public void Play()
+        {
+            if (!enabled) return;
+            if (State == TsunamiState.Idle && UsesWaves && wavesReleased < waves.Length)
+            {
+                ReleaseNext();
+                return;
+            }
+            PlayCurrent();
+        }
+
+        void PlayCurrent()
         {
             if (!enabled) return;
             switch (State)
@@ -286,16 +418,19 @@ namespace Tsunami
             HasPendingChanges = false;
             timer = 0f;
             incomingRun = false;
+            wavesReleased = 0;
+            dangerRemaining = 0f;
             SetState(TsunamiState.Idle);
             SimulationReset?.Invoke();
             ScheduleRelease();
         }
 
-        /// <summary>Reset and immediately release the tsunami (no countdown).</summary>
+        /// <summary>Reset and immediately release the tsunami (no countdown); with waves, the first wave again.</summary>
         public void Restart()
         {
             ResetSimulation();
-            BeginRun();
+            if (UsesWaves) ReleaseNext();
+            else BeginRun();
         }
 
         // Kept for older UI / scripts.
@@ -313,8 +448,13 @@ namespace Tsunami
                 SetState(TsunamiState.Running);
                 return;
             }
+            StartSource();
+        }
+
+        // Fresh initial state: sea at rest + the scenario's disturbance at the source.
+        void StartSource()
+        {
             ApplyBathymetryIfNeeded(false);
-            // Fresh initial state: sea at rest + the scenario's disturbance.
             simulation.ResetWater();
             SimulationReset?.Invoke();
             TsunamiScenario s = Current;
@@ -465,6 +605,15 @@ namespace Tsunami
             if (State == next) return;
             State = next;
             StateChanged?.Invoke(next);
+            CheckDanger();
+        }
+
+        void CheckDanger()
+        {
+            bool danger = InDanger;
+            if (danger == dangerShown) return;
+            dangerShown = danger;
+            DangerChanged?.Invoke(danger);
         }
     }
 }

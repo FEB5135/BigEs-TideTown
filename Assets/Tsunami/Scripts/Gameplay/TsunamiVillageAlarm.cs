@@ -4,8 +4,8 @@ using UnityEngine.SceneManagement;
 namespace Tsunami
 {
     /// <summary>
-    /// Tells the villagers about the tsunami alarm: from the warning until the reset they drop their work and run
-    /// into their houses (Gatherer.SetAlarm). Gatherer lives in the IdleTown.Runtime assembly, which cannot see this
+    /// Tells the villagers about the tsunami alarm: while a wave is announced or in progress (TsunamiController.InDanger)
+    /// they drop their work and run into their houses (Gatherer.SetAlarm); between waves they come out again. Gatherer lives in the IdleTown.Runtime assembly, which cannot see this
     /// one, so the link is made from here. Needs no scene setup: it finds the controller whenever a scene loads.
     /// </summary>
     static class TsunamiVillageAlarm
@@ -25,7 +25,7 @@ namespace Tsunami
         static void Hook()
         {
             if (controller != null)
-                controller.StateChanged -= OnStateChanged;
+                controller.DangerChanged -= OnDangerChanged;
             controller = Object.FindAnyObjectByType<TsunamiController>();
             Gatherer.SetAlarm(false);
             if (controller == null)
@@ -35,10 +35,10 @@ namespace Tsunami
             var root = controller.transform.root.gameObject;
             if (root.GetComponent<NavIgnore>() == null)
                 root.AddComponent<NavIgnore>();
-            controller.StateChanged += OnStateChanged;
-            OnStateChanged(controller.State);
+            controller.DangerChanged += OnDangerChanged;
+            OnDangerChanged(controller.InDanger);
         }
 
-        static void OnStateChanged(TsunamiState state) => Gatherer.SetAlarm(state != TsunamiState.Idle);
+        static void OnDangerChanged(bool danger) => Gatherer.SetAlarm(danger);
     }
 }
