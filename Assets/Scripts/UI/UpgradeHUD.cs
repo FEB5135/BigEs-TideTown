@@ -57,6 +57,9 @@ public class UpgradeHUD : MonoBehaviour
     Text speedText;
     CanvasGroup speedGroup;
 
+    // Tutorial'ın gösterdiği İşçi butonu (henüz kurulmadıysa null).
+    public RectTransform WorkerButton => workerButton != null ? (RectTransform)workerButton.transform : null;
+
     void Start()
     {
         well = Well.Instance;
