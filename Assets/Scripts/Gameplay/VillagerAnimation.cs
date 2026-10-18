@@ -21,6 +21,10 @@ public sealed class VillagerAnimation : MonoBehaviour
     [Tooltip("Vagonu iterken kolların açısı ve gövdenin öne eğilmesi.")]
     [SerializeField] float pushArmAngle = -72f;
     [SerializeField] float pushLean = 12f;
+    [Tooltip("Tsunami alarmında kaçarken: kollar başın üstünde (açı), içe doğru çaprazlanır (derece) ve hafifçe sallanır.")]
+    [SerializeField] float panicArmAngle = -170f;
+    [SerializeField] float panicCross = 32f;
+    [SerializeField] float panicWave = 10f;
     [SerializeField, Min(0f)] float blendSpeed = 12f;
 
     Gatherer gatherer;
@@ -32,6 +36,7 @@ public sealed class VillagerAnimation : MonoBehaviour
     public bool IsWalking { get; private set; }
     public bool IsChopping { get; private set; }
     public bool IsPushing { get; private set; }
+    public bool IsPanicking { get; private set; }
 
     void Awake() => Initialize();
 
@@ -63,7 +68,8 @@ public sealed class VillagerAnimation : MonoBehaviour
         previousPosition = transform.position;
         delta.y = 0f;
         IsPushing = gatherer.isActiveAndEnabled && gatherer.Activity == GathererActivity.Pushing;
-        IsWalking = gatherer.isActiveAndEnabled && (gatherer.Activity == GathererActivity.Walking || IsPushing) &&
+        IsPanicking = gatherer.isActiveAndEnabled && gatherer.Activity == GathererActivity.Fleeing;
+        IsWalking = gatherer.isActiveAndEnabled && (gatherer.Activity == GathererActivity.Walking || IsPushing || IsPanicking) &&
                     delta.sqrMagnitude > 0.000001f;
         IsChopping = gatherer.isActiveAndEnabled && gatherer.Activity == GathererActivity.Harvesting &&
                      gatherer.Type == ResourceType.Wood && gatherer.CurrentTarget != null &&
@@ -83,15 +89,26 @@ public sealed class VillagerAnimation : MonoBehaviour
         // Vagonu iterken kollar öne uzanır.
         // Balta hızlı iner; kollar o sırada çok daha hızlı izler, yoksa vuruş gecikip yumuşar.
         float armBlend = IsChopping ? 1f - Mathf.Exp(-40f * Time.deltaTime) : blend;
-        Pose(leftArm, leftArmRest, IsChopping ? lift : IsPushing ? pushArmAngle : -swing * 0.7f, armBlend);
-        Pose(rightArm, rightArmRest, IsChopping ? lift : IsPushing ? pushArmAngle : swing * 0.7f, armBlend);
+        if (IsPanicking)
+        {
+            // Kollar başın üstünde, bilekler çaprazlanmış; koşarken panikle sallanır.
+            float wave = Mathf.Sin(Time.time * 9f) * panicWave;
+            // Sol omuz +Z, sağ omuz -Z tarafında: kollar karşı tarafa yatınca bilekler başın üstünde kesişir.
+            Pose(leftArm, leftArmRest, panicArmAngle + wave, -panicCross, armBlend);
+            Pose(rightArm, rightArmRest, panicArmAngle - wave, panicCross, armBlend);
+        }
+        else
+        {
+            Pose(leftArm, leftArmRest, IsChopping ? lift : IsPushing ? pushArmAngle : -swing * 0.7f, armBlend);
+            Pose(rightArm, rightArmRest, IsChopping ? lift : IsPushing ? pushArmAngle : swing * 0.7f, armBlend);
+        }
         Pose(leftLeg, leftLegRest, swing, blend);
         Pose(rightLeg, rightLegRest, -swing, blend);
     }
 
     void OnDisable()
     {
-        IsWalking = IsChopping = IsPushing = false;
+        IsWalking = IsChopping = IsPushing = IsPanicking = false;
         if (!initialized)
             return;
         visualRoot.SetLocalPositionAndRotation(bodyPosition, bodyRest);
@@ -129,9 +146,12 @@ public sealed class VillagerAnimation : MonoBehaviour
 
     static Quaternion Rest(Transform bone) => bone != null ? bone.localRotation : Quaternion.identity;
 
-    static void Pose(Transform bone, Quaternion rest, float angle, float blend)
+    static void Pose(Transform bone, Quaternion rest, float angle, float blend) => Pose(bone, rest, angle, 0f, blend);
+
+    // angle: öne-arkaya (omuz ekseni Z); sideways: kaldırılmış kolu yana, gövdenin ortasına doğru eğer.
+    static void Pose(Transform bone, Quaternion rest, float angle, float sideways, float blend)
     {
         if (bone != null)
-            bone.localRotation = Quaternion.Slerp(bone.localRotation, rest * Quaternion.Euler(0f, 0f, angle), blend);
+            bone.localRotation = Quaternion.Slerp(bone.localRotation, rest * Quaternion.Euler(sideways, 0f, angle), blend);
     }
 }

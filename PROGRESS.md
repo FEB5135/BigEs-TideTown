@@ -35,6 +35,12 @@ Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç g
 
 ## Son durum (yapılanlar)
 
+- **Ev başına bir işçi, boştaki köylü belirteci, tsunamide eve kaçış (18 Ekim 2026, `feature/upgrades`):** Kullanıcı: "evler rastgele; ev sayısı kadar işçi sınırı olsun; işçi bir evin yanında doğsun; boştaki köylüler göz yormayan bir belirteçle işaretli olsun; tsunami alarmında işlerini bırakıp ellerini çapraz havaya kaldırıp evlerine kaçsınlar".
+  - `Assets/Scripts/Economy/Houses.cs`: WFC haritasından evler. Ev karoları (10–13) 2×2 köşe parçalarıdır; uzun sıra evler (11/13) birleşebildiği için birbirine değen hücreler bir bina, bina her 4 hücre için bir ev sayılır; her eve binanın yanındaki düz zemin hücrelerinden ayrı bir kapı (binanın çevresine dağıtılmış). İlk sorulduğunda bir kez kurulur. Play'de 104–120 ev çıktı.
+  - `UpgradeHUD`: işçi sınırı = ev sayısı, buton "İşçi 3/120", dolunca "Boş ev yok". İşçi boş bir evin kapısında, evden dışarı bakarak doğar; ev `Gatherer.Shelter` olur.
+  - Belirteç: boştaki (işsiz) köylünün başında küçük soluk sarı elmas (`Assets/Materials/IdleMarker.mat`, URP Unlit), yavaşça döner ve iner kalkar; ekranda sabit boyda kalsın diye kamera uzaklığıyla büyür (`markerScreenSize` 0.035, 80 m'de ~1 m). Malzeme `SampleSceneSetup.EnsureWorkerTemplate` ile Worker Template'e bağlı; yeni işçi şablondan alır.
+  - Alarm: `Assets/Tsunami/Scripts/Gameplay/TsunamiVillageAlarm.cs` (Assembly-CSharp; Gatherer IdleTown.Runtime'da olduğu için köprü buradan, sahne kurulumu gerekmez) `TsunamiController.StateChanged`'i dinler: Idle dışı = alarm. `Gatherer.SetAlarm`: köylüler işi bırakır, `GathererActivity.Fleeing` ile 1.8 kat hızla kendi kapılarına (en yakın NavMesh noktası) koşar, varınca görünmez olur (collider kapalı); Sıfırla ile kapıdan çıkıp dolaşırlar. Alarmda köylü tutulamaz, tutulan bırakılıp kaçar. `VillagerAnimation`: kaçarken kollar başın üstünde (−170°) içe 32° çaprazlanmış ve sallanır (sol omuz +Z, sağ −Z; ilk denemede işaret ters olduğu için kollar Y gibi açılıyordu, kemik verisiyle düzeltildi).
+  - Claude Play'de denedi (Unity'yi kendisi sürdü): ev sayısı her oyunda değişiyor (104/105/108/120), işçi evin yanında doğuyor, belirteç başında, alarmda koşup kapıda kayboluyor, Sıfırla'da çıkıyor, konsolda hata yok. Kol pozu yalnız yukarıdan görüldü (kollar başın üstünde toplanmış), yandan bakılamadı. Not: işçiler evlerinin 5 m çevresinde dolaştığı için işe konulmamışken kaçış kısa sürer.
 - **Kuyu çevresinde ağaç yok, İşçi Hızı menüde (18 Ekim 2026, `feature/upgrades`):** Kullanıcı: "kuyunun belli bir uzaklığına kadar ağaç oluşmasın, işçiler gidip gelsin; işçi hızlandırma yükseltmesi menüden olsun".
   - `WfcSolver`: `clearIds` (5), `clearCenter` (kuyu), `clearRadius` 24 m: bu çemberde ağaç çıkmaz (boyanmış hücreler ve yalnız ağaç olabilen hücreler hariç). Bağlantı `SampleSceneSetup.EnsureWellClearing` (kurulum da çağırır), tek seferlik betikle uygulandı.
   - `UpgradeHUD`: ormanın `UpgradeLevel`'ı (köylü işçilerin hızı) artık yapının üstünde yüzen buton değil, alttaki panelde İşçi butonunun yanında "» İşçi Hızı Sv N / bedel" (son seviyede "En yüksek"; para yetmezken soluk). Elle boyanan haritada ormanın tek bir yeri yok. Taş ocaklarının butonları eskisi gibi ocakların üstünde.
@@ -186,6 +192,7 @@ Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç g
 
 ## Sıradaki işler / açık konular
 
+- [ ] Tsunami kaçışı: kol pozu oyun kamerasından yakından gözle kontrol edilmeli; köylüler evlerine girince sel takipçisi onları sayamıyor (köy hasarı ileride evlere bağlanabilir).
 - [ ] WFC kıyı/köy bölgeleri ve köylüsüz başlangıç Unity'de Play'de denenmeli: işçi al → ormana/ocağa bırak → evlerin, dağların içinden geçmediğini, çatıya çıkmadığını izle. `VillagerAnimationIntegrationTests` köylüsüz sahneye göre güncellenmeli.
 - [ ] WFC: elle boyanmış harita sabitlemesiz de bazı tohumlarda çözülemiyor (7 oyunda 2); boyanmış hücreler/kurallar ekip tasarımcısıyla kontrol edilmeli ya da başarısızlıkta yeni tohumla yeniden denenmeli.
 - [ ] Sel takipçisi WFC ev karolarını (id 10–13) izlemiyor; köy hasarı/durum yazısı için gerekirse eklenecek.

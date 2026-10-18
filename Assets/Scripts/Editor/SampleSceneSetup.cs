@@ -385,6 +385,9 @@ public static class SampleSceneSetup
             Object.DestroyImmediate(worker.gameObject);
         template.name = WorkerTemplateName;
         template.gameObject.SetActive(false);
+        var workerSettings = new SerializedObject(template);
+        workerSettings.FindProperty("idleMarkerMaterial").objectReferenceValue = IdleMarkerMaterial();
+        workerSettings.ApplyModifiedPropertiesWithoutUndo();
 
         var ui = new SerializedObject(hud);
         ui.FindProperty("workerTemplate").objectReferenceValue = template;
@@ -393,6 +396,19 @@ public static class SampleSceneSetup
     }
 
     const string WorkerTemplateName = "Worker Template";
+    const string IdleMarkerPath = "Assets/Materials/IdleMarker.mat";
+
+    // Boştaki köylünün belirteci: ışıktan etkilenmeyen, göz yormayan soluk sarı.
+    static Material IdleMarkerMaterial()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(IdleMarkerPath);
+        if (material != null)
+            return material;
+        material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "IdleMarker" };
+        material.SetColor("_BaseColor", new Color(1f, 0.93f, 0.62f));
+        AssetDatabase.CreateAsset(material, IdleMarkerPath);
+        return material;
+    }
 
     // Kuyunun çevresinde ağaç çıkmaz (WfcSolver.clearCenter): işçiler odunu uzaktan taşısın.
     public static bool EnsureWellClearing(Scene scene)

@@ -66,6 +66,9 @@ public class VillagerPicker : MonoBehaviour
         }
 
         var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
+        // Tsunami alarmında tutulan köylü bırakılır ve evine kaçar.
+        if (held != null && Gatherer.Alarm)
+            Drop();
         if (held != null)
         {
             if (TryGroundPoint(ray, out var ground))
@@ -110,7 +113,7 @@ public class VillagerPicker : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             var gatherer = hits[i].collider.GetComponentInParent<Gatherer>();
-            if (gatherer != null && gatherer.IsVillager && hits[i].distance < bestDistance)
+            if (gatherer != null && gatherer.CanBePicked && hits[i].distance < bestDistance)
             {
                 best = gatherer;
                 bestDistance = hits[i].distance;
@@ -123,6 +126,8 @@ public class VillagerPicker : MonoBehaviour
         bestDistance = radius;
         foreach (var villager in Gatherer.Villagers)
         {
+            if (!villager.CanBePicked)
+                continue;
             var screen = cam.WorldToScreenPoint(villager.transform.position + Vector3.up);
             if (screen.z <= 0f)
                 continue;
@@ -199,6 +204,11 @@ public class VillagerPicker : MonoBehaviour
         t.SetPositionAndRotation(new Vector3(spot.x, t.position.y, spot.z), Quaternion.Euler(0f, t.eulerAngles.y, 0f));
         villager.SnapToGround();
 
+        if (Gatherer.Alarm)
+        {
+            villager.Flee();
+            return;
+        }
         var cart = QuarryCartNear(holdPoint);
         if (cart != null)
             villager.PushCart(cart);

@@ -26119,6 +26119,8 @@ MonoBehaviour:
   wanderRadius: 5
   wanderPause: {x: 1.5, y: 4}
   pushGap: 0.35
+  idleMarkerMaterial: {fileID: 2100000, guid: 955b62f57cba20e47b26182a1138a8b9, type: 2}
+  fleeSpeedMultiplier: 1.8
   needsPusher: 0
 --- !u!23 &2120344315
 MeshRenderer:
@@ -26202,6 +26204,9 @@ MonoBehaviour:
   windUpAngle: -165
   pushArmAngle: -72
   pushLean: 12
+  panicArmAngle: -170
+  panicCross: 28
+  panicWave: 10
   blendSpeed: 12
 --- !u!1 &2120990946
 GameObject:
