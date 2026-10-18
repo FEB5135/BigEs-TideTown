@@ -12696,6 +12696,7 @@ MonoBehaviour:
   workerButtonWidth: 290
   workerWood: 15
   workerStone: 10
+  speedButtonWidth: 300
 --- !u!1 &1114714851
 GameObject:
   m_ObjectHideFlags: 0
@@ -22481,6 +22482,9 @@ MonoBehaviour:
   flatPatch: 14
   mountainIds: 06000000070000000800000009000000i
   mountainClearance: 6
+  clearIds: 05000000i
+  clearCenter: {fileID: 2141296704}
+  clearRadius: 24
 --- !u!114 &1602157108
 MonoBehaviour:
   m_ObjectHideFlags: 0

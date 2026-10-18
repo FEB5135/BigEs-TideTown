@@ -25,6 +25,7 @@ public static class SampleSceneSetup
             EnsureVillagerJobs(scene);
             EnsureAudio(scene);
             EnsureUpgrades(scene);
+            EnsureWellClearing(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -79,6 +80,7 @@ public static class SampleSceneSetup
         EnsureVillagerJobs(scene);
         EnsureAudio(scene);
         EnsureUpgrades(scene);
+        EnsureWellClearing(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -390,6 +392,19 @@ public static class SampleSceneSetup
     }
 
     const string WorkerTemplateName = "Worker Template";
+
+    // Kuyunun çevresinde ağaç çıkmaz (WfcSolver.clearCenter): işçiler odunu uzaktan taşısın.
+    public static bool EnsureWellClearing(Scene scene)
+    {
+        var solver = Find<WfcSolver>(scene);
+        var well = Find<Well>(scene);
+        if (solver == null || well == null)
+            return false;
+        var settings = new SerializedObject(solver);
+        settings.FindProperty("clearCenter").objectReferenceValue = well.transform;
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
 
     // Oyun içi kısa sesler (GameAudio): Kenney RPG Audio ve Impact Sounds (CC0) ile bizim ürettiğimiz vagon sesi
     // (Art/Audio/make_cart_roll.py). Hepsi Assets/Audio/SFX'te.

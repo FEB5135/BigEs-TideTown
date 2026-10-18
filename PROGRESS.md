@@ -34,6 +34,11 @@ Son güncelleme: 2026-10-18 (`feature/storm-warning`, `feature/upgrades`'e birle
 
 ## Son durum (yapılanlar)
 
+- **Kuyu çevresinde ağaç yok, İşçi Hızı menüde (18 Ekim 2026, `feature/upgrades`):** Kullanıcı: "kuyunun belli bir uzaklığına kadar ağaç oluşmasın, işçiler gidip gelsin; işçi hızlandırma yükseltmesi menüden olsun".
+  - `WfcSolver`: `clearIds` (5), `clearCenter` (kuyu), `clearRadius` 24 m: bu çemberde ağaç çıkmaz (boyanmış hücreler ve yalnız ağaç olabilen hücreler hariç). Bağlantı `SampleSceneSetup.EnsureWellClearing` (kurulum da çağırır), tek seferlik betikle uygulandı.
+  - `UpgradeHUD`: ormanın `UpgradeLevel`'ı (köylü işçilerin hızı) artık yapının üstünde yüzen buton değil, alttaki panelde İşçi butonunun yanında "» İşçi Hızı Sv N / bedel" (son seviyede "En yüksek"; para yetmezken soluk). Elle boyanan haritada ormanın tek bir yeri yok. Taş ocaklarının butonları eskisi gibi ocakların üstünde.
+  - Claude Play'de denedi: kuyunun çevresi ağaçsız (evler var), test menüsüyle 100/100 verilip İşçi Hızı'na basıldı: 20 odun 10 taş düştü, buton Sv 3 (45/30) oldu, konsolda hata yok.
+  - Not: Unity dışı WFC düzeneği (scratchpad) `clearCenter` için Transform/Vector3 taslağı istemediğinden bu özellikle derlenmez; gerekirse taslağa eklenmeli.
 - **İç kesimde kum, ağaç sıklığı, tepe ağaçları geri alındı (18 Ekim 2026, `feature/upgrades`):** Kullanıcı: "tepelerin üstündeki ağaçları sen yapma, arkadaş halledecek; kimi yerlerde kum var; fazla ağaç var".
   - Tepe ağacı varyantları MapView'dan çıkarıldı, `Assets/Prefabs/Map` silindi, düz tepe ağırlığı 1'e döndü.
   - Kum: kıyı kuralındaki "dışarıda" testi, boyanmış çimen halkasının hemen içindeki hücreleri de dışarıda sayıyordu (kum da kara da aynı yönde); oralar zorunlu kara olmadığı için WFC 2×2 kum çukuru açabiliyordu. Artık dışarıda sayılmak için kuma karadan yakın olmak da gerekiyor. Ayrıca çözümden sonra harita kenarına bağlı olmayan her kum öbeği (kum + kum yokuşları) `pitFillId` (0, çimen) ile dolduruluyor (`WfcSolver.FillPits`). Düzenekte çukur 0, kural ihlali 0 (doğrulayıcıyla).

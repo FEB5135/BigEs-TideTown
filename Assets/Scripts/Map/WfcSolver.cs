@@ -54,6 +54,11 @@ public class WfcSolver : MonoBehaviour
     int[] mountainIds = { 6, 7, 8, 9 };
     [SerializeField, Tooltip("How many cells around painted mountains are never made flat.")]
     float mountainClearance = 6f;
+    [SerializeField, Tooltip("Ids kept out of the circle around Clear Center (trees around the well, so workers have a walk).")]
+    int[] clearIds = { 5 };
+    [SerializeField] Transform clearCenter;
+    [SerializeField, Tooltip("Radius of that circle, in metres.")]
+    float clearRadius = 24f;
 
     float[] villageBias;
     bool[] villageTile;
@@ -157,6 +162,7 @@ public class WfcSolver : MonoBehaviour
         ApplyCoast();
         ApplyVillage();
         ApplyFlats();
+        ApplyClearing();
 
         attempts = 0;
         attemptLimit = Math.Max(MaxAttempts, cellCount * 32);
@@ -642,6 +648,38 @@ public class WfcSolver : MonoBehaviour
 
             Restrict(i, isHill, false);
         }
+    }
+
+    void ApplyClearing()
+    {
+        if (clearCenter == null || clearIds == null || clearIds.Length == 0 || clearRadius <= 0f)
+            return;
+
+        var local = world.transform.InverseTransformPoint(clearCenter.position);
+        var cx = local.x / world.CellSize - 0.5f;
+        var cy = local.z / world.CellSize - 0.5f;
+        var radius = clearRadius / world.CellSize;
+        var isClear = IdMask(clearIds);
+        for (var i = 0; i < counts.Length; i++)
+        {
+            var dx = i % width - cx;
+            var dy = i / width - cy;
+            if (counts[i] <= 1 || dx * dx + dy * dy > radius * radius || !HasOther(i, isClear))
+                continue;
+            Restrict(i, isClear, false);
+        }
+    }
+
+    bool HasOther(int cell, bool[] mask)
+    {
+        var cellBase = cell * tileCount;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile] && !mask[tile])
+                return true;
+        }
+
+        return false;
     }
 
     bool HasAny(int cell, bool[] mask)
