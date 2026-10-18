@@ -48,7 +48,7 @@ public class CartSound : MonoBehaviour
         if (roll == null)
             return;
         var audio = GameAudio.Instance;
-        float level = audio != null ? audio.volume * audio.Attenuation(transform.position) : 1f;
+        float level = audio != null ? audio.Level * audio.Attenuation(transform.position) : GameSettings.EffectsVolume;
         float k = Mathf.Clamp01(speed / fullSpeed);
         roll.volume = rollVolume * k * level;
         roll.pitch = Mathf.Lerp(0.8f, 1.1f, k);
