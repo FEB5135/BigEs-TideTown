@@ -1004,6 +1004,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::IdleTown.Construction.WallDemoGrid
   world: {fileID: 1602157105}
+  terrainSurface: {fileID: 0}
   color: {r: 0.16, g: 0.24, b: 0.2, a: 1}
 --- !u!23 &123608663
 MeshRenderer:
@@ -1122,6 +1123,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::IdleTown.Construction.WallDemoGrid
   world: {fileID: 10385819}
+  terrainSurface: {fileID: 0}
   color: {r: 0.16, g: 0.24, b: 0.2, a: 1}
 --- !u!23 &132178528
 MeshRenderer:
@@ -1388,6 +1390,9 @@ MonoBehaviour:
   checkInterval: 0.25
   floodDepth: 0.25
   destroyDepth: 1.2
+  houseDestroyDepth: 1
+  houseFlowMinDepth: 0.3
+  houseDestroyFlow: 1.5
   floodedMaterial: {fileID: 2100000, guid: 299b5e79509d14a4680a8b75f258d662, type: 2}
   destroyedMaterial: {fileID: 2100000, guid: 2c51b033a80863246b6e93ebc2ab438e, type: 2}
   statusText: {fileID: 155505860}
@@ -5478,6 +5483,56 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &595395689
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 595395691}
+  - component: {fileID: 595395690}
+  m_Layer: 0
+  m_Name: Tutorial
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &595395690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595395689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 246223ed0db01f94a9c4210c9813525b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleTown.Runtime::TutorialHints
+  font: {fileID: 12800000, guid: 45f0fe53976ab1d4c8aec9a9c0215b70, type: 3}
+  panelSprite: {fileID: 21300000, guid: 0de1c9bb912f47c44b6a7660670392f5, type: 3}
+  infoDuration: 9
+  stepGap: 0.6
+  alwaysShow: 0
+  rightReserve: 510
+--- !u!4 &595395691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595395689}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &614770273 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1969125119422315795, guid: d63ed926607a3da4c911637089faa9da, type: 3}
@@ -14410,6 +14465,7 @@ MonoBehaviour:
   resourceStoreSource: {fileID: 2141296705}
   inputCamera: {fileID: 784009414}
   wallPrefab: {fileID: 0}
+  terrainSurface: {fileID: 0}
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -18148,6 +18204,19 @@ MonoBehaviour:
   - Id: 17
     Prefab: {fileID: 919132149155446097, guid: bf1bf830a28d3cf4583217a13a9f5dde, type: 3}
     Weight: 1
+  ruins:
+  - Intact: {fileID: 919132149155446097, guid: deac77179a5b2654a83c51740dac228e, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: 3d09f5cc85f5c524f8973c62cc795c3f, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: b586c733e6881eb48bd68e674025e32a, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: ac1f718b862177e4eba47d8456cc61ca, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: 8a2a627eee3fe48488d10326e7dc91ee, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: 17b5a716168f2d34aa0e86dc753cba23, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: f3eb92d29645a9e41afeac04d0b63587, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: a54f922abb12dd744a74b239e9ebbda3, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: bc10eeac1c1382346b8c763c38306242, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: b1f35dd1a2a18b24eb76f78ef7fc69d3, type: 3}
+  - Intact: {fileID: 919132149155446097, guid: fc2ff5fec7b9b344cba1c598142d988f, type: 3}
+    Ruined: {fileID: 919132149155446097, guid: 0aa26520171ca3d44a09c83cf016609a, type: 3}
 --- !u!114 &1602157105
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -26552,3 +26621,4 @@ SceneRoots:
   - {fileID: 970497801}
   - {fileID: 501909854}
   - {fileID: 1575717507}
+  - {fileID: 595395691}

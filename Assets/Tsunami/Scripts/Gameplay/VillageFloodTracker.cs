@@ -14,6 +14,8 @@ namespace Tsunami
     /// <summary>
     /// Samples simulated water depth around each building at a fixed interval (no physics queries).
     /// Damage is latched: once flooded/destroyed, a building stays that way until ResetVillage().
+    /// Also knocks down the generated map's houses (Houses, WFC tiles 10-13): as soon as water touches any cell of a
+    /// house, its whole building falls. There is no partial damage; MapView breaks it apart and leaves its sunken model.
     /// </summary>
     public class VillageFloodTracker : MonoBehaviour
     {
@@ -44,6 +46,10 @@ namespace Tsunami
         [Tooltip("Water depth (m) at which a building is destroyed.")]
         [SerializeField, Min(0.01f)] float destroyDepth = 1.2f;
 
+        [Header("Houses (generated map)")]
+        [Tooltip("Water this deep (m) touching a house knocks its building down.")]
+        [SerializeField, Min(0.001f)] float houseWetDepth = 0.05f;
+
         [Header("Feedback")]
         [SerializeField] Material floodedMaterial;
         [SerializeField] Material destroyedMaterial;
@@ -51,6 +57,8 @@ namespace Tsunami
         [SerializeField] Text statusText;
 
         float nextCheck;
+        int labelledHouses;
+        bool housesChanged;
 
         public int TotalCount => buildings.Length;
 
@@ -68,6 +76,21 @@ namespace Tsunami
         public int FloodedCount { get; private set; }
         public int DestroyedCount { get; private set; }
         public event Action Changed;
+
+        void OnEnable()
+        {
+            Houses.Destroyed += OnHouseChanged;
+            Houses.Repaired += OnHouseChanged;
+        }
+
+        void OnDisable()
+        {
+            Houses.Destroyed -= OnHouseChanged;
+            Houses.Repaired -= OnHouseChanged;
+        }
+
+        // A house can also fall or be rebuilt from elsewhere; the label catches up at the next check.
+        void OnHouseChanged(Houses.House house) => housesChanged = true;
 
         void Start()
         {
@@ -106,7 +129,38 @@ namespace Tsunami
                     changed = true;
                 }
             }
+            KnockDownHouses();
             if (changed) Recount();
+        }
+
+        void KnockDownHouses()
+        {
+            // The house list is built on first use, after the map has been generated. A sea at rest (or a paused
+            // tsunami) knocks nothing down.
+            if (!simulation.Paused)
+                foreach (Houses.House house in Houses.All)
+                    if (!house.IsDestroyed && Floods(house, out Vector3 flow))
+                        house.Destroy(flow);
+            if (housesChanged || Houses.All.Count != labelledHouses) Recount();
+        }
+
+        bool Floods(Houses.House house, out Vector3 flow)
+        {
+            if (house.CellCenters.Count == 0) return Floods(house.Center, out flow);
+            foreach (Vector3 cell in house.CellCenters)
+                if (Floods(cell, out flow)) return true;
+            flow = default;
+            return false;
+        }
+
+        // Water at p, and its flow velocity (the solver grid is world aligned).
+        bool Floods(Vector3 p, out Vector3 flow)
+        {
+            flow = default;
+            if (simulation.SampleDepth(p) < houseWetDepth) return false;
+            TsunamiPhysicsSolver solver = simulation.Solver;
+            flow = new Vector3(simulation.Terrain.SampleField(solver.VelocityX, p), 0f, simulation.Terrain.SampleField(solver.VelocityZ, p));
+            return true;
         }
 
         float SampleFootprint(Vector3 p, float r)
@@ -149,6 +203,7 @@ namespace Tsunami
                 ApplyVisual(b, i);
             }
             nextCheck = 0f;
+            Houses.RepairAll();
             Recount();
         }
 
@@ -168,8 +223,12 @@ namespace Tsunami
             SafeCount = safe;
             FloodedCount = flooded;
             DestroyedCount = destroyed;
+            labelledHouses = Houses.Built.Count;
+            housesChanged = false;
             if (statusText != null)
-                statusText.text = $"Village: {safe} safe   {flooded} flooded   {destroyed} destroyed   (of {safe + flooded + destroyed})";
+                statusText.text = labelledHouses > 0
+                    ? $"Evler: {labelledHouses - Houses.DestroyedCount} ayakta   {Houses.DestroyedCount} yıkık   (toplam {labelledHouses})"
+                    : $"Village: {safe} safe   {flooded} flooded   {destroyed} destroyed   (of {safe + flooded + destroyed})";
             Changed?.Invoke();
         }
     }
