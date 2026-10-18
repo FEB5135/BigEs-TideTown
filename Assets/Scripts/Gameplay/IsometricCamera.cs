@@ -89,7 +89,8 @@ public class IsometricCamera : MonoBehaviour
             Pan(mouse, overUI);
         }
 
-        distance = Mathf.SmoothDamp(distance, targetDistance, ref zoomVelocity, zoomSmoothTime);
+        // Gerçek zamanla: tutorial oyunu durdurduğunda (timeScale 0) da yakınlaşma çalışsın.
+        distance = Mathf.SmoothDamp(distance, targetDistance, ref zoomVelocity, zoomSmoothTime, Mathf.Infinity, Time.unscaledDeltaTime);
         Apply();
     }
 

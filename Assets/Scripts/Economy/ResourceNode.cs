@@ -35,16 +35,24 @@ public class ResourceNode : MonoBehaviour
     // Tıklanınca ya da toplayıcı vurunca (örn. grid'de çizilen ağacı sallamak için).
     public event Action Hit;
 
+    // Sahnedeki açık kaynaklar (örn. tutorial'da tıklanacak ağacı göstermek için).
+    public static IReadOnlyList<ResourceNode> Active => active;
     public ResourceType Type => type;
     public int Remaining => remaining;
-    public bool IsAvailable => remaining > 0 && claimants.Count < maxGatherers;
+    public int WorkerCapacity => type == ResourceType.Stone ? (Upgrade != null ? Upgrade.MineWorkerCapacity : 2) : Mathf.Max(1, maxGatherers);
+    public int ActiveGatherers
+    {
+        get { claimants.RemoveAll(worker => worker == null || !worker.isActiveAndEnabled); return claimants.Count; }
+    }
+    public bool IsAvailable => remaining > 0 && ActiveGatherers < WorkerCapacity;
     public Transform[] ApproachPath => approachPath;
     // Ocağın seviyesi (yoksa null); ocağın vagonları buna göre hızlanır.
-    public UpgradeLevel Upgrade { get; private set; }
+    UpgradeLevel upgrade;
+    public UpgradeLevel Upgrade => upgrade != null ? upgrade : upgrade = GetComponent<UpgradeLevel>();
 
     void Awake()
     {
-        Upgrade = GetComponent<UpgradeLevel>();
+        upgrade = GetComponent<UpgradeLevel>();
         remaining = capacity;
         restRotation = transform.localRotation;
         EnsureCollider();
@@ -101,10 +109,15 @@ public class ResourceNode : MonoBehaviour
         return best;
     }
 
-    public void Claim(Gatherer gatherer)
+    public void Claim(Gatherer gatherer) => TryClaim(gatherer);
+
+    public bool TryClaim(Gatherer gatherer)
     {
-        if (!claimants.Contains(gatherer))
-            claimants.Add(gatherer);
+        if (gatherer == null) return false;
+        if (claimants.Contains(gatherer)) return true;
+        if (!IsAvailable) return false;
+        claimants.Add(gatherer);
+        return true;
     }
 
     public void Release(Gatherer gatherer) => claimants.Remove(gatherer);
