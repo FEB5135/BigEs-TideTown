@@ -26,7 +26,10 @@ namespace Tsunami
         [Tooltip("Large countdown / alert label. Optional.")]
         [SerializeField] Text countdownText;
         [Tooltip("Seconds the 'get ready for the next wave' notice stays on the large label.")]
-        [SerializeField, Min(0f)] float prepareNoticeTime = 8f;
+        [SerializeField, Min(0f)] float prepareNoticeTime = 5f;
+        [Tooltip("With waves, the large countdown appears only this many seconds before the wave hits; until then " +
+                 "the storm clouds are the only sign of how close it is.")]
+        [SerializeField, Min(0f)] float finalCountdown = 10f;
 
         int shownKey = int.MinValue;
         int shownReleaseSecond = int.MinValue;
@@ -147,18 +150,17 @@ namespace Tsunami
             calmCountdown = calm;
             if (countdownText == null) return;
             int key = -1;
-            if (controller.State == TsunamiState.Warning) key = Mathf.CeilToInt(controller.WarningRemaining);
+            if (controller.State == TsunamiState.Warning)
+            {
+                float left = controller.WarningRemaining;
+                if (controller.WaveCount == 0 || left <= finalCountdown) key = Mathf.CeilToInt(left);
+            }
             else if (controller.State == TsunamiState.Running && controller.Simulation != null && controller.Simulation.SimTime < 6.0) key = 1000;
-            else if (calm && Time.time < prepareUntil) key = 2000 + Mathf.CeilToInt(controller.NextReleaseRemaining);
+            else if (calm && Time.time < prepareUntil) key = 2000;
             if (key == shownKey) return;
             shownKey = key;
             string wave = controller.WaveCount > 0 ? $"{controller.WavesReleased}. DALGA" : "TSUNAMİ";
-            if (key >= 2000)
-            {
-                int left = key - 2000;
-                countdownText.text = $"{controller.WavesReleased + 1}. DALGAYA HAZIRLAN!\n" +
-                                     $"{controller.NextWaveHeight:0} m dalga {left / 60}:{left % 60:00} sonra";
-            }
+            if (key == 2000) countdownText.text = $"{controller.WavesReleased + 1}. DALGAYA HAZIRLAN!";
             else if (key == 1000) countdownText.text = $"{wave} GELİYOR";
             else if (key >= 0) countdownText.text = controller.WaveCount > 0 ? $"{wave} ({controller.WaveHeight:0} m)\n{key}" : $"TSUNAMİ UYARISI\n{key}";
             else countdownText.text = string.Empty;
@@ -189,15 +191,15 @@ namespace Tsunami
                     : "Durum: " + Describe(controller.State);
                 return;
             }
-            // The wave sequence: what is happening now, and how long until the next wave.
+            // The wave sequence: what is happening now. No times: the storm clouds tell how close the next wave is.
             int released = controller.WavesReleased, count = controller.WaveCount;
-            string next = shownReleaseSecond >= 0 ? $"{released + 1}. dalgaya ({controller.NextWaveHeight:0} m) {time}" : null;
+            bool coming = shownReleaseSecond >= 0;
             string now;
             if (controller.State == TsunamiState.Paused) now = Describe(TsunamiState.Paused);
-            else if (released == 0) now = next != null ? "Fırtına" : Describe(controller.State);
+            else if (released == 0) now = coming ? "Fırtına yaklaşıyor" : Describe(controller.State);
             else if (controller.InDanger) now = released == count ? $"Son dalga ({released}/{count})" : $"{released}. dalga";
-            else now = released == count ? "Dalgalar bitti" : "Sakin";
-            statusText.text = next != null ? $"Durum: {now} - {next}" : $"Durum: {now}";
+            else now = released == count ? "Dalgalar bitti" : coming ? $"Sakin - {released + 1}. dalga gelecek" : "Sakin";
+            statusText.text = $"Durum: {now}";
         }
 
         public static string Describe(TsunamiState state)

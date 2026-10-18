@@ -24602,7 +24602,8 @@ MonoBehaviour:
   waveHeightText: {fileID: 2025824919}
   statusText: {fileID: 722723330}
   countdownText: {fileID: 695503404}
-  prepareNoticeTime: 8
+  prepareNoticeTime: 5
+  finalCountdown: 10
 --- !u!114 &1950063955
 MonoBehaviour:
   m_ObjectHideFlags: 0
