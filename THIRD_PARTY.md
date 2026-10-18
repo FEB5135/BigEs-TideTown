@@ -28,7 +28,6 @@ Bu projede ekip dışından alınan hazır kaynaklar ve yapay zekâ kullanımı 
 
 | Kaynak ve sağlayıcı | Bağlantı | Lisans | Kullanım ve değişiklik | Repoda mı? |
 | --- | --- | --- | --- | --- |
-| Glorious Morning — Waterflame | https://www.newgrounds.com/audio/listen/91476 | [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) | *Çağlar Boyu Savaş (Age of War)* oyununun orijinal ana teması (`Assets/Audio/Music/Glorious_Morning.mp3`). Tsunami dalgası köye yaklaştığı anda savunma/savaş fazı müziği olarak çalar. Değiştirilmedi. | Evet |
 | Townie Loop — Kevin MacLeod (Incompetech) | https://incompetech.com/music/royalty-free/index.php?search=Townie+Loop | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Köy kurma, odun/taş toplama ve duvar örme (Idle & Build) fazı fon müziği (`Assets/Audio/Music/Townie_Loop.mp3`). Değiştirilmedi. | Evet |
 | Volatile Reaction — Kevin MacLeod (Incompetech) | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400039 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Alternatif yüksek tempolu savunma / aksiyon müziği (`Assets/Audio/Music/Volatile_Reaction.mp3`). Değiştirilmedi. | Evet |
 

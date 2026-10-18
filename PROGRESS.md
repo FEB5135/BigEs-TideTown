@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (main: duvar var olan rotayı izliyor + otomatik kat, inşa panelinin alt durum yazıları kapalı; commit yok)
+Son güncelleme: 2026-10-18 (main: ana menüde Tide Town logosu ve oyun ikonu, "Köyü tsunamiden koru" alt başlığı kalktı; commit yok)
 
 ## Bağlam
 
@@ -40,6 +40,12 @@ Son güncelleme: 2026-10-18 (main: duvar var olan rotayı izliyor + otomatik kat
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Tide Town logosu ve oyun ikonu (18 Ekim 2026, main, commit yok):** Kullanıcı logo resmini verdi: "bunu başlangıç logosu ve oyun ikonu olarak ayarla, Köyü tsunamiden koruyu da kaldır".
+  - Logoyu ekipten biri çizdi (kullanıcı teyit etti), THIRD_PARTY.md'ye eklenmedi. Resim zaten saydam arka planlıydı; saydam kenarları kırpılıp `Assets/UI/Menu/Logo.png` (960x825, mipmap açık) ve kareye ortalanmış `Assets/UI/Icons/GameIcon.png` (1024x1024) yapıldı.
+  - Ana menü (`SampleScene` > Main Menu > Main Page > Logo): eski dalga amblemi, "Tide Town" yazısı ve "KÖYÜ TSUNAMİDEN KORU" alt başlığı silindi; yerine logo resmi (`Image`, oranı korunuyor) geldi. Logo 465x400, (0, 300): üst kenardan 40 içeride, Oyna'nın 78 üstünde. `MainMenuSetup.BuildMainPage` de aynı düzeni kuruyor; sahneye bir kez `Tools > BigEs > Logo ve İkonu Uygula` (`MainMenuSetup.ApplyLogoAndIcon`, ikinci çalıştırmada bir şey yapmaz) ile uygulandı.
+  - Oyun ikonu: Player Settings varsayılan ikonu `GameIcon.png` (`ProjectSettings.asset` > `m_BuildTargetIcons`).
+  - Play'de denendi (Claude Unity'yi sürdü): açılışta logo Oyna/Ayarlar/Çıkış'ın üstünde, konsolda hata yok. Build alınıp exe ikonu görülmedi. Unity'nin kaydederken yaptığı Wood Button anchor değişikliği ve `IdleMarker.mat` rengi yine sahne/diff'te (eskisi gibi commit'e alınmamalı). Eski sahnelerde (ResourceTest) alt başlık duruyor; oynanmıyor.
 
 - **İnşa araç çubuğu ve otomatik kat (18 Ekim 2026):** Kaynak kartlarıyla uyumlu Tahta, Taş, Güçlü ve Silme (N) kartları eklendi. İnşa modunda işçi ve hız kartları gizlenir, çıkınca geri gelir. Tutorial ↑/↓, 2 m kat, 20 m sınır ve otomatik üst kata çıkmayı anlatır. Güncel main duvar hattını takip etme ve en alçak kısmı tamamlama davranışı korundu; Oto kat aç/kapat denetimi yeni araç çubuğuna bağlandı. Birleşmiş sürümde Unity EditMode duvar/ekonomi testleri 74/74 geçti.
 
@@ -258,6 +264,7 @@ Son güncelleme: 2026-10-18 (main: duvar var olan rotayı izliyor + otomatik kat
 - [x] **Ev sayısı tutarsız** (kullanıcı: "ev sayıları her tur artıyor sanırım, olmamalı"): Ölçüldü (geçici kayıtçıyla): "Tekrar Oyna" turlarında sayılar haritaya göre değişiyor (115 / 138 / 98 / 105; ev karosu 478 / 576 / 400…), artmıyor. Asıl hata Editor'deydi: Play kodu ve sahneyi yeniden yüklemeden başladığı için aynı `World` nesnesi kalıyor, `Houses` statik listesi (`builtFor`) eski haritanın evlerini tutuyordu (ör. 612 karolu haritada 91 ev; önceki "570" de buydu). İşçi sınırı ve ev yıkımı da bu eski listeyle çalışıyordu. Düzeltme: `Houses.Invalidate()` her Play başında (`RuntimeInitializeOnLoadMethod(SubsystemRegistration)`) ve `WfcSolver.Solve` yeni harita kurarken listeyi unutturuyor. Doğrulandı: arka arkaya iki Play'de 550 karo → 133 ev, 518 karo → 125 ev; konsolda hata yok.
 - [x] **Kaybetme kartı** (kullanıcı: "evler yıkıldığı an kaybetme ekranı gelmesin, biraz süre geçsin, yıkılmayan evleri göstermesin"): `GameOutcome.loseDelay` 3 → 8 sn; kaybedince "Ayakta kalan evler" satırı yok, diğer satırlar yukarı kayıyor (kazanma kartı aynı). Play'de: ilk ev ~26. saniyede düştü, kart ~8–10 sn sonra "KÖY YIKILDI / Yıkılan evler 17 / Skor / En yüksek skor" olarak geldi.
 
+- [ ] Logo ikonu: build alınıp exe/görev çubuğu ikonu kontrol edilmeli. (Logoyu ekipten biri çizdi; THIRD_PARTY'ye girmiyor.)
 - [ ] Duvar oto kat / rota izleme Play'de denenmeli: duvar çiz, uçlarını iki yönde seç (kat 2, 3), U'nun ağzını kapat, ↑/↓ ile elle kat. Önizleme çizgisi atlanan (zaten yüksek) parçaların üstünden düz geçebiliyor; durum yazıları kapalı olduğu için geçersiz yolun sebebi artık panelde görünmüyor (yalnız kırmızı önizleme).
 - [ ] Dalgalar: arkadaşın kazan/kaybet ekranı `WavesFinished` / `WaveReleased` olaylarına bağlanacak (biz dokunmuyoruz). Kazanma ölçütü (ör. ayakta kalan ev oranı) onlarda. Dalgalar arasında ayakta kalan duvar hasarının sıfırlanması istenmiyorsa `TeamMapTsunamiAdapter.ResetStandingWallDamage` yalnız tam sıfırlamada çağrılmalı. Yıkık evin sahibi köylünün alarmda nereye kaçacağı hâlâ açık.
 - [ ] Madenlerin 2/4/5 vagon kapasitesini Play'de birden fazla köylü atayarak üretim ve kuyuya dönüş döngüsünde görsel olarak kontrol et; kapasite, kaynak sınırı ve üçüncü seviye hız bonusu otomatik testlerle doğrulandı.

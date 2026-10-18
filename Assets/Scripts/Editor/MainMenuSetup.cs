@@ -146,27 +146,9 @@ public static class MainMenuSetup
     // grup içinin iki katı: logo -> Oyna 88, Oyna -> Ayarlar 40, Ayarlar -> Çıkış 20. Skor sağ üst köşede.
     static Object[] BuildMainPage(Transform page, out Text highScore, out Button play, out Button settings, out Button quit)
     {
-        // Logo: dalga amblemi, oyun adı ve alt başlık. Oyunun logosu gelince bu obje değiştirilir.
-        // Kalın koyu dış çizgi yerine ince lacivert çizgi ve sert (bulanıksız) aşağı gölge: low-poly "ekstrüzyon".
-        var logo = NewRect(page, "Logo", new Vector2(900f, 300f), new Vector2(0f, 262f));
-        var waves = NewImage(logo, "Waves", SpriteDir + "Waves.png", Water);
-        waves.sizeDelta = new Vector2(76f, 76f);
-        waves.anchoredPosition = new Vector2(0f, 118f);
-        AddShadow(waves.GetComponent<Image>(), Navy, 4f, 1f);
-
-        var title = NewText(logo, "Title", "Tide Town", 120, Color.white);
-        title.font = titleFont;
-        title.rectTransform.sizeDelta = new Vector2(900f, 176f);
-        title.rectTransform.anchoredPosition = new Vector2(0f, 14f);
-        var outline = title.gameObject.AddComponent<Outline>();
-        outline.effectColor = Navy;
-        outline.effectDistance = new Vector2(3f, 3f);
-        AddShadow(title, Navy, 9f, 1f);
-
-        var subtitle = NewText(logo, "Subtitle", "KÖYÜ TSUNAMİDEN KORU", 34, Foam);
-        subtitle.rectTransform.sizeDelta = new Vector2(900f, 44f);
-        subtitle.rectTransform.anchoredPosition = new Vector2(0f, -98f);
-        AddShadow(subtitle, Navy, 3f, 1f);
+        // Logo: oyunun Tide Town logosu (Logo.png), üstte ortada; alt başlık yok.
+        var logo = NewRect(page, "Logo", LogoSize, LogoPosition);
+        LogoImage(logo);
 
         // En yüksek skor: menünün ortasından sağ üst köşeye, kenarlardan Margin içeride bir çip.
         var score = NewRect(page, "High Score", new Vector2(300f, 76f), Vector2.zero);
@@ -240,6 +222,80 @@ public static class MainMenuSetup
         so.FindProperty("fullscreenValue").objectReferenceValue = fullscreen;
         so.ApplyModifiedPropertiesWithoutUndo();
         return back;
+    }
+
+    // Logo resmi 960x825; ekranda 400 yüksek, üst kenardan 40 içeride, Oyna'nın 78 üstünde biter.
+    static readonly Vector2 LogoSize = new Vector2(465f, 400f);
+    static readonly Vector2 LogoPosition = new Vector2(0f, 300f);
+    const string LogoPath = SpriteDir + "Logo.png";
+    const string IconPath = "Assets/UI/Icons/GameIcon.png";
+
+    static RectTransform LogoImage(RectTransform logo)
+    {
+        var image = Stretch(NewImage(logo, "Image", LogoPath, Color.white));
+        image.GetComponent<Image>().preserveAspect = true;
+        // Resim ekranda ~2 kat küçüldüğü için mipmap açık (yoksa ahşap harflerin kenarları kırılıyor).
+        if (AssetImporter.GetAtPath(LogoPath) is TextureImporter importer && !importer.mipmapEnabled)
+        {
+            importer.mipmapEnabled = true;
+            importer.SaveAndReimport();
+        }
+        return image;
+    }
+
+    // Tools > BigEs > Logo ve İkonu Uygula, ya da komut satırından:
+    // Unity -batchmode -quit -executeMethod MainMenuSetup.ApplyLogoAndIcon
+    // Açık sahnedeki (batchmode'da SampleScene) eski yazı logosunu (dalga amblemi + "Tide Town" + alt başlık)
+    // Logo.png ile değiştirip sahneyi kaydeder ve oyunun varsayılan ikonunu GameIcon.png yapar.
+    [MenuItem("Tools/BigEs/Logo ve İkonu Uygula")]
+    public static void ApplyLogoAndIcon()
+    {
+        var scene = Application.isBatchMode
+            ? EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity")
+            : EditorSceneManager.GetActiveScene();
+        Debug.Log("[MainMenuSetup] " + UpgradeLogo(scene));
+        EditorSceneManager.SaveScene(scene);
+
+        var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
+        if (icon == null)
+        {
+            Debug.LogError("[MainMenuSetup] icon not found: " + IconPath);
+            return;
+        }
+        PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[MainMenuSetup] default icon set: " + IconPath);
+    }
+
+    public static string UpgradeLogo(UnityEngine.SceneManagement.Scene scene)
+    {
+        MainMenu menu = null;
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            menu = root.GetComponentInChildren<MainMenu>(true);
+            if (menu != null)
+                break;
+        }
+        if (menu == null)
+            return "main menu not found";
+        var logo = menu.transform.Find("Main Page/Logo") as RectTransform;
+        if (logo == null)
+            return "logo not found";
+        if (logo.Find("Image") != null)
+            return "logo already upgraded";
+
+        int removed = 0;
+        foreach (var name in new[] { "Waves", "Title", "Subtitle" })
+            if (logo.Find(name) is Transform old)
+            {
+                Object.DestroyImmediate(old.gameObject);
+                removed++;
+            }
+        logo.sizeDelta = LogoSize;
+        logo.anchoredPosition = LogoPosition;
+        LogoImage(logo);
+        EditorSceneManager.MarkSceneDirty(scene);
+        return $"logo image added, {removed} old title objects removed";
     }
 
     // Sahnedeki eski Ayarlar sayfasını (Ses + Tam Ekran + Grafik) yeni düzene çevirir: Müzik + Efektler + Tam Ekran.
