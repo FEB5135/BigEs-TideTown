@@ -26,6 +26,7 @@ public static class SampleSceneSetup
             EnsureAudio(scene);
             EnsureUpgrades(scene);
             EnsureWellClearing(scene);
+            EnsureNavigation(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -81,6 +82,7 @@ public static class SampleSceneSetup
         EnsureAudio(scene);
         EnsureUpgrades(scene);
         EnsureWellClearing(scene);
+        EnsureNavigation(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -385,6 +387,10 @@ public static class SampleSceneSetup
             Object.DestroyImmediate(worker.gameObject);
         template.name = WorkerTemplateName;
         template.gameObject.SetActive(false);
+        var workerSettings = new SerializedObject(template);
+        workerSettings.FindProperty("idleMarkerMaterial").objectReferenceValue = IdleMarkerMaterial();
+        workerSettings.FindProperty("markerScreenSize").floatValue = 0.11f;
+        workerSettings.ApplyModifiedPropertiesWithoutUndo();
 
         var ui = new SerializedObject(hud);
         ui.FindProperty("workerTemplate").objectReferenceValue = template;
@@ -393,6 +399,35 @@ public static class SampleSceneSetup
     }
 
     const string WorkerTemplateName = "Worker Template";
+    const string IdleMarkerPath = "Assets/Materials/IdleMarker.mat";
+
+    // Boştaki köylünün belirteci: ışıktan etkilenmeyen arayüzün su mavisi (#2EC4D6). Sarı, sarımsı yeşil çimende
+    // seçilmiyordu.
+    static Material IdleMarkerMaterial()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(IdleMarkerPath);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "IdleMarker" };
+            AssetDatabase.CreateAsset(material, IdleMarkerPath);
+        }
+        material.SetColor("_BaseColor", new Color(0.18f, 0.77f, 0.84f));
+        EditorUtility.SetDirty(material);
+        return material;
+    }
+
+    // Yol bulma köylüler için: 0.8 m (vagon genişliği) evlerin ve ağaçların arasındaki 2 m'lik geçitleri kapatıyordu;
+    // köylüler yolu bulamayıp uzaktan vuruyor, kaçarken takılıyordu.
+    public static bool EnsureNavigation(Scene scene)
+    {
+        var baker = Find<NavigationBaker>(scene);
+        if (baker == null)
+            return false;
+        var settings = new SerializedObject(baker);
+        settings.FindProperty("agentRadius").floatValue = 0.45f;
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
 
     // Kuyunun çevresinde ağaç çıkmaz (WfcSolver.clearCenter): işçiler odunu uzaktan taşısın.
     public static bool EnsureWellClearing(Scene scene)
