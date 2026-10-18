@@ -41,6 +41,8 @@ namespace IdleTown.Construction
         [Tooltip("Local-space height of the bottom of floor 1 relative to World.")]
         [SerializeField] float floorZeroBaseHeight;
         [SerializeField, Min(1)] int maxFloors = 10;
+        [Tooltip("Picks the floor from the walls under the path: one storey above their lowest part. ↑ ↓ override it until the selection ends.")]
+        [SerializeField] bool autoFloor = true;
 
         [Header("Input mode")]
         [SerializeField] bool constructionModeActive = true;
@@ -84,6 +86,7 @@ namespace IdleTown.Construction
         int previewStone;
         bool buildInProgress;
         int selectedFloor;
+        bool manualFloor;
         WallTier selectedTier;
         bool hasPreviewEndpoint;
         Vector2Int previewEndpoint;
@@ -287,7 +290,7 @@ namespace IdleTown.Construction
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("↓", buttonStyle, GUILayout.Width(48)))
                 SetSelectedFloor(selectedFloor - 1);
-            GUILayout.Label($"KAT {selectedFloor + 1} / {maxFloors}     {FloorBaseHeight(selectedFloor):0.##} m", labelStyle);
+            GUILayout.Label($"KAT {selectedFloor + 1} / {maxFloors}     {FloorBaseHeight(selectedFloor):0.##} m{(AutoFloorActive ? "     OTO" : "")}", labelStyle);
             if (GUILayout.Button("↑", buttonStyle, GUILayout.Width(48)))
                 SetSelectedFloor(selectedFloor + 1);
             GUILayout.EndHorizontal();
@@ -317,11 +320,7 @@ namespace IdleTown.Construction
                 ConfirmLastValidPreview();
             GUI.enabled = wasEnabled;
             GUI.backgroundColor = oldBackground;
-            GUI.contentColor = hasStart && !previewValid ? new Color(1f, .47f, .4f) : new Color(.6f, .92f, .74f);
-            GUILayout.Label(status, statusStyle);
-            GUI.contentColor = new Color(.67f, .74f, .76f);
-            GUILayout.Label(confirmationStatus, statusStyle);
-            GUI.contentColor = oldContent;
+            // Status lines are off: they ran past the panel's bottom edge over the map.
             GUILayout.EndArea();
             GUI.color = oldColor;
         }
@@ -490,8 +489,12 @@ namespace IdleTown.Construction
             return true;
         }
 
+        public bool AutoFloorActive => autoFloor && !manualFloor;
+
         public void SetSelectedFloor(int floor)
         {
+            // A chosen floor holds until the selection is built or cancelled.
+            manualFloor = true;
             var clamped = Mathf.Clamp(floor, 0, Mathf.Max(1, maxFloors) - 1);
             if (selectedFloor == clamped)
                 return;
@@ -524,6 +527,9 @@ namespace IdleTown.Construction
         }
 
         public bool TryBuild(Vector2Int start, Vector2Int end, int floor, WallTier tier, out string reason)
+            => TryBuildPath(WallConstructionModel.CreateSnappedPath(start, end), floor, tier, out reason);
+
+        bool TryBuildPath(List<WallEdge> path, int floor, WallTier tier, out string reason)
         {
             if (buildInProgress)
             {
@@ -537,7 +543,6 @@ namespace IdleTown.Construction
                 return false;
             }
 
-            var path = WallConstructionModel.CreateSnappedPath(start, end);
             if (!Validate(path, floor, tier, out reason, out var wood, out var stone))
                 return false;
 
@@ -694,8 +699,10 @@ namespace IdleTown.Construction
                 return false;
             }
 
-            var path = WallConstructionModel.CreateSnappedPath(startNode, endpoint);
-            if (!Validate(path, selectedFloor, selectedTier, out var reason, out var spentWood, out var spentStone))
+            var path = PlanPath(startNode, endpoint, out var floor);
+            if (AutoFloorActive)
+                selectedFloor = Mathf.Clamp(floor, 0, maxFloors - 1);
+            if (!Validate(path, floor, selectedTier, out var reason, out var spentWood, out var spentStone))
             {
                 status = reason;
                 confirmationStatus = $"Başarısız: {reason}";
@@ -705,7 +712,7 @@ namespace IdleTown.Construction
                 return false;
             }
 
-            if (!TryBuild(startNode, endpoint, selectedFloor, selectedTier, out reason))
+            if (!TryBuildPath(path, floor, selectedTier, out reason))
             {
                 status = reason;
                 confirmationStatus = $"Başarısız: {reason}";
@@ -723,7 +730,8 @@ namespace IdleTown.Construction
             previewPath.Clear();
             previewLine.positionCount = 0;
             HideGhosts();
-            status = $"İnşa tamamlandı: Kat {selectedFloor + 1}, {TierName(selectedTier)}, {builtCount} parça; {CostText(spentWood, spentStone)} harcandı.";
+            manualFloor = false;
+            status = $"İnşa tamamlandı: Kat {floor + 1}, {TierName(selectedTier)}, {builtCount} parça; {CostText(spentWood, spentStone)} harcandı.";
             confirmationStatus = status;
             return true;
         }
@@ -780,6 +788,7 @@ namespace IdleTown.Construction
             previewValid = false;
             hasPreviewEndpoint = false;
             hasLastValidPreviewEndpoint = false;
+            manualFloor = false;
             if (previewLine != null)
                 previewLine.positionCount = 0;
             HideGhosts();
@@ -832,10 +841,12 @@ namespace IdleTown.Construction
             }
 
             previewEndpoint = hoveredNode.Value;
-            previewPath.AddRange(WallConstructionModel.CreateSnappedPath(startNode, hoveredNode.Value));
+            previewPath.AddRange(PlanPath(startNode, hoveredNode.Value, out var floor));
+            if (AutoFloorActive)
+                selectedFloor = Mathf.Clamp(floor, 0, maxFloors - 1);
             previewValid = Validate(
                 previewPath,
-                selectedFloor,
+                floor,
                 selectedTier,
                 out var reason,
                 out previewWood,
@@ -858,15 +869,32 @@ namespace IdleTown.Construction
             DrawPreview();
         }
 
+        /// <summary>
+        /// The edges and floor a start-end selection builds. Ends already joined by a wall follow that wall;
+        /// with auto floor only the lowest part of the path is built, one storey up.
+        /// </summary>
+        List<WallEdge> PlanPath(Vector2Int start, Vector2Int end, out int floor)
+        {
+            var path = WallConstructionModel.CreateSnappedPath(start, end);
+            if (model.TryFindRoute(start, end, path, out var route))
+                path = route;
+            floor = selectedFloor;
+            if (!AutoFloorActive || path.Count == 0)
+                return path;
+            var planned = new List<WallEdge>(path.Count);
+            floor = model.ResolveAutoFloor(path, selectedTier, maxFloors, planned);
+            return planned;
+        }
+
         void RevalidateCachedEndpoint()
         {
             if (!hasLastValidPreviewEndpoint)
                 return;
 
-            var cachedPath = WallConstructionModel.CreateSnappedPath(startNode, lastValidPreviewEndpoint);
+            var cachedPath = PlanPath(startNode, lastValidPreviewEndpoint, out var floor);
             if (!Validate(
                     cachedPath,
-                    selectedFloor,
+                    floor,
                     selectedTier,
                     out _,
                     out lastValidPreviewWood,
@@ -905,6 +933,11 @@ namespace IdleTown.Construction
         {
             wood = 0;
             stone = 0;
+            if (floor >= maxFloors && path.Count > 0)
+            {
+                reason = $"Duvar en yüksek kata ulaştı ({maxFloors} kat, {maxFloors * wallHeight:0.#} m).";
+                return false;
+            }
             if (!model.Validate(path, world.Width, world.Height, floor, tier, maxFloors, out reason))
                 return false;
 

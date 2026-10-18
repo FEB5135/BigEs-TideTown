@@ -879,6 +879,161 @@ namespace IdleTown.Tests
             }
         }
 
+        static bool HasWall(WallConstructionController controller, WallEdge edge, int floor)
+        {
+            foreach (var wall in controller.Walls)
+                if (wall.Floor == floor && wall.Edge.Equals(edge))
+                    return true;
+            return false;
+        }
+
+        static void WithController(int wood, Action<WallConstructionController> test)
+        {
+            var root = new GameObject("Auto Floor Test");
+            try
+            {
+                var world = root.AddComponent<World>();
+                var controller = root.AddComponent<WallConstructionController>();
+                controller.Configure(world, null);
+                controller.SetResourceStore(new FakeResourceStore(wood, 100));
+                test(controller);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void AutoFloor_PickingTheEndsOfAWallInReverseRaisesThatSameWall()
+        {
+            WithController(100, controller =>
+            {
+                Assert.That(controller.TryBuild(new Vector2Int(0, 0), new Vector2Int(5, 2), out var reason), Is.True, reason);
+                var floorOne = new List<WallEdge>();
+                foreach (var wall in controller.Walls) floorOne.Add(wall.Edge);
+
+                controller.HandleNodeClick(new Vector2Int(5, 2));
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(5, 2));
+
+                Assert.That(controller.Walls, Has.Count.EqualTo(floorOne.Count * 3));
+                foreach (var edge in floorOne)
+                {
+                    Assert.That(HasWall(controller, edge, 1), Is.True, $"floor 2 {edge}");
+                    Assert.That(HasWall(controller, edge, 2), Is.True, $"floor 3 {edge}");
+                }
+                Assert.That(controller.SelectedFloor, Is.EqualTo(2));
+            });
+        }
+
+        [Test]
+        public void AutoFloor_FollowsAWallBuiltInTwoStrokes()
+        {
+            WithController(100, controller =>
+            {
+                // (0,0)-(3,1) then (3,1)-(6,2): both ends sit on one wall that is as short as a straight line.
+                Assert.That(controller.TryBuild(new Vector2Int(0, 0), new Vector2Int(3, 1), out var a), Is.True, a);
+                Assert.That(controller.TryBuild(new Vector2Int(3, 1), new Vector2Int(6, 2), out var b), Is.True, b);
+                var floorOne = controller.Walls.Count;
+
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(6, 2));
+
+                Assert.That(controller.Walls, Has.Count.EqualTo(floorOne * 2));
+                foreach (var wall in controller.Walls)
+                    if (wall.Floor == 1)
+                        Assert.That(HasWall(controller, wall.Edge, 0), Is.True, wall.Edge.ToString());
+            });
+        }
+
+        [Test]
+        public void AutoFloor_OpenEndsOfAUCloseWithAGroundWall()
+        {
+            WithController(100, controller =>
+            {
+                Assert.That(controller.TryBuild(new Vector2Int(0, 0), new Vector2Int(0, 4), out var a), Is.True, a);
+                Assert.That(controller.TryBuild(new Vector2Int(0, 4), new Vector2Int(3, 4), out var b), Is.True, b);
+                Assert.That(controller.TryBuild(new Vector2Int(3, 4), new Vector2Int(3, 0), out var c), Is.True, c);
+
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(3, 0));
+
+                Assert.That(controller.Walls, Has.Count.EqualTo(14));
+                Assert.That(HasWall(controller, new WallEdge(new Vector2Int(1, 0), new Vector2Int(2, 0)), 0), Is.True);
+                foreach (var wall in controller.Walls) Assert.That(wall.Floor, Is.Zero);
+            });
+        }
+
+        [Test]
+        public void AutoFloor_RaisesTheLowestPartFirstAndExtendsOnlyTheMissingGround()
+        {
+            WithController(100, controller =>
+            {
+                Assert.That(controller.TryBuild(new Vector2Int(0, 0), new Vector2Int(4, 0), out var a), Is.True, a);
+                Assert.That(controller.TryBuild(new Vector2Int(0, 0), new Vector2Int(2, 0), 1, WallTier.Timber, out var b), Is.True, b);
+
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(4, 0));
+                // Only the two one-storey edges rose; the wall is now level at two storeys.
+                Assert.That(controller.Walls, Has.Count.EqualTo(8));
+                Assert.That(HasWall(controller, new WallEdge(new Vector2Int(3, 0), new Vector2Int(4, 0)), 1), Is.True);
+                Assert.That(HasWall(controller, new WallEdge(new Vector2Int(0, 0), new Vector2Int(1, 0)), 2), Is.False);
+
+                controller.HandleNodeClick(new Vector2Int(2, 0));
+                controller.HandleNodeClick(new Vector2Int(6, 0));
+                // Past the wall's end only the new ground edges are built.
+                Assert.That(controller.Walls, Has.Count.EqualTo(10));
+                Assert.That(HasWall(controller, new WallEdge(new Vector2Int(5, 0), new Vector2Int(6, 0)), 0), Is.True);
+            });
+        }
+
+        [Test]
+        public void AutoFloor_UpgradesAWeakerMaterialBeforeStacking()
+        {
+            WithController(100, controller =>
+            {
+                Assert.That(controller.TryBuild(new Vector2Int(0, 0), new Vector2Int(2, 0), out var a), Is.True, a);
+                controller.SetSelectedTier(WallTier.Stone);
+
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(2, 0));
+                Assert.That(controller.Walls, Has.Count.EqualTo(2));
+                foreach (var wall in controller.Walls) Assert.That(wall.Tier, Is.EqualTo(WallTier.Stone));
+
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                controller.HandleNodeClick(new Vector2Int(2, 0));
+                Assert.That(controller.Walls, Has.Count.EqualTo(4));
+                Assert.That(HasWall(controller, new WallEdge(new Vector2Int(0, 0), new Vector2Int(1, 0)), 1), Is.True);
+            });
+        }
+
+        [Test]
+        public void AutoFloor_StopsAtTheTopFloorAndArrowsOverrideItForOneSelection()
+        {
+            WithController(1000, controller =>
+            {
+                var top = controller.MaxFloors;
+                for (var floor = 0; floor < top; floor++)
+                {
+                    controller.HandleNodeClick(new Vector2Int(0, 0));
+                    controller.HandleNodeClick(new Vector2Int(1, 0));
+                }
+                Assert.That(controller.Walls, Has.Count.EqualTo(top));
+
+                controller.HandleNodeClick(new Vector2Int(0, 0));
+                Assert.That(controller.ConfirmEndpoint(new Vector2Int(1, 0)), Is.False);
+                Assert.That(controller.Walls, Has.Count.EqualTo(top));
+
+                controller.SetSelectedFloor(0);
+                Assert.That(controller.AutoFloorActive, Is.False);
+                Assert.That(controller.ConfirmEndpoint(new Vector2Int(0, 1)), Is.True);
+                Assert.That(HasWall(controller, new WallEdge(new Vector2Int(0, 0), new Vector2Int(0, 1)), 0), Is.True);
+                Assert.That(controller.AutoFloorActive, Is.True);
+            });
+        }
+
         sealed class FakeResourceStore : IWallResourceStore
         {
             public FakeResourceStore(int wood, int stone)
