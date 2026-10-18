@@ -17581,6 +17581,12 @@ MonoBehaviour:
   - Id: 17
     Prefab: {fileID: 919132149155446097, guid: bf1bf830a28d3cf4583217a13a9f5dde, type: 3}
     Weight: 1
+  - Id: 4
+    Prefab: {fileID: 919132149155446097, guid: 371822746a2c2804686fcdf8fa1d8448, type: 3}
+    Weight: 1
+  - Id: 4
+    Prefab: {fileID: 919132149155446097, guid: e05930f34fd85e7418ca00eaaa45a38f, type: 3}
+    Weight: 1
   ruins:
   - Intact: {fileID: 919132149155446097, guid: deac77179a5b2654a83c51740dac228e, type: 3}
     Ruined: {fileID: 919132149155446097, guid: 3d09f5cc85f5c524f8973c62cc795c3f, type: 3}
