@@ -14,6 +14,9 @@ namespace Tsunami
     /// <summary>
     /// Samples simulated water depth around each building at a fixed interval (no physics queries).
     /// Damage is latched: once flooded/destroyed, a building stays that way until ResetVillage().
+    /// Also wears down the generated map's houses (Houses, WFC tiles 10-13): every house loses health from deep
+    /// standing water and, much faster, from fast flowing water (depth x speed^2, the flow's momentum flux).
+    /// Damage accrues on simulation time, so a paused tsunami does no harm. Visuals listen to the Houses events.
     /// </summary>
     public class VillageFloodTracker : MonoBehaviour
     {
@@ -44,6 +47,14 @@ namespace Tsunami
         [Tooltip("Water depth (m) at which a building is destroyed.")]
         [SerializeField, Min(0.01f)] float destroyDepth = 1.2f;
 
+        [Header("Houses (generated map)")]
+        [Tooltip("Water shallower than this (m) does not hurt a house.")]
+        [SerializeField, Min(0f)] float houseSafeDepth = 0.3f;
+        [Tooltip("Health lost per simulated second for each metre of standing water above the safe depth (1 = whole house).")]
+        [SerializeField, Min(0f)] float floodDamage = 0.06f;
+        [Tooltip("Health lost per simulated second per unit of depth x speed^2 (m^3/s^2). 3 m of water at 4 m/s flattens a house in about half a second.")]
+        [SerializeField, Min(0f)] float flowDamage = 0.04f;
+
         [Header("Feedback")]
         [SerializeField] Material floodedMaterial;
         [SerializeField] Material destroyedMaterial;
@@ -51,6 +62,8 @@ namespace Tsunami
         [SerializeField] Text statusText;
 
         float nextCheck;
+        double lastSimTime;
+        int labelledHouses;
 
         public int TotalCount => buildings.Length;
 
@@ -106,7 +119,43 @@ namespace Tsunami
                     changed = true;
                 }
             }
+            DamageHouses();
             if (changed) Recount();
+        }
+
+        void DamageHouses()
+        {
+            // The house list is built on first use, after the map has been generated.
+            bool changed = Houses.All.Count != labelledHouses;
+            double now = simulation.SimTime;
+            float dt = (float)(now - lastSimTime);
+            lastSimTime = now;
+            if (dt <= 0f) // paused, or the water was just reset
+            {
+                if (changed) Recount();
+                return;
+            }
+            foreach (Houses.House house in Houses.All)
+            {
+                if (house.IsDestroyed) continue;
+                float rate = 0f;
+                if (house.CellCenters.Count == 0) rate = HouseDamageRate(house.Center);
+                foreach (Vector3 cell in house.CellCenters) rate = Mathf.Max(rate, HouseDamageRate(cell));
+                if (rate <= 0f) continue;
+                var stage = house.Stage;
+                house.Damage(rate * dt);
+                changed |= house.Stage != stage;
+            }
+            if (changed) Recount();
+        }
+
+        // Health lost per simulated second by a house cell at p.
+        float HouseDamageRate(Vector3 p)
+        {
+            float depth = simulation.SampleDepth(p);
+            if (depth <= houseSafeDepth) return 0f;
+            float speed = simulation.Terrain.SampleField(simulation.Speed, p);
+            return (depth - houseSafeDepth) * floodDamage + depth * speed * speed * flowDamage;
         }
 
         float SampleFootprint(Vector3 p, float r)
@@ -149,6 +198,8 @@ namespace Tsunami
                 ApplyVisual(b, i);
             }
             nextCheck = 0f;
+            if (simulation != null) lastSimTime = simulation.SimTime;
+            Houses.RepairAll();
             Recount();
         }
 
@@ -168,8 +219,13 @@ namespace Tsunami
             SafeCount = safe;
             FloodedCount = flooded;
             DestroyedCount = destroyed;
+            labelledHouses = Houses.Built.Count;
             if (statusText != null)
-                statusText.text = $"Village: {safe} safe   {flooded} flooded   {destroyed} destroyed   (of {safe + flooded + destroyed})";
+                statusText.text = labelledHouses > 0
+                    ? $"Evler: {Houses.CountIn(Houses.DamageStage.Intact)} sağlam   " +
+                      $"{Houses.CountIn(Houses.DamageStage.Damaged) + Houses.CountIn(Houses.DamageStage.HeavilyDamaged)} hasarlı   " +
+                      $"{Houses.CountIn(Houses.DamageStage.Destroyed)} yıkık   (toplam {labelledHouses})"
+                    : $"Village: {safe} safe   {flooded} flooded   {destroyed} destroyed   (of {safe + flooded + destroyed})";
             Changed?.Invoke();
         }
     }
