@@ -125,6 +125,18 @@ namespace Tsunami
         /// <summary>Approach heading chosen at runtime (compass degrees, 0 = +Z / north), or NaN.</summary>
         public float ChosenHeading { get; private set; } = float.NaN;
 
+        /// <summary>The four corners of the map: the ocean on two neighbouring edges (+1 = +X / +Z side).</summary>
+        public static readonly Vector2Int[] Corners =
+            { new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, -1), new Vector2Int(-1, 1) };
+
+        bool mapReady;
+        bool hasRequestedCorner;
+        Vector2Int requestedCorner;
+        // The map's tile heights per World cell, rasterised once the map exists. Every water grid sample sits on a
+        // World cell whatever side the ocean is on, so moving the ocean only copies these instead of rasterising
+        // every chunk triangle again (that took ~0.35 s).
+        float[] mapHeights;
+
         // WfcSolver and MapView build the map in their Start; wait until the chunks exist, then rebuild the water
         // terrain from them and aim the wave through the most open corridor of this (random) map.
         System.Collections.IEnumerator RebuildAfterMapGenerated()
@@ -132,16 +144,31 @@ namespace Tsunami
             yield return null;
             yield return null;
             if (world == null || terrain == null || simulation == null) yield break;
+            mapReady = true;
             Apply();
-            if (autoApproach && ChooseApproach()) Apply();
+            if (hasRequestedCorner) { if (ChooseApproach(requestedCorner)) Apply(); }
+            else if (autoApproach && ChooseApproach(null)) Apply();
+        }
+
+        /// <summary>
+        /// The next wave comes from this corner: the open ocean lies along its two edges and the wave is aimed down
+        /// the most open corridor within that quarter. Rebuilds the water domain (water back at rest) when the ocean
+        /// moves, so call it while the land is dry. Before the map exists the corner is kept for when it does.
+        /// </summary>
+        public void AimFromCorner(Vector2Int corner)
+        {
+            requestedCorner = corner;
+            hasRequestedCorner = true;
+            if (mapReady && ChooseApproach(corner)) Apply();
         }
 
         /// <summary>
         /// Scores straight corridors from the village (approach target) to the map edge in corridorHeadings
         /// directions by the hills they cross, aims the wave down the most open one and puts the open ocean on that
-        /// side. Returns true when the ocean side changed (the domain must be rebuilt).
+        /// side. With a corner, only the headings out through that corner's quarter count and the ocean goes on its
+        /// two edges. Returns true when the ocean side changed (the domain must be rebuilt).
         /// </summary>
-        bool ChooseApproach()
+        bool ChooseApproach(Vector2Int? corner)
         {
             Rect r = MapRectWorld;
             Vector3 target = approachTarget;
@@ -153,6 +180,7 @@ namespace Tsunami
             {
                 float a = k * Mathf.PI * 2f / corridorHeadings;
                 var d = new Vector2(Mathf.Sin(a), Mathf.Cos(a));
+                if (corner.HasValue && (d.x * corner.Value.x < 0.38f || d.y * corner.Value.y < 0.38f)) continue;
                 float tExit = ExitDistance(r, target, d);
                 if (tExit < 30f) continue;
                 var perp = new Vector2(-d.y, d.x);
@@ -172,11 +200,18 @@ namespace Tsunami
                 float score = samples > 0 ? sum / samples + 0.25f * peak : float.MaxValue;
                 if (score < bestScore) { bestScore = score; bestDir = d; bestExit = tExit; }
             }
+            if (bestDir == Vector2.zero && corner.HasValue)
+            {
+                // No corridor long enough in that quarter: straight in from the corner.
+                bestDir = new Vector2(corner.Value.x, corner.Value.y).normalized;
+                bestExit = ExitDistance(r, target, bestDir);
+                bestScore = float.NaN;
+            }
             if (bestDir == Vector2.zero) return false;
             approachThrough = new Vector3(target.x + bestDir.x * bestExit * 0.75f, target.y, target.z + bestDir.y * bestExit * 0.75f);
             ChosenHeading = Mathf.Repeat(Mathf.Atan2(bestDir.x, bestDir.y) * Mathf.Rad2Deg, 360f);
-            var side = new Vector2Int(Mathf.Abs(bestDir.x) > 0.38f ? (int)Mathf.Sign(bestDir.x) : 0,
-                                      Mathf.Abs(bestDir.y) > 0.38f ? (int)Mathf.Sign(bestDir.y) : 0);
+            var side = corner ?? new Vector2Int(Mathf.Abs(bestDir.x) > 0.38f ? (int)Mathf.Sign(bestDir.x) : 0,
+                                                Mathf.Abs(bestDir.y) > 0.38f ? (int)Mathf.Sign(bestDir.y) : 0);
             Debug.Log($"[TeamMapTsunamiAdapter] Wave approach: {ChosenHeading:0}° (most open corridor, mean hill {bestScore:0.00}); ocean side {side}.", this);
             if (side == oceanSide) return false;
             oceanSide = side;
@@ -340,7 +375,15 @@ namespace Tsunami
             terrain.UseExternalHeights(n, cell, heights);
             foreach (Transform root in terrainMeshRoots)
                 if (root != null && root.gameObject.activeInHierarchy) RasterizeMeshes(root, heights, n, groundY, null);
-            if (Application.isPlaying && rasterizeWfcTiles) RasterizeWfcChunks(heights, n, groundY, offX, offZ);
+            if (Application.isPlaying && rasterizeWfcTiles)
+            {
+                if (mapHeights != null && mapHeights.Length == W * H) PasteMapHeights(heights, n, offX, offZ, W, H);
+                else
+                {
+                    RasterizeWfcChunks(heights, n, groundY, offX, offZ);
+                    if (mapReady) mapHeights = CopyMapHeights(heights, n, offX, offZ, W, H);
+                }
+            }
             terrain.UseExternalHeights(n, cell, heights);
             terrain.SetRenderCover(covered);
             var seabed = terrain.GetComponent<MeshRenderer>();
@@ -589,6 +632,25 @@ namespace Tsunami
         /// Draws the WFC map's chunk meshes (built by MapView at runtime) into the heights, except cells whose tile
         /// is listed in ignoredTileIds (trees) - so hills, mountains and slopes block and steer the water.
         /// </summary>
+        static float[] CopyMapHeights(float[] heights, int n, int offX, int offZ, int W, int H)
+        {
+            var map = new float[W * H];
+            for (int wz = 0; wz < H; wz++)
+                for (int wx = 0; wx < W; wx++)
+                    map[wz * W + wx] = heights[(wz + offZ) * n + wx + offX];
+            return map;
+        }
+
+        void PasteMapHeights(float[] heights, int n, int offX, int offZ, int W, int H)
+        {
+            for (int wz = 0; wz < H; wz++)
+                for (int wx = 0; wx < W; wx++)
+                {
+                    int i = (wz + offZ) * n + wx + offX;
+                    heights[i] = Mathf.Max(heights[i], mapHeights[wz * W + wx]);
+                }
+        }
+
         void RasterizeWfcChunks(float[] heights, int n, float groundY, int offX, int offZ)
         {
             Func<int, int, bool> skip = (x, z) =>

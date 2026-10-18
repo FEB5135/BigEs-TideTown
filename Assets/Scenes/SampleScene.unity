@@ -25102,6 +25102,7 @@ MonoBehaviour:
   waveDuration: 60
   drainStart: 45
   drainDuration: 15
+  randomCorners: 1
   fallbackSourcePosition: {x: 0, y: 0, z: -90}
   fallbackDirection: 0
 --- !u!4 &1964409334

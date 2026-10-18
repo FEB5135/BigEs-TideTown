@@ -76,6 +76,9 @@ namespace Tsunami
         [SerializeField, Min(0f)] float drainStart = 45f;
         [Tooltip("Seconds the land takes to dry; the water goes slowly at first and is all gone at the end.")]
         [SerializeField, Min(0.1f)] float drainDuration = 15f;
+        [Tooltip("Each wave comes from a random corner of the map (the ocean on two neighbouring edges), each corner " +
+                 "equally likely. Drawn when the wave's countdown starts, so the storm already comes from there.")]
+        [SerializeField] bool randomCorners = true;
 
         [Header("Fallback placement (scenes without a map adapter)")]
         [SerializeField] Vector3 fallbackSourcePosition = new Vector3(0f, 0f, -90f);
@@ -94,6 +97,7 @@ namespace Tsunami
         bool releaseScheduled;
         float releaseRemaining;
         int wavesReleased;
+        int aimedWave = -1;  // index of the wave whose corner has been drawn
         float dangerRemaining;
         float waveAge = -1f; // seconds since the latest wave was released (-1: none in progress)
         bool dangerShown;
@@ -249,6 +253,7 @@ namespace Tsunami
                     dangerRemaining = 0f;
                     CheckDanger();
                     if (UsesWaves && wavesReleased >= waves.Length) WavesFinished?.Invoke();
+                    else AimNextWave(); // the land is dry again: the ocean can move to the next wave's corner
                 }
             }
             if (State != TsunamiState.Warning) return;
@@ -283,6 +288,18 @@ namespace Tsunami
             }
             releaseScheduled = true;
             Debug.Log($"[TsunamiController] Tsunami in {releaseRemaining:0} s.", this);
+            AimNextWave();
+        }
+
+        // Draws the corner the next wave of the sequence comes from (once per wave), each corner 1 in 4.
+        void AimNextWave()
+        {
+            if (!UsesWaves || !randomCorners || mapAdapter == null || wavesReleased >= waves.Length) return;
+            if (aimedWave == wavesReleased) return;
+            aimedWave = wavesReleased;
+            Vector2Int corner = TeamMapTsunamiAdapter.Corners[UnityEngine.Random.Range(0, TeamMapTsunamiAdapter.Corners.Length)];
+            Debug.Log($"[TsunamiController] Wave {wavesReleased + 1} comes from corner {corner}.", this);
+            mapAdapter.AimFromCorner(corner);
         }
 
         /// <summary>
@@ -313,6 +330,7 @@ namespace Tsunami
                 PlayCurrent();
                 return;
             }
+            AimNextWave(); // released early (testing): its corner may not have been drawn yet
             int index = wavesReleased++;
             Current.amplitude = Mathf.Clamp(waves[index].height, MinWaveHeight, MaxWaveHeight);
             ParametersChanged?.Invoke();
@@ -446,6 +464,7 @@ namespace Tsunami
             timer = 0f;
             incomingRun = false;
             wavesReleased = 0;
+            aimedWave = -1;
             dangerRemaining = 0f;
             waveAge = -1f;
             SetState(TsunamiState.Idle);
