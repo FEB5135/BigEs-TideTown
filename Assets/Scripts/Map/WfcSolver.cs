@@ -111,6 +111,7 @@ public class WfcSolver : MonoBehaviour
         if (!BuildTiles())
             return;
 
+        Houses.Invalidate(); // the map is about to change: its houses are found again from the new one
         PinsKept = true;
         if (TrySolve(true))
             return;

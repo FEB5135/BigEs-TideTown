@@ -26,7 +26,7 @@ namespace Tsunami
         [SerializeField] float maxWaveSeconds = 120f;
         [SerializeField] int pointsPerHouse = 10;
         [Tooltip("Real seconds between the last house that loses the game and the end card.")]
-        [SerializeField] float loseDelay = 3f;
+        [SerializeField] float loseDelay = 8f;
 
         static readonly Color Navy = new(0.043f, 0.165f, 0.239f, 0.96f);
         static readonly Color Gold = new(1f, 0.824f, 0.247f);
@@ -225,10 +225,16 @@ namespace Tsunami
                     : "Su köye ulaştı, evler yıkıldı.",
                 28, Muted, -128f, 40f);
 
-            Row(card, "Ayakta kalan evler", $"{standing} / {total}", Foam, -200f);
-            Row(card, "Yıkılan evler", destroyed.ToString(), destroyed > 0 ? Coral : Foam, -248f);
-            Row(card, "Skor", score.ToString("N0"), Gold, -296f);
-            Row(card, record ? "Yeni rekor!" : "En yüksek skor", best.ToString("N0"), record ? Gold : Muted, -344f);
+            // Lost: the standing houses are beside the point, only the damage is listed.
+            float top = -200f;
+            if (won)
+            {
+                Row(card, "Ayakta kalan evler", $"{standing} / {total}", Foam, top);
+                top -= 48f;
+            }
+            Row(card, "Yıkılan evler", destroyed.ToString(), destroyed > 0 ? Coral : Foam, top);
+            Row(card, "Skor", score.ToString("N0"), Gold, top - 48f);
+            Row(card, record ? "Yeni rekor!" : "En yüksek skor", best.ToString("N0"), record ? Gold : Muted, top - 96f);
 
             var menu = FindAnyObjectByType<MainMenu>();
             var again = MakeButton(card, menu != null ? menu.PlayButtonTemplate : null, "TEKRAR OYNA", () => Reload(true));

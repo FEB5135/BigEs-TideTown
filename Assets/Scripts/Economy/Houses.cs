@@ -80,6 +80,17 @@ public static class Houses
     static readonly List<House> all = new();
     static World builtFor;
 
+    // Liste haritaya göre bir kez kurulur. Yeni harita çözülünce ve her Play başında unutulur: Editor Play'e kodu ve
+    // sahneyi yeniden yüklemeden girince aynı World nesnesi kalıyor ve eski haritanın evleri sayılıyordu.
+    public static void Invalidate()
+    {
+        all.Clear();
+        builtFor = null;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetOnPlay() => Invalidate();
+
     public static IReadOnlyList<House> All
     {
         get
