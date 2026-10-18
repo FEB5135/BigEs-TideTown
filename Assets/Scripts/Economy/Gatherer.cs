@@ -325,11 +325,9 @@ public class Gatherer : MonoBehaviour
         var house = Shelter ?? NearestHouse();
         if (house != null)
         {
-            // Kapı hücresinin ortası evin ve ağaçların dibinde NavMesh dışında kalabilir: ona en yakın yürünebilir nokta.
-            var door = house.DoorNearest(transform.position);
-            if (NavMesh.SamplePosition(door, out var reachable, 4f, NavMesh.AllAreas))
-                door = reachable.position;
-            // Yol bulunamazsa (tutulup bırakıldığı yer) biraz bekleyip yeniden dener; ilerleyemiyorsa içeri girer.
+            var door = ReachableDoor(house);
+            // Yol bulunamazsa (tutulup bırakıldığı yer) biraz bekleyip yeniden dener; ilerleyemiyorsa kapıya düz
+            // yürür. Yolun ortasında kaybolmaz.
             for (int attempt = 0; attempt < 6 && FlatDistance(door) > 1.5f; attempt++)
             {
                 var before = transform.position;
@@ -338,6 +336,8 @@ public class Gatherer : MonoBehaviour
                 if (attempt > 0 && (transform.position - before).sqrMagnitude < 0.04f)
                     break;
             }
+            Activity = GathererActivity.Fleeing;
+            yield return MoveTo(door, 0.6f);
         }
         Activity = GathererActivity.Idle;
         SetHidden(true);
@@ -359,6 +359,30 @@ public class Gatherer : MonoBehaviour
         var offset = point - transform.position;
         offset.y = 0f;
         return offset.magnitude;
+    }
+
+    // Kapı hücresinin ortası evin ve ağaçların dibinde NavMesh dışında kalabilir: ona en yakın yürünebilir nokta.
+    static Vector3 WalkableDoor(Houses.House house, Vector3 from)
+    {
+        var door = house.DoorNearest(from);
+        return NavMesh.SamplePosition(door, out var hit, 4f, NavMesh.AllAreas) ? hit.position : door;
+    }
+
+    // Kendi evine yolu yoksa (köyün kopuk bir köşesinde kalmış), yolu olan en yakın evin kapısı.
+    Vector3 ReachableDoor(Houses.House own)
+    {
+        var door = WalkableDoor(own, transform.position);
+        if (NavigationBaker.IsReachable(transform.position, door))
+            return door;
+        var houses = new List<Houses.House>(Houses.All);
+        houses.Sort((a, b) => (a.Center - transform.position).sqrMagnitude.CompareTo((b.Center - transform.position).sqrMagnitude));
+        for (int i = 0; i < houses.Count && i < 15; i++)
+        {
+            var other = WalkableDoor(houses[i], transform.position);
+            if (NavigationBaker.IsReachable(transform.position, other))
+                return other;
+        }
+        return door;
     }
 
     Houses.House NearestHouse()
@@ -394,6 +418,14 @@ public class Gatherer : MonoBehaviour
         Stop();
         HasJob = false;
         routine = StartCoroutine(WanderLoop(transform.position));
+    }
+
+    // Geliştirirken Play'de köylüyü tutup taşımadan işe koymak için (Inspector'da bileşenin menüsü).
+    [ContextMenu("Test: Ormanda Çalış")]
+    void TestWorkInForest()
+    {
+        if (Application.isPlaying)
+            WorkInForest();
     }
 
     // Oduncu olur: en yakın boş ağacı bulur, toplar, kuyuya götürür; sürekli.
@@ -443,6 +475,8 @@ public class Gatherer : MonoBehaviour
     // Tutulup bırakıldıktan sonra yeni yerindeki zemine göre yükseklik farkı korunur.
     public void SnapToGround()
     {
+        offMeshReturn = null; // Tutulup başka yere bırakıldı.
+
         var position = transform.position;
         if (TryGetGroundHeight(position, out float groundY))
             transform.position = new Vector3(position.x, groundY + heightOffset, position.z);
@@ -530,7 +564,7 @@ public class Gatherer : MonoBehaviour
         {
             yield return WaitForPusher();
             var well = Well.Instance;
-            var node = home != null ? home : ResourceNode.FindNearestFree(resourceType, transform.position);
+            var node = home != null ? home : ResourceNode.FindNearestFree(resourceType, transform.position, IsUnreachable);
             CurrentTarget = node;
             Activity = GathererActivity.Idle;
             if (well == null || node == null)
@@ -561,6 +595,16 @@ public class Gatherer : MonoBehaviour
                 yield return TravelTo(node.transform.position, stopDistance);
             if (node == null)
                 continue;
+            // Yolu bulunamayan ağaç (sık ormanın ortası, tepenin üstü): bir süre atlanır, başkasına gidilir.
+            if (home == null && FlatDistance(node.transform.position) > stopDistance + MaxFinalStep)
+            {
+                unreachable[node] = Time.time + UnreachableSeconds;
+                node.Release(this);
+                claimed = null;
+                CurrentTarget = null;
+                yield return null;
+                continue;
+            }
             if (resourceType == ResourceType.Wood)
                 yield return FaceTarget(node.transform.position);
             if (node == null)
@@ -594,16 +638,44 @@ public class Gatherer : MonoBehaviour
             if (carried <= 0)
                 continue;
 
-            // Kuyunun bu taraftaki kenarına gidilir; ortasına yol aranırsa kuyunun etrafında dolanır.
-            float approach = Mathf.Max(wellStopDistance, well.ApproachRadius);
-            var fromWell = transform.position - well.transform.position;
-            fromWell.y = 0f;
-            var rim = well.transform.position + (fromWell.sqrMagnitude > 0.01f ? fromWell.normalized : Vector3.forward) * (approach + 0.5f);
-            yield return TravelTo(rim, 0.5f);
+            // Kuyunun bu taraftaki kenarına gidilir; ortasına yol aranırsa kuyunun etrafında dolanır. O kenar evlerin
+            // arasında kalıp yolu yoksa kuyunun çevresinde yolu olan en yakın kenar seçilir.
+            yield return TravelTo(WellRim(well), 0.5f);
+            // Kuyunun kenarına yol bulunamadıysa (başladığı yer kopuktu), yaklaştığı yerden bir kez daha dener.
+            if (well != null && FlatDistance(well.transform.position) > Mathf.Max(wellStopDistance, well.ApproachRadius) + MaxFinalStep)
+                yield return TravelTo(WellRim(well), 0.5f);
             SetCarrying(false);
             if (well != null)
                 well.Throw(resourceType, carried, transform.position + Vector3.up);
         }
+    }
+
+    const float UnreachableSeconds = 30f;
+    readonly Dictionary<ResourceNode, float> unreachable = new();
+
+    bool IsUnreachable(ResourceNode node) => unreachable.TryGetValue(node, out var until) && Time.time < until;
+
+    Vector3 WellRim(Well well)
+    {
+        float approach = Mathf.Max(wellStopDistance, well.ApproachRadius) + 0.5f;
+        var fromWell = transform.position - well.transform.position;
+        fromWell.y = 0f;
+        if (fromWell.sqrMagnitude < 0.01f)
+            fromWell = Vector3.forward;
+        var first = well.transform.position + fromWell.normalized * approach;
+        // Kenardan dışarı doğru halkalar; her halkada bu taraftan başlayıp iki yana sırayla 22.5°'lik adımlarla.
+        for (int ring = 0; ring < 5; ring++)
+        {
+            float radius = approach + ring * 1.5f;
+            for (int step = 0; step < 16; step++)
+            {
+                float angle = (step + 1) / 2 * 22.5f * (step % 2 == 0 ? 1f : -1f);
+                var rim = well.transform.position + Quaternion.Euler(0f, angle, 0f) * fromWell.normalized * radius;
+                if (NavigationBaker.IsReachable(transform.position, rim))
+                    return rim;
+            }
+        }
+        return first;
     }
 
     // Vagon: iten köylü yoksa olduğu yerde bekler.
@@ -633,6 +705,13 @@ public class Gatherer : MonoBehaviour
             yield return MoveTo(target, distance);
             yield break;
         }
+        // Son adımda NavMesh dışına (ağaçların arasına) girdiyse önce girdiği yoldan geri çıkar; o cepten NavMesh ile
+        // yol bulunmaz.
+        if (offMeshReturn is Vector3 back)
+        {
+            offMeshReturn = null;
+            yield return MoveTo(back, PathStopDistance);
+        }
         if (!NavigationBaker.TryFindPath(transform.position, target, corners))
         {
             if (Activity != GathererActivity.Fleeing)
@@ -643,9 +722,22 @@ public class Gatherer : MonoBehaviour
         var points = corners.ToArray();
         for (int i = 1; i < points.Length; i++)
             yield return MoveTo(points[i], PathStopDistance);
-        // Hedef bir engelin içindeyse (ağaç, kuyu) NavMesh'in bittiği yerde durulur.
-        yield return MoveTo(NavigationBaker.ClampToNavMesh(points[points.Length - 1], target), distance);
+        // Hedef bir engelin içindeyse (ağaç, kuyu) NavMesh'in kenarından son birkaç metre düz yürünür, yoksa uzaktan
+        // vurur/atardı. Hedef daha uzaksa (yol yarıda kaldı) NavMesh'in bittiği yerde durulur; düz gitse evlerin
+        // içinden geçerdi.
+        var edge = NavigationBaker.ClampToNavMesh(points[points.Length - 1], target);
+        var rest = target - edge;
+        rest.y = 0f;
+        bool offMesh = rest.magnitude <= MaxFinalStep + distance && rest.magnitude > distance;
+        if (offMesh)
+            yield return MoveTo(edge, PathStopDistance);
+        yield return MoveTo(offMesh ? target : edge, distance);
+        if (offMesh)
+            offMeshReturn = edge;
     }
+
+    const float MaxFinalStep = 3f;
+    Vector3? offMeshReturn;
 
     IEnumerator MoveTo(Vector3 target, float distance)
     {

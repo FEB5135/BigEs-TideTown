@@ -80,13 +80,16 @@ public class ResourceNode : MonoBehaviour
         claimants.Clear();
     }
 
-    public static ResourceNode FindNearestFree(ResourceType type, Vector3 position)
+    public static ResourceNode FindNearestFree(ResourceType type, Vector3 position) => FindNearestFree(type, position, null);
+
+    // skip: atlanacak kaynaklar (örn. toplayıcının yolunu bulamadığı ağaçlar).
+    public static ResourceNode FindNearestFree(ResourceType type, Vector3 position, System.Func<ResourceNode, bool> skip)
     {
         ResourceNode best = null;
         float bestSqr = float.MaxValue;
         foreach (var node in active)
         {
-            if (node.type != type || !node.IsAvailable)
+            if (node.type != type || !node.IsAvailable || (skip != null && skip(node)))
                 continue;
             float sqr = (node.transform.position - position).sqrMagnitude;
             if (sqr < bestSqr)

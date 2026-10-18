@@ -30,6 +30,11 @@ namespace Tsunami
             Gatherer.SetAlarm(false);
             if (controller == null)
                 return;
+            // The water surface, swell and storm clouds are not ground. The clouds still sit over the island centre
+            // when the villagers' NavMesh is built at Start, and their boxes walled off the well.
+            var root = controller.transform.root.gameObject;
+            if (root.GetComponent<NavIgnore>() == null)
+                root.AddComponent<NavIgnore>();
             controller.StateChanged += OnStateChanged;
             OnStateChanged(controller.State);
         }
