@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç güncellemesi, THIRD_PARTY.md)
+Son güncelleme: 2026-10-18 (`feature/upgrades`: ev başına işçi, boştaki köylü belirteci, tsunamide eve kaçış, NavMesh düzeltmeleri; hepsi push edildi, `206eec1`)
 
 ## Bağlam
 
@@ -25,6 +25,7 @@ Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç g
 
 ## Aktif çalışma
 
+- **Şu anki dal: `feature/upgrades`** (main'den, güncel main de içinde; origin ile aynı). Main'e birleştirmek kullanıcıya sorulacak. Unity'de değişiklik uygulamak/derlemek/Play denemek gerektiğinde Claude Unity'yi bilgisayar kontrolüyle kendisi kullanır (kullanıcıya "öne getir" denmez); sahne değişiklikleri tek seferlik `Assets/Scripts/Editor/Apply...Once.cs` betikleriyle yapılır. Play'de köylüyü fareyle taşımak zor: Gatherer'ın Inspector menüsünde "Test: Ormanda Çalış" / "Test: Vagon İt" var; kaynak için Tools > BigEs > Test: Kuyuya 100 Odun 100 Tas.
 - 2026-10-18: main'in imleç güncellemesi (`0567b41`, yeni `cursor_*` dokuları) ve THIRD_PARTY.md düzenlemesi (`67cce63`) `feature/upgrades`'e birleştirildi (`041a14d`). THIRD_PARTY.md'de main'in tablosu alındı, bu daldaki WFC harita üretimi için "Kod (Harita Üretimi)" satırı eklendi. Unity'de sahne diskten yeniden yüklendi; Play'de yeni imleç, ağaçsız kuyu çevresi ve İşçi Hızı butonu görüldü.
 - Dal: `feature/upgrades` (main'den; 2026-10-18'de kullanıcı isteğiyle `feature/storm-warning` içine birleştirildi, merge `fa0e041`, içinde güncel main de var). Ardından main'in `04170d0` "New Icons" commit'i (odun/taş ikonları, SampleScene) çakışmasız bu dala alındı (`651a132`; merge mesajı yanlışlıkla "into feature/storm-warning" diyor). Yükseltmeler, işçi üretme, işçi hızı + fırtına, Anında Etkinleştir, gelen dalga birlikte bu dalda. Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
@@ -194,8 +195,8 @@ Son güncelleme: 2026-10-18 (main, `feature/upgrades`'e birleştirildi: imleç g
 ## Sıradaki işler / açık konular
 
 - [ ] Tsunami kaçışı: kol pozu oyun kamerasından yakından gözle kontrol edilmeli; köylüler evlerine girince sel takipçisi onları sayamıyor (köy hasarı ileride evlere bağlanabilir).
-- [ ] WFC kıyı/köy bölgeleri ve köylüsüz başlangıç Unity'de Play'de denenmeli: işçi al → ormana/ocağa bırak → evlerin, dağların içinden geçmediğini, çatıya çıkmadığını izle. `VillagerAnimationIntegrationTests` köylüsüz sahneye göre güncellenmeli.
-- [ ] WFC: elle boyanmış harita sabitlemesiz de bazı tohumlarda çözülemiyor (7 oyunda 2); boyanmış hücreler/kurallar ekip tasarımcısıyla kontrol edilmeli ya da başarısızlıkta yeni tohumla yeniden denenmeli.
+- [ ] `VillagerAnimationIntegrationTests` köylüsüz sahneye göre güncellenmeli (SampleScene artık köylüyle başlamıyor; işçi alınır).
+- [ ] WFC: bir ara elle boyanmış harita sabitlemesiz de bazı tohumlarda çözülemiyordu (7 oyunda 2); kıyı/köy bölgeleri eklendikten sonra Unity dışı düzenekte 46 tohumun hepsi çözüldü. Unity'de yine "WFC failed to fill the map" görülürse başarısızlıkta yeni tohumla yeniden deneme eklenebilir.
 - [ ] Sel takipçisi WFC ev karolarını (id 10–13) izlemiyor; köy hasarı/durum yazısı için gerekirse eklenecek.
 - [ ] WFC: elle boyanmış harita artık ormanı da içeriyorsa `GridForest` orman alanı (`forestSize`) kapatılabilir ya da harita tasarımına göre yeniden konumlanabilir; şimdilik çakışınca WFC sabitlemesiz çözüyor (konsolda uyarı). Unity'de Play'de doğrulanmalı.
 - [ ] `feature/storm-warning`'e güncel main birleştirildi (2026-10-18). Unity'de SampleScene açılıp Play'de denenmeli (fırtına + tsunami, main'den gelen müzik/AudioManager, orman); hata yoksa main'e birleştirme. Tsunami ekibine söylenmeli: `StylizedWater` artık deniz üstündeki yükselmeye tepe köpüğü veriyor ve fırtına karartmasını kendisi yapıyor. Panelden 1-2 m'lik küçük dalga seçilirse tepe köpüğü az olur (Play'de yalnız 10 m denendi). İstenirse: gök gürültüsü sesi (indirme izni gerekir), yağmur, bulutların oyun bakışında daha görünür olması.
