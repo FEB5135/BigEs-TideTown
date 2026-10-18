@@ -5,8 +5,8 @@ using UnityEngine;
 // (11, 13) birleşip uzun sıra evler de olabilir. Birbirine değen ev hücreleri bir bina; bina, her 4 hücresi için bir
 // ev sayılır ve her evin bir kapısı (binanın yanındaki düz zemin hücrelerinden biri) olur: işçi orada doğar, tsunamide
 // oraya koşup içeri girer. Harita her oyunda rastgele olduğu için ev sayısı (işçi sınırı) da her oyunda farklıdır.
-// Ev ya ayaktadır ya yıkıktır: tsunami suyu yeterince derin ya da hızlıysa ev yıkılır (VillageFloodTracker karar
-// verir), MapView evin karolarını yıkık modelle değiştirir. Tsunami sıfırlanınca evler yeniden ayağa kalkar.
+// Ev ya ayaktadır ya yıkıktır: su değen ev yıkılır (VillageFloodTracker karar verir), binadaki bütün evlerle birlikte;
+// MapView evi parçalayıp karolarını batık modelle değiştirir. Tsunami sıfırlanınca evler yeniden ayağa kalkar.
 public static class Houses
 {
     public static event System.Action<House> Destroyed;
@@ -22,13 +22,24 @@ public static class Houses
         public readonly List<Vector3> CellCenters = new();
 
         public bool IsDestroyed { get; private set; }
+        // Evi yıkan suyun akış hızı (m/s, dünya yönünde); parçalar bu yöne savrulur.
+        public Vector3 Impact { get; private set; }
+        // Aynı binadaki evler (kendisi dahil); bina hep bütün olarak yıkılır.
+        public IReadOnlyList<House> Building => (IReadOnlyList<House>)building ?? new[] { this };
+        internal List<House> building;
 
-        public void Destroy()
+        public void Destroy(Vector3 impact = default)
         {
             if (IsDestroyed)
                 return;
-            IsDestroyed = true;
-            Destroyed?.Invoke(this);
+            foreach (var home in building ?? new List<House> { this })
+            {
+                if (home.IsDestroyed)
+                    continue;
+                home.IsDestroyed = true;
+                home.Impact = impact;
+                Destroyed?.Invoke(home);
+            }
         }
 
         public void Repair()
@@ -178,6 +189,7 @@ public static class Houses
                 doorList.Sort((a, b) => Angle(a.Key, middle).CompareTo(Angle(b.Key, middle)));
                 int homes = Mathf.Max(1, cells.Count / 4);
                 int firstHome = all.Count;
+                var building = new List<House>();
                 for (int i = 0; i < homes; i++)
                 {
                     var house = new House();
@@ -189,6 +201,8 @@ public static class Houses
                     }
                     else
                         house.Center = world.CellCenter(x, y);
+                    house.building = building;
+                    building.Add(house);
                     all.Add(house);
                 }
 

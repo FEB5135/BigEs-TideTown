@@ -14,9 +14,8 @@ namespace Tsunami
     /// <summary>
     /// Samples simulated water depth around each building at a fixed interval (no physics queries).
     /// Damage is latched: once flooded/destroyed, a building stays that way until ResetVillage().
-    /// Also knocks down the generated map's houses (Houses, WFC tiles 10-13): a house is destroyed when the water
-    /// over any of its cells gets deep enough, or flows hard enough (depth x speed^2, the flow's momentum flux).
-    /// There is no partial damage; MapView swaps a destroyed house for its sunken model.
+    /// Also knocks down the generated map's houses (Houses, WFC tiles 10-13): as soon as water touches any cell of a
+    /// house, its whole building falls. There is no partial damage; MapView breaks it apart and leaves its sunken model.
     /// </summary>
     public class VillageFloodTracker : MonoBehaviour
     {
@@ -48,12 +47,8 @@ namespace Tsunami
         [SerializeField, Min(0.01f)] float destroyDepth = 1.2f;
 
         [Header("Houses (generated map)")]
-        [Tooltip("Standing water this deep (m) over a house destroys it.")]
-        [SerializeField, Min(0.01f)] float houseDestroyDepth = 1f;
-        [Tooltip("Flowing water at least this deep (m) can push a house over...")]
-        [SerializeField, Min(0f)] float houseFlowMinDepth = 0.3f;
-        [Tooltip("...once depth x speed^2 (m^3/s^2) reaches this. 1.5 is e.g. 0.6 m of water at 1.6 m/s.")]
-        [SerializeField, Min(0.01f)] float houseDestroyFlow = 1.5f;
+        [Tooltip("Water this deep (m) touching a house knocks its building down.")]
+        [SerializeField, Min(0.001f)] float houseWetDepth = 0.05f;
 
         [Header("Feedback")]
         [SerializeField] Material floodedMaterial;
@@ -134,34 +129,38 @@ namespace Tsunami
                     changed = true;
                 }
             }
-            DamageHouses();
+            KnockDownHouses();
             if (changed) Recount();
         }
 
-        void DamageHouses()
+        void KnockDownHouses()
         {
-            // The house list is built on first use, after the map has been generated.
-            foreach (Houses.House house in Houses.All)
-                if (!house.IsDestroyed && Floods(house))
-                    house.Destroy();
+            // The house list is built on first use, after the map has been generated. A sea at rest (or a paused
+            // tsunami) knocks nothing down.
+            if (!simulation.Paused)
+                foreach (Houses.House house in Houses.All)
+                    if (!house.IsDestroyed && Floods(house, out Vector3 flow))
+                        house.Destroy(flow);
             if (housesChanged || Houses.All.Count != labelledHouses) Recount();
         }
 
-        bool Floods(Houses.House house)
+        bool Floods(Houses.House house, out Vector3 flow)
         {
-            if (house.CellCenters.Count == 0) return Floods(house.Center);
+            if (house.CellCenters.Count == 0) return Floods(house.Center, out flow);
             foreach (Vector3 cell in house.CellCenters)
-                if (Floods(cell)) return true;
+                if (Floods(cell, out flow)) return true;
+            flow = default;
             return false;
         }
 
-        bool Floods(Vector3 p)
+        // Water at p, and its flow velocity (the solver grid is world aligned).
+        bool Floods(Vector3 p, out Vector3 flow)
         {
-            float depth = simulation.SampleDepth(p);
-            if (depth >= houseDestroyDepth) return true;
-            if (depth < houseFlowMinDepth) return false;
-            float speed = simulation.Terrain.SampleField(simulation.Speed, p);
-            return depth * speed * speed >= houseDestroyFlow;
+            flow = default;
+            if (simulation.SampleDepth(p) < houseWetDepth) return false;
+            TsunamiPhysicsSolver solver = simulation.Solver;
+            flow = new Vector3(simulation.Terrain.SampleField(solver.VelocityX, p), 0f, simulation.Terrain.SampleField(solver.VelocityZ, p));
+            return true;
         }
 
         float SampleFootprint(Vector3 p, float r)

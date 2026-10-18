@@ -23,6 +23,7 @@ public class MapView : MonoBehaviour
     readonly Dictionary<Mesh, Mesh> treeGroundMeshes = new();
     readonly Dictionary<GameObject, GameObject> ruinOf = new();
     readonly HashSet<int> ruinedCells = new();
+    HouseCollapse collapse;
 
     public IEnumerable<Collider> ConstructionSurfaces
     {
@@ -113,6 +114,9 @@ public class MapView : MonoBehaviour
 
         cells = new CellDraw[world.Width * world.Height];
         world.CellChanged += Refresh;
+        collapse = new GameObject("House Collapse").AddComponent<HouseCollapse>();
+        collapse.transform.SetParent(transform, false);
+        collapse.Init(material);
         Houses.Destroyed += OnHouseDestroyed;
         Houses.Repaired += OnHouseRepaired;
         filling = true;
@@ -143,8 +147,42 @@ public class MapView : MonoBehaviour
         foreach (var mesh in treeGroundMeshes.Values) if (mesh != null) ReleaseMesh(mesh);
     }
 
-    void OnHouseDestroyed(Houses.House house) => SetRuined(house, true);
+    void OnHouseDestroyed(Houses.House house)
+    {
+        Collapse(house);
+        SetRuined(house, true);
+    }
     void OnHouseRepaired(Houses.House house) => SetRuined(house, false);
+
+    // Breaks the house's standing tiles apart, each exactly where and how it is drawn (position and rotation).
+    void Collapse(Houses.House house)
+    {
+        if (cells == null || collapse == null)
+            return;
+        var origin = Vector3.zero;
+        var count = 0;
+        foreach (var home in house.Building)
+            foreach (var centre in home.CellCenters)
+            {
+                origin += centre;
+                count++;
+            }
+        origin = count > 0 ? origin / count : house.Center;
+
+        foreach (var cell in house.Cells)
+        {
+            if (!world.InBounds(cell.x, cell.y) || ruinedCells.Contains(cell.y * world.Width + cell.x))
+                continue;
+            var draw = cells[cell.y * world.Width + cell.x];
+            if (draw.Prefab == null)
+                continue;
+            foreach (var filter in draw.Prefab.GetComponentsInChildren<MeshFilter>())
+                if (filter.sharedMesh != null && filter.sharedMesh.isReadable)
+                    collapse.Break(filter.sharedMesh,
+                        transform.localToWorldMatrix * draw.Local * LocalToRoot(filter.transform, draw.Prefab.transform),
+                        origin, house.Impact);
+        }
+    }
 
     // A house's tiles switch to (or back from) their sunken models; its chunks are rebuilt once.
     void SetRuined(Houses.House house, bool ruined)
