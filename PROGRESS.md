@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (Wallfix ve güncel tutorial main'e aktarılıyor; duvar/maden dengesi ve temas hasarı düzeltmesi korundu)
+Son güncelleme: 2026-10-18 (Wallfix ve güncel tutorial main'e aktarıldı; birleşmiş sürümde duvar/maden EditMode testleri 64/64 geçti)
 
 ## Bağlam
 
