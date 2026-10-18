@@ -295,7 +295,10 @@ MonoBehaviour:
   home: {fileID: 0}
   carryCapacity: 5
   harvestDuration: 2
+  hitInterval: 0.5
   moveSpeed: 5
+  workSpeedMultiplier: 1.5
+  workTimeMultiplier: 0.6
   turnSpeed: 360
   stopDistance: 1.5
   wellStopDistance: 3
@@ -303,6 +306,14 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  villager: 0
+  wanderRadius: 5
+  wanderPause: {x: 1.5, y: 4}
+  pushGap: 0.35
+  idleMarkerMaterial: {fileID: 0}
+  markerScreenSize: 0.035
+  fleeSpeedMultiplier: 1.8
+  needsPusher: 0
 --- !u!114 &3993946570926498979
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -323,7 +334,14 @@ MonoBehaviour:
   walkAngle: 15
   strideLength: 2
   walkBob: 0.045
-  chopFrequency: 1.8
+  bodyRock: 3
+  strikeAngle: -70
+  windUpAngle: -165
+  pushArmAngle: -72
+  pushLean: 12
+  panicArmAngle: -170
+  panicCross: 32
+  panicWave: 10
   blendSpeed: 12
 --- !u!1 &8321078294980074271
 GameObject:
@@ -486,7 +504,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8608a2c3fecca27489e749a343983910, type: 2}
+  - {fileID: 2100000, guid: 4714764ae6fb7414394f6c0beb823147, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
