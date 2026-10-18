@@ -28,6 +28,8 @@ public class TutorialHints : MonoBehaviour
     [SerializeField] float stepGap = 0.6f;
     [Tooltip("Test: PlayerPrefs'e bakmadan her oyunda göster.")]
     [SerializeField] bool alwaysShow;
+    [Tooltip("Sağ üstteki tsunami panelinin kapladığı genişlik (1920 referans pikseli). Kart onun soluna sığdırılır.")]
+    [SerializeField] float rightReserve = 510f;
 
     static readonly Color Navy = new(0.043f, 0.165f, 0.239f, 0.94f);
     static readonly Color Gold = new(1f, 0.824f, 0.247f);
@@ -36,7 +38,11 @@ public class TutorialHints : MonoBehaviour
     static readonly Color Muted = new(0.812f, 0.910f, 0.949f, 0.8f);
 
     const float CardWidth = 860f;
+    const float MinCardWidth = 600f;
     const float CardHeight = 150f;
+    const float BodyTop = 68f;
+    const float BodyBottom = 22f;
+    const float Margin = 16f;
     const float CardTop = -24f;
     const float SlideDistance = 24f;
     const float FadeTime = 0.3f;
@@ -65,7 +71,9 @@ public class TutorialHints : MonoBehaviour
     WallConstructionController construction;
     bool wallBuilt;
 
+    Canvas canvas;
     RectTransform card;
+    float cardX;
     CanvasGroup group;
     Text badge, title, body;
 
@@ -216,6 +224,40 @@ public class TutorialHints : MonoBehaviour
 
     void OnWallBuilt(WallRecord record, GameObject instance) => wallBuilt = true;
 
+    void LateUpdate()
+    {
+        if (card != null && card.gameObject.activeSelf)
+            Layout();
+    }
+
+    // Kart soldaki duvar panelinin (IMGUI, ekranla ölçeklenmez) ve sağ üstteki tsunami panelinin arasına sığdırılır:
+    // yer varsa ortada durur, dar ekranda kayar ve daralır; metin alt satıra geçer, kart uzar.
+    void Layout()
+    {
+        float scale = canvas.scaleFactor;
+        if (scale <= 0f)
+            return;
+        float width = Screen.width / scale;
+        float left = Margin;
+        if (construction != null && construction.isActiveAndEnabled)
+            left = WallConstructionController.PanelRect.xMax / scale + Margin;
+        float right = width - rightReserve;
+        float cardWidth = Mathf.Clamp(right - left, MinCardWidth, CardWidth);
+        float minX = left + cardWidth * 0.5f - width * 0.5f;
+        float maxX = right - cardWidth * 0.5f - width * 0.5f;
+        cardX = minX > maxX ? minX : Mathf.Clamp(0f, minX, maxX);
+
+        if (!Mathf.Approximately(card.sizeDelta.x, cardWidth))
+            card.sizeDelta = new Vector2(cardWidth, card.sizeDelta.y);
+        float height = Mathf.Max(CardHeight, BodyTop + body.preferredHeight + BodyBottom);
+        if (!Mathf.Approximately(card.sizeDelta.y, height))
+        {
+            card.sizeDelta = new Vector2(cardWidth, height);
+            body.rectTransform.offsetMin = new Vector2(body.rectTransform.offsetMin.x, -height + BodyBottom);
+        }
+        card.anchoredPosition = new Vector2(cardX, card.anchoredPosition.y);
+    }
+
     IEnumerator Run()
     {
         for (int i = 0; i < steps.Length; i++)
@@ -228,6 +270,8 @@ public class TutorialHints : MonoBehaviour
                 continue;
 
             SetStep(i, step);
+            card.gameObject.SetActive(true);
+            Layout();
             yield return Fade(true);
             float shown = 0f;
             while (!step.done() && (step.autoAdvance <= 0f || shown < step.autoAdvance))
@@ -294,11 +338,11 @@ public class TutorialHints : MonoBehaviour
             float k = Mathf.SmoothStep(0f, 1f, t / FadeTime);
             float alpha = Mathf.Lerp(from, to, k);
             group.alpha = alpha;
-            card.anchoredPosition = new Vector2(0f, CardTop + (1f - alpha) * SlideDistance);
+            card.anchoredPosition = new Vector2(cardX, CardTop + (1f - alpha) * SlideDistance);
             yield return null;
         }
         group.alpha = to;
-        card.anchoredPosition = new Vector2(0f, CardTop + (1f - to) * SlideDistance);
+        card.anchoredPosition = new Vector2(cardX, CardTop + (1f - to) * SlideDistance);
         if (!show)
             card.gameObject.SetActive(false);
     }
@@ -312,7 +356,7 @@ public class TutorialHints : MonoBehaviour
 
         var canvasObject = new GameObject("Tutorial Canvas", typeof(RectTransform));
         canvasObject.transform.SetParent(transform, false);
-        var canvas = canvasObject.AddComponent<Canvas>();
+        canvas = canvasObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 20;
         var scaler = canvasObject.AddComponent<CanvasScaler>();
@@ -347,7 +391,7 @@ public class TutorialHints : MonoBehaviour
         Place(badge.rectTransform, new Vector2(36f, -24f), new Vector2(120f, 30f));
 
         title = NewText("Title", card, 34, Gold, TextAnchor.UpperLeft);
-        Place(title.rectTransform, new Vector2(124f, -20f), new Vector2(CardWidth - 124f - 150f, 44f));
+        Stretch(title.rectTransform, 124f, 150f, -20f, 44f);
         var shadow = title.gameObject.AddComponent<Shadow>();
         shadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
         shadow.effectDistance = new Vector2(0f, -3f);
@@ -355,7 +399,7 @@ public class TutorialHints : MonoBehaviour
         body = NewText("Body", card, 26, Foam, TextAnchor.UpperLeft);
         body.horizontalOverflow = HorizontalWrapMode.Wrap;
         body.lineSpacing = 1.05f;
-        Place(body.rectTransform, new Vector2(36f, -68f), new Vector2(CardWidth - 72f, 76f));
+        Stretch(body.rectTransform, 36f, 36f, -BodyTop, 76f);
 
         var skipRect = NewRect("Skip Button", card);
         skipRect.anchorMin = skipRect.anchorMax = skipRect.pivot = new Vector2(1f, 1f);
@@ -406,6 +450,16 @@ public class TutorialHints : MonoBehaviour
         rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
         rect.anchoredPosition = topLeft;
         rect.sizeDelta = size;
+    }
+
+    // Yatayda kartın iki kenarına yapışık, üstten sabit uzaklıkta.
+    static void Stretch(RectTransform rect, float left, float right, float top, float height)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.offsetMin = new Vector2(left, top - height);
+        rect.offsetMax = new Vector2(-right, top);
     }
 
     static void EnsureEventSystem()

@@ -12,6 +12,8 @@ namespace IdleTown.Construction
     public sealed class WallConstructionController : MonoBehaviour
     {
         static readonly Rect ConstructionPanelRect = new(16f, 16f, 470f, 390f);
+        // Panelin ekran pikseli cinsinden yeri (IMGUI, ölçeklenmez); tutorial kartı onu örtmesin diye.
+        internal static Rect PanelRect => ConstructionPanelRect;
 
         [Header("Scene references")]
         [SerializeField] World world;
