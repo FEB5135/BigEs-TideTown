@@ -260,8 +260,9 @@ public static class SampleSceneSetup
         if (picker == null)
             picker = camera.gameObject.AddComponent<VillagerPicker>();
         var settings = new SerializedObject(picker);
-        settings.FindProperty("openHand").objectReferenceValue = CursorTexture("HandOpen.png");
-        settings.FindProperty("closedHand").objectReferenceValue = CursorTexture("HandClosed.png");
+        settings.FindProperty("defaultCursor").objectReferenceValue = CursorTexture("cursor_default.png");
+        settings.FindProperty("openHand").objectReferenceValue = CursorTexture("cursor_open.png");
+        settings.FindProperty("closedHand").objectReferenceValue = CursorTexture("cursor_clenched.png");
         settings.ApplyModifiedPropertiesWithoutUndo();
 
         foreach (var root in scene.GetRootGameObjects())
