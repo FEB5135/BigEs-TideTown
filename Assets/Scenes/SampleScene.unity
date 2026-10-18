@@ -12742,8 +12742,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::UpgradeHUD
   template: {fileID: 1288251310}
-  woodIcon: {fileID: 21300000, guid: 5a0f7c264e8f1764da6ff95b255cb47d, type: 3}
-  stoneIcon: {fileID: 21300000, guid: fa98f5ff7de336a4b9776e2ebeada65a, type: 3}
+  woodIcon: {fileID: -5034061168752090764, guid: a16cbec982e8759409678f3b95bcb11f, type: 3}
+  stoneIcon: {fileID: 7006522896477268026, guid: 16ecae6bb56577f418d82e12c7ed888e, type: 3}
   upgradeButtonScale: 0.6
   upgradeButtonWidth: 300
   buttonSortingOrder: -2

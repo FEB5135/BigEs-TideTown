@@ -228,8 +228,8 @@ public static class ResourceTestSetup
         var hud = canvasGo.AddComponent<ResourceHUD>();
         var entries = new ResourceHUD.Entry[]
         {
-            ResourceButton(panel, ResourceType.Wood, "Assets/UI/Icons/Wood.png"),
-            ResourceButton(panel, ResourceType.Stone, "Assets/UI/Icons/Stone.png"),
+            ResourceButton(panel, ResourceType.Wood, "Assets/UI/Icons/log.png"),
+            ResourceButton(panel, ResourceType.Stone, "Assets/UI/Icons/stone.png"),
         };
         var so = new SerializedObject(hud);
         var list = so.FindProperty("entries");

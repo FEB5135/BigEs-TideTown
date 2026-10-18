@@ -78,8 +78,8 @@ namespace Tsunami
 
     /// <summary>
     /// Gameplay durability tuning. Hydraulic loads are supplied in newtons, simulation time in seconds and
-    /// durability in game hit points. The two rates convert kN.s to hit points; they are deliberately gameplay
-    /// scales rather than material-engineering predictions.
+    /// durability in game hit points. The impact rate converts kN.s to hit points; continuous pressure is
+    /// non-damaging. These are gameplay scales rather than material-engineering predictions.
     /// </summary>
     [Serializable]
     public struct WallDamageSettings
@@ -87,6 +87,8 @@ namespace Tsunami
         public float durability;
         public float impactThresholdKilonewtons;
         public float impactDamagePerKilonewtonSecond;
+        // Legacy serialized fields: pressure remains available to the solver, but contact no longer
+        // consumes wall durability. Old scenes with a positive rate are normalized to zero below.
         public float sustainedThresholdKilonewtons;
         public float sustainedDamagePerKilonewtonSecond;
         public float minimumFailureSeconds;
@@ -97,7 +99,7 @@ namespace Tsunami
             impactThresholdKilonewtons = 6f,
             impactDamagePerKilonewtonSecond = 0.32f,
             sustainedThresholdKilonewtons = 12f,
-            sustainedDamagePerKilonewtonSecond = 0.055f,
+            sustainedDamagePerKilonewtonSecond = 0f,
             minimumFailureSeconds = 3f
         };
 
@@ -112,7 +114,7 @@ namespace Tsunami
             value.impactThresholdKilonewtons = Math.Max(0f, value.impactThresholdKilonewtons);
             value.impactDamagePerKilonewtonSecond = Math.Max(0f, value.impactDamagePerKilonewtonSecond);
             value.sustainedThresholdKilonewtons = Math.Max(0f, value.sustainedThresholdKilonewtons);
-            value.sustainedDamagePerKilonewtonSecond = Math.Max(0f, value.sustainedDamagePerKilonewtonSecond);
+            value.sustainedDamagePerKilonewtonSecond = 0f;
             value.minimumFailureSeconds = value.minimumFailureSeconds > 0f ? value.minimumFailureSeconds : 3f;
             return value;
         }
@@ -135,11 +137,10 @@ namespace Tsunami
 
             settings = settings.Validated();
             float impactKilonewtons = Math.Max(0f, impactForceNewtons) * 0.001f;
-            float sustainedKilonewtons = Math.Max(0f, sustainedForceNewtons) * 0.001f;
             impactDamage = Math.Max(0f, impactKilonewtons - settings.impactThresholdKilonewtons) *
                            settings.impactDamagePerKilonewtonSecond * solverDt;
-            sustainedDamage = Math.Max(0f, sustainedKilonewtons - settings.sustainedThresholdKilonewtons) *
-                              settings.sustainedDamagePerKilonewtonSecond * solverDt;
+            // Water left behind by a wave may redistribute or rest against a wall indefinitely.
+            // Only the dynamic impact term damages it; hydrostatic/contact load never does.
             float total = impactDamage + sustainedDamage;
             float limit = settings.durability * solverDt / settings.minimumFailureSeconds;
             if (total > limit)

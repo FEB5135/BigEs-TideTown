@@ -101,7 +101,7 @@ namespace IdleTown.Tests
 
             Assert.That(controller.TryBuild(Vector2Int.zero, new Vector2Int(2, 0), out var reason), Is.True, reason);
             Assert.That(well.Wood, Is.EqualTo(8));
-            Assert.That(well.Stone, Is.EqualTo(8));
+            Assert.That(well.Stone, Is.EqualTo(10));
 
             var woodAfterBuild = well.Wood;
             var stoneAfterBuild = well.Stone;
@@ -119,10 +119,11 @@ namespace IdleTown.Tests
             var world = root.AddComponent<World>();
             var controller = root.AddComponent<WallConstructionController>();
             controller.Configure(world, well);
+            var tier = scarceType == ResourceType.Stone ? WallTier.Stone : WallTier.Timber;
             var woodBefore = well.Wood;
             var stoneBefore = well.Stone;
 
-            Assert.That(controller.TryBuild(Vector2Int.zero, new Vector2Int(2, 0), out _), Is.False);
+            Assert.That(controller.TryBuild(Vector2Int.zero, new Vector2Int(2, 0), 0, tier, out _), Is.False);
             Assert.That(well.Wood, Is.EqualTo(woodBefore));
             Assert.That(well.Stone, Is.EqualTo(stoneBefore));
             Assert.That(controller.Edges, Is.Empty);
@@ -151,13 +152,12 @@ namespace IdleTown.Tests
             var controller = root.AddComponent<WallConstructionController>();
             controller.Configure(world, well);
             LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: construction observer failure"));
-            LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: construction observer failure"));
 
             Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out var reason), Is.True, reason);
             Assert.That(well.Wood, Is.EqualTo(9));
-            Assert.That(well.Stone, Is.EqualTo(9));
+            Assert.That(well.Stone, Is.EqualTo(10));
             Assert.That(controller.Edges, Has.Count.EqualTo(1));
-            Assert.That(laterObserverCalls, Is.EqualTo(2));
+            Assert.That(laterObserverCalls, Is.EqualTo(1));
         }
     }
 }

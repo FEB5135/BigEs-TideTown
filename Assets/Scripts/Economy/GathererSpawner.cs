@@ -12,6 +12,8 @@ public class GathererSpawner : MonoBehaviour
     [SerializeField] bool needsPusher = true;
 
     readonly List<Gatherer> spawned = new();
+    ResourceNode node;
+    UpgradeLevel upgrade;
 
     public IReadOnlyList<Gatherer> Spawned => spawned;
 
@@ -19,23 +21,39 @@ public class GathererSpawner : MonoBehaviour
     public Gatherer FreeCart()
     {
         foreach (var cart in spawned)
-            if (cart != null && !cart.IsReserved)
+            if (cart != null && cart.isActiveAndEnabled && !cart.IsReserved)
                 return cart;
         return null;
     }
 
     void Start()
     {
+        node = GetComponent<ResourceNode>();
+        upgrade = node.Upgrade;
+        if (upgrade != null) upgrade.Changed += OnUpgraded;
+        EnsureCapacity();
+    }
+
+    void OnUpgraded(int level) => EnsureCapacity();
+
+    void OnDestroy()
+    {
+        if (upgrade != null) upgrade.Changed -= OnUpgraded;
+    }
+
+    void EnsureCapacity()
+    {
         if (prefab == null)
             return;
-        var node = GetComponent<ResourceNode>();
+        spawned.RemoveAll(cart => cart == null);
+        int capacity = node.Type == ResourceType.Stone ? node.WorkerCapacity : count;
         // Yolun başında (ray başı), içeri bakarak başlar; yol yoksa kaynağın önünde.
         var path = node.ApproachPath;
         var start = path != null && path.Length > 0 && path[0] != null ? path[0] : transform;
         var inward = path != null && path.Length > 1 && path[1] != null ? path[1].position - start.position : -transform.forward;
         inward.y = 0f;
         var rotation = inward.sqrMagnitude > 0.001f ? Quaternion.LookRotation(inward) : Quaternion.identity;
-        for (int i = 0; i < count; i++)
+        for (int i = spawned.Count; i < capacity; i++)
         {
             var gatherer = Instantiate(prefab, start.position - inward.normalized * (i * 2.5f), rotation);
             gatherer.name = $"{prefab.name} ({name})";

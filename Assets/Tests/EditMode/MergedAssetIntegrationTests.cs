@@ -9,8 +9,8 @@ namespace IdleTown.Tests
 {
     public sealed class MergedAssetIntegrationTests
     {
-        [TestCase("Assets/UI/Icons/Wood.png")]
-        [TestCase("Assets/UI/Icons/Stone.png")]
+        [TestCase("Assets/UI/Icons/log.png")]
+        [TestCase("Assets/UI/Icons/stone.png")]
         [TestCase("Assets/UI/Kenney/buttonLong_brown.png")]
         [TestCase("Assets/UI/Kenney/buttonLong_brown_pressed.png")]
         [TestCase("Assets/UI/Kenney/panelInset_beige.png")]

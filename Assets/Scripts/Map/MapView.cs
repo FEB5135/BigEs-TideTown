@@ -110,7 +110,7 @@ public class MapView : MonoBehaviour
 
         if (ruins != null)
             foreach (var ruin in ruins)
-                if (ruin.Intact != null && ruin.Ruined != null)
+                if (ruin.Intact != null && ruin.Ruined != null && !IsLandscape(ruin.Intact.name))
                     ruinOf[ruin.Intact] = ruin.Ruined;
 
         cells = new CellDraw[world.Width * world.Height];
@@ -156,32 +156,46 @@ public class MapView : MonoBehaviour
 
     void OnHouseDestroyed(Houses.House house)
     {
-        Collapse(house);
-        SetRuined(house, true);
+        var structure = StructureCells(house);
+        Collapse(house, structure);
+        SetRuined(structure, true);
     }
-    void OnHouseRepaired(Houses.House house) => SetRuined(house, false);
+    void OnHouseRepaired(Houses.House house) => SetRuined(StructureCells(house), false);
+
+    // The submerged tile, plus every house cell the rules still join to it.
+    List<Vector2Int> StructureCells(Houses.House house)
+    {
+        var cells = new List<Vector2Int>();
+        var seen = new HashSet<int>();
+        foreach (var cell in house.Cells)
+            Houses.CollectStructure(world, cell.x, cell.y, cells, seen);
+        if (cells.Count == 0)
+            cells.AddRange(house.Cells);
+        return cells;
+    }
 
     // Breaks the house's standing tiles apart, each exactly where and how it is drawn (position and rotation).
-    void Collapse(Houses.House house)
+    void Collapse(Houses.House house, List<Vector2Int> structure)
     {
         if (cells == null || collapse == null)
             return;
         var origin = Vector3.zero;
         var count = 0;
-        foreach (var home in house.Building)
-            foreach (var centre in home.CellCenters)
-            {
-                origin += centre;
-                count++;
-            }
+        foreach (var cell in structure)
+        {
+            if (!world.InBounds(cell.x, cell.y))
+                continue;
+            origin += world.CellCenter(cell.x, cell.y);
+            count++;
+        }
         origin = count > 0 ? origin / count : house.Center;
 
-        foreach (var cell in house.Cells)
+        foreach (var cell in structure)
         {
             if (!world.InBounds(cell.x, cell.y) || ruinedCells.Contains(cell.y * world.Width + cell.x))
                 continue;
             var draw = cells[cell.y * world.Width + cell.x];
-            if (draw.Prefab == null)
+            if (draw.Prefab == null || !ruinOf.ContainsKey(draw.Prefab))
                 continue;
             foreach (var filter in draw.Prefab.GetComponentsInChildren<MeshFilter>())
                 if (filter.sharedMesh != null && filter.sharedMesh.isReadable)
@@ -192,14 +206,19 @@ public class MapView : MonoBehaviour
     }
 
     // A house's tiles switch to (or back from) their sunken models; its chunks are rebuilt once.
-    void SetRuined(Houses.House house, bool ruined)
+    void SetRuined(List<Vector2Int> structure, bool ruined)
     {
         if (cells == null)
             return;
         filling = true;
-        foreach (var cell in house.Cells)
+        foreach (var cell in structure)
         {
             if (!world.InBounds(cell.x, cell.y))
+                continue;
+            // House cell lists can outlive a regenerated map. Only registered house models may change.
+            world.Get(cell.x, cell.y, out var id, out _);
+            var intact = Pick(id, cell.x, cell.y);
+            if (intact == null || !ruinOf.ContainsKey(intact))
                 continue;
             var index = cell.y * world.Width + cell.x;
             if (ruined ? ruinedCells.Add(index) : ruinedCells.Remove(index))

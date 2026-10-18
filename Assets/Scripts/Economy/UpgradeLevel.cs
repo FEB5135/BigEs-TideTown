@@ -49,7 +49,8 @@ public class UpgradeLevel : MonoBehaviour
     public int MaxLevel => Mathf.Max(1, steps.Length);
     public bool IsMax => level >= MaxLevel;
     public float SpeedMultiplier => Current?.speed ?? 1f;
-    public float WorkTimeMultiplier => Current?.workTime ?? 1f;
+    public int MineWorkerCapacity => level >= 3 ? 5 : level == 2 ? 4 : 2;
+    public float WorkTimeMultiplier => (Current?.workTime ?? 1f) / (!forest && level >= 3 ? 1.5f : 1f);
 
     Step Current => steps.Length > 0 ? steps[Mathf.Clamp(level - 1, 0, steps.Length - 1)] : null;
 

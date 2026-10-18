@@ -30,7 +30,7 @@ namespace IdleTown.Tests
             {
                 testMode = TestMode.EditMode,
                 testNames = new[] { "IdleTown.Tests.WallConstructionModelTests", "IdleTown.Tests.WallConstructionControllerTests",
-                    "IdleTown.Tests.WallfixRegressionTests", "IdleTown.Tests.WellWallIntegrationTests" }
+                    "IdleTown.Tests.WallfixRegressionTests", "IdleTown.Tests.WellWallIntegrationTests", "IdleTown.Tests.EconomyWallBalanceTests" }
             }));
         }
 

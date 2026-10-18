@@ -39,7 +39,7 @@ namespace IdleTown.Construction
         public static bool AreCumulativeCostsValid(WallCost timber, WallCost stone, WallCost reinforced)
         {
             return IsNonNegative(timber) && IsNonNegative(stone) && IsNonNegative(reinforced) &&
-                   IsAtLeast(stone, timber) && IsAtLeast(reinforced, stone);
+                   IsAtLeast(reinforced, timber) && IsAtLeast(reinforced, stone);
         }
 
         public static bool TryGetBuildCost(
@@ -64,7 +64,7 @@ namespace IdleTown.Construction
             }
 
             var existing = CostFor(existingTier.Value, timber, stone, reinforced);
-            cost = new WallCost(target.Wood - existing.Wood, target.Stone - existing.Stone);
+            cost = new WallCost(Math.Max(0, target.Wood - existing.Wood), Math.Max(0, target.Stone - existing.Stone));
             return true;
         }
 

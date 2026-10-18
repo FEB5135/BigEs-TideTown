@@ -55,13 +55,14 @@ public class HouseCollapse : MonoBehaviour
     // building's centre, `flow` the water velocity that knocked it down.
     public void Break(Mesh mesh, Matrix4x4 world, Vector3 origin, Vector3 flow)
     {
-        if (mesh == null || pieces.Count >= maxPieces)
+        // Init registers the individual intact house meshes, never a combined terrain chunk.
+        if (mesh == null || pieces.Count >= maxPieces || !fragments.TryGetValue(mesh, out var houseFragments))
             return;
         var ground = world.MultiplyPoint3x4(Vector3.zero).y;
         var rotation = world.rotation;
         var scale = world.lossyScale;
         var height = Mathf.Max(0.5f, (world.MultiplyPoint3x4(mesh.bounds.max).y - ground));
-        foreach (var fragment in Fragments(mesh))
+        foreach (var fragment in houseFragments)
         {
             var position = world.MultiplyPoint3x4(fragment.Center);
             var up = Mathf.Clamp01((position.y - ground) / height); // 0 floor, 1 roof
@@ -228,10 +229,15 @@ public class HouseCollapse : MonoBehaviour
     void OnDestroy()
     {
         if (material != null)
-            Destroy(material);
+            Release(material);
         foreach (var list in fragments.Values)
             foreach (var fragment in list)
-                Destroy(fragment.Mesh);
+                Release(fragment.Mesh);
+    }
+
+    static void Release(Object value)
+    {
+        if (Application.isPlaying) Destroy(value); else DestroyImmediate(value);
     }
 }
 
