@@ -12,7 +12,9 @@ public class HouseCollapse : MonoBehaviour
     [SerializeField] float lifetime = 5f;
     [SerializeField, Tooltip("How strongly the water's flow throws the pieces.")]
     float flowThrow = 0.7f;
-    [SerializeField] int maxPieces = 3000;
+    [SerializeField] int maxPieces = 1500;
+    [SerializeField, Tooltip("At most this many pieces start per frame; a whole street falling at once is spread over a few frames.")]
+    int piecesPerFrame = 120;
 
     class Piece
     {
@@ -30,6 +32,7 @@ public class HouseCollapse : MonoBehaviour
     readonly Dictionary<Mesh, Fragment[]> fragments = new();
     readonly List<Piece> pieces = new();
     readonly Stack<GameObject> pool = new();
+    readonly Queue<(Mesh mesh, Matrix4x4 world, Vector3 origin, Vector3 flow)> requests = new();
     Material material;
 
     // The house models are open shells; cut apart, their insides show, so the pieces are drawn from both sides.
@@ -46,7 +49,13 @@ public class HouseCollapse : MonoBehaviour
     // building's centre, `flow` the water velocity that knocked it down.
     public void Break(Mesh mesh, Matrix4x4 world, Vector3 origin, Vector3 flow)
     {
-        if (mesh == null || pieces.Count >= maxPieces)
+        if (mesh != null)
+            requests.Enqueue((mesh, world, origin, flow));
+    }
+
+    void Spawn(Mesh mesh, Matrix4x4 world, Vector3 origin, Vector3 flow)
+    {
+        if (pieces.Count >= maxPieces)
             return;
         var ground = world.MultiplyPoint3x4(Vector3.zero).y;
         var rotation = world.rotation;
@@ -79,6 +88,13 @@ public class HouseCollapse : MonoBehaviour
 
     void Update()
     {
+        int start = pieces.Count;
+        while (requests.Count > 0 && pieces.Count - start < piecesPerFrame)
+        {
+            var request = requests.Dequeue();
+            Spawn(request.mesh, request.world, request.origin, request.flow);
+        }
+
         float dt = Time.deltaTime;
         float sinkFrom = lifetime * 0.7f;
         for (int i = pieces.Count - 1; i >= 0; i--)
@@ -198,7 +214,11 @@ public class HouseCollapse : MonoBehaviour
         {
             piece = new GameObject("House piece", typeof(MeshFilter), typeof(MeshRenderer));
             piece.transform.SetParent(transform, false);
-            piece.GetComponent<MeshRenderer>().sharedMaterial = material;
+            var renderer = piece.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            // Hundreds of small flying pieces: their shadows cost more than they show.
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
         }
         piece.GetComponent<MeshFilter>().sharedMesh = mesh;
         piece.SetActive(true);

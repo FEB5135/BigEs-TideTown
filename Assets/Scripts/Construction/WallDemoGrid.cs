@@ -54,23 +54,35 @@ namespace IdleTown.Construction
             {
                 var conformed = new System.Collections.Generic.List<Vector3>();
                 Physics.SyncTransforms();
-                void Add(int x, int z, int bx, int bz)
+                // Each line is drawn in half-cell sections. Every corner and edge midpoint is shared by several
+                // sections, so the terrain is sampled once per point (half-cell lattice) and the sections reuse it.
+                int columns = world.Width * 2 + 1, rows = world.Height * 2 + 1;
+                var positions = new Vector3[columns * rows];
+                for (int j = 0; j < rows; j++)
+                    for (int i = 0; i < columns; i++)
+                        positions[j * columns + i] = world.transform.TransformPoint(new Vector3(i * world.CellSize * .5f, 0, j * world.CellSize * .5f));
+                var points = new Vector3[positions.Length];
+                var found = new bool[positions.Length];
+                terrainSurface.SampleMany(positions, points, found);
+                void Add(int i, int j, int bi, int bj)
                 {
-                    var a = world.transform.TransformPoint(new Vector3(x * world.CellSize, 0, z * world.CellSize));
-                    var b = world.transform.TransformPoint(new Vector3(bx * world.CellSize, 0, bz * world.CellSize));
-                    for (int section = 0; section < 2; section++)
-                    {
-                        var start = Vector3.Lerp(a, b, section * .5f);
-                        var end = Vector3.Lerp(a, b, (section + 1) * .5f);
-                        if (!terrainSurface.Sample(start, out start) || !terrainSurface.Sample(end, out end)) continue;
-                        conformed.Add(transform.InverseTransformPoint(start + Vector3.up * .035f));
-                        conformed.Add(transform.InverseTransformPoint(end + Vector3.up * .035f));
-                    }
+                    int a = j * columns + i, b = bj * columns + bi;
+                    if (!found[a] || !found[b]) return;
+                    conformed.Add(transform.InverseTransformPoint(points[a] + Vector3.up * .035f));
+                    conformed.Add(transform.InverseTransformPoint(points[b] + Vector3.up * .035f));
                 }
                 for (int x = 0; x <= world.Width; x++)
-                    for (int z = 0; z < world.Height; z++) Add(x, z, x, z + 1);
+                    for (int z = 0; z < world.Height; z++)
+                    {
+                        Add(x * 2, z * 2, x * 2, z * 2 + 1);
+                        Add(x * 2, z * 2 + 1, x * 2, z * 2 + 2);
+                    }
                 for (int z = 0; z <= world.Height; z++)
-                    for (int x = 0; x < world.Width; x++) Add(x, z, x + 1, z);
+                    for (int x = 0; x < world.Width; x++)
+                    {
+                        Add(x * 2, z * 2, x * 2 + 1, z * 2);
+                        Add(x * 2 + 1, z * 2, x * 2 + 2, z * 2);
+                    }
                 vertices = conformed.ToArray();
             }
 

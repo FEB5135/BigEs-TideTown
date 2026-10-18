@@ -163,12 +163,8 @@ namespace Tsunami
             screen.alpha = 1f;
         }
 
-        static void Reload(bool play)
-        {
-            Time.timeScale = 1f;
-            MainMenu.PlayOnLoad = play;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        }
+        // The new map is built behind a loading curtain (SceneTransition), not on a frozen frame.
+        void Reload(bool play) => SceneTransition.Reload(play, font);
 
         // ------------------------------------------------------------------ end card
 
