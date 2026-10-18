@@ -290,6 +290,31 @@ namespace Tsunami
         }
 
         /// <summary>
+        /// Water on land (every cell that is dry when the sea is at rest) seeps into the ground: each such cell keeps
+        /// (1 - fraction) of its water, and its flow slows with it. The sea itself is not touched.
+        /// </summary>
+        public void DrainLand(float fraction)
+        {
+            float keep = 1f - Math.Clamp(fraction, 0f, 1f);
+            for (int i = 0; i < Depth.Length; i++)
+            {
+                if (InitiallyWet[i] || Depth[i] <= 0f) continue;
+                float h = Depth[i] * keep;
+                if (h < DryDepth)
+                {
+                    Depth[i] = 0f;
+                    Qx[i] = Qz[i] = 0f;
+                    VelocityX[i] = VelocityZ[i] = Speed[i] = 0f;
+                    continue;
+                }
+                Depth[i] = h;
+                Qx[i] *= keep;
+                Qz[i] *= keep;
+            }
+            MaxDepthChange = 1f; // redraw the surface
+        }
+
+        /// <summary>
         /// Adds an initial sea-surface disturbance (only on wet sea cells) and, for directional sources, the
         /// matching long-wave flow. Returns the added volume (m^3; an N-wave adds ~0).
         /// </summary>

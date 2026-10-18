@@ -600,6 +600,13 @@ namespace Tsunami
         /// <summary>Water depth (m) at a world position, bilinearly interpolated.</summary>
         public float SampleDepth(Vector3 world) => terrain.SampleField(Depth, world);
 
+        /// <summary>Water left on land seeps away: each land cell keeps (1 - fraction) of it (see the solver).</summary>
+        public void DrainLand(float fraction)
+        {
+            Solver.DrainLand(fraction);
+            StepCount++;
+        }
+
         /// <summary>Total water volume in the grid (m^3). Diagnostic; iterates every cell.</summary>
         public double TotalVolume() => Solver.TotalVolume();
 

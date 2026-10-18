@@ -70,7 +70,12 @@ namespace Tsunami
         };
         [Tooltip("Seconds after its release that a wave counts as in progress: the villagers shelter and the storm " +
                  "stays. Afterwards they come out until the next wave; after the last one WavesFinished is raised.")]
-        [SerializeField, Min(1f)] float waveDuration = 75f;
+        [SerializeField, Min(1f)] float waveDuration = 60f;
+        [Tooltip("Seconds after its release when the water left on land starts seeping into the ground, so walls can " +
+                 "be built on dry land before the next wave.")]
+        [SerializeField, Min(0f)] float drainStart = 45f;
+        [Tooltip("Seconds the land takes to dry; the water goes slowly at first and is all gone at the end.")]
+        [SerializeField, Min(0.1f)] float drainDuration = 15f;
 
         [Header("Fallback placement (scenes without a map adapter)")]
         [SerializeField] Vector3 fallbackSourcePosition = new Vector3(0f, 0f, -90f);
@@ -90,6 +95,7 @@ namespace Tsunami
         float releaseRemaining;
         int wavesReleased;
         float dangerRemaining;
+        float waveAge = -1f; // seconds since the latest wave was released (-1: none in progress)
         bool dangerShown;
 
         public TsunamiState State { get; private set; } = TsunamiState.Idle;
@@ -234,6 +240,7 @@ namespace Tsunami
                     return;
                 }
             }
+            if (waveAge >= 0f && State != TsunamiState.Paused) Drain(Time.deltaTime);
             if (dangerRemaining > 0f && State != TsunamiState.Paused)
             {
                 dangerRemaining -= Time.deltaTime;
@@ -312,6 +319,7 @@ namespace Tsunami
             if (State == TsunamiState.Idle) PlayCurrent();
             else SendWave();
             dangerRemaining = waveDuration;
+            waveAge = 0f;
             if (wavesReleased < waves.Length)
             {
                 releaseRemaining = Mathf.Max(0f, waves[wavesReleased].delay);
@@ -320,6 +328,25 @@ namespace Tsunami
             Debug.Log($"[TsunamiController] Wave {index + 1}/{waves.Length}: {Current.amplitude:0} m.", this);
             CheckDanger();
             WaveReleased?.Invoke(index);
+        }
+
+        // During the drain window each frame removes the share of the remaining land water that leaves it all gone
+        // at the window's end: the puddles shrink gradually instead of vanishing.
+        void Drain(float dt)
+        {
+            float before = waveAge;
+            waveAge += dt;
+            float end = drainStart + drainDuration;
+            if (waveAge <= drainStart) return;
+            if (before >= end)
+            {
+                waveAge = -1f;
+                return;
+            }
+            float from = Mathf.Max(before, drainStart);
+            float left = end - from;
+            simulation.DrainLand(waveAge >= end ? 1f : Mathf.Clamp01((waveAge - from) / left));
+            if (waveAge >= end) waveAge = -1f;
         }
 
         // A new wave while one is in progress (or paused): sent in from the open sea like the first.
@@ -420,6 +447,7 @@ namespace Tsunami
             incomingRun = false;
             wavesReleased = 0;
             dangerRemaining = 0f;
+            waveAge = -1f;
             SetState(TsunamiState.Idle);
             SimulationReset?.Invoke();
             ScheduleRelease();

@@ -9,7 +9,7 @@ using UnityEngine.AI;
 // Köylü (villager) işaretliyse işi verilene kadar köyde dolaşır; oyuncu onu tutup ormana bırakınca oduncu olur,
 // ocağa bırakınca o ocağın vagonunu iter (VillagerPicker). Vagon (needsPusher) iten biri yokken bekler.
 // Boştaki köylünün başında küçük bir belirteç durur. Tsunami alarmında (SetAlarm) köylüler işi bırakıp kolları
-// havada evlerine koşar ve içeri girer; alarm bitince kapıdan çıkıp dolaşır.
+// havada evlerine koşar ve içeri girer; alarm bitince kapıdan çıkıp önceki işine döner (işi yoksa dolaşır).
 public enum GathererActivity { Idle, Walking, Harvesting, Pushing, Fleeing }
 
 public class Gatherer : MonoBehaviour
@@ -86,6 +86,9 @@ public class Gatherer : MonoBehaviour
     ResourceNode claimed;
     Gatherer pushedCart;
     Gatherer reservedBy; // Vagon: ona doğru yürüyen ya da onu iten köylü.
+    // Alarmda bırakılan iş; alarm bitince köylü buna döner.
+    bool resumeForest;
+    Gatherer resumeCart;
 
     public ResourceType Type => resourceType;
     public GathererActivity Activity { get; private set; }
@@ -313,6 +316,11 @@ public class Gatherer : MonoBehaviour
     {
         if (!villager)
             return;
+        if (!InShelter && Activity != GathererActivity.Fleeing)
+        {
+            resumeCart = pushedCart;
+            resumeForest = HasJob && pushedCart == null;
+        }
         Stop();
         HasJob = false;
         if (!ready)
@@ -343,14 +351,24 @@ public class Gatherer : MonoBehaviour
         SetHidden(true);
     }
 
-    // Alarm bitti: kapıdan çıkıp evinin çevresinde dolaşır.
+    // Alarm bitti: kapıdan çıkıp önceki işine döner (vagonu başkası almışsa ya da işi yoksa evinin çevresinde dolaşır).
     public void LeaveShelter()
     {
         if (!villager)
             return;
         Stop();
         SetHidden(false);
-        if (ready)
+        var cart = resumeCart;
+        bool forest = resumeForest;
+        resumeCart = null;
+        resumeForest = false;
+        if (!ready)
+            return;
+        if (cart != null && (cart.reservedBy == null || cart.reservedBy == this))
+            PushCart(cart);
+        else if (forest)
+            WorkInForest();
+        else
             Wander();
     }
 
