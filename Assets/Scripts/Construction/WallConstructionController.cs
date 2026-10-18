@@ -233,6 +233,9 @@ namespace IdleTown.Construction
 
         void OnGUI()
         {
+            // The panel is IMGUI and would draw over the loading curtain.
+            if (SceneTransition.Active)
+                return;
             // Arrows have one input route, latched until release to ignore key repeat.
             var input = Event.current;
             if ((input.type == EventType.KeyDown || input.type == EventType.KeyUp) && input.keyCode == KeyCode.N)

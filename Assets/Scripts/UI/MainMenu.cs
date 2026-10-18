@@ -12,6 +12,11 @@ public class MainMenu : MonoBehaviour
     // Kamera oyuna indiğinde, oyuncu kontrolü aldığı anda çağrılır.
     public static event Action GameStarted;
     public static bool IsOpen { get; private set; }
+    // "Tekrar Oyna" ile sahne yeniden yüklenince menü beklemeden oyun başlar.
+    public static bool PlayOnLoad { get; set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => PlayOnLoad = false; // Domain reload kapalı: Play'ler arasında kalmasın.
 
     [SerializeField] CameraIntro cameraIntro;
     [Tooltip("Menünün tamamı (kaybolurken kullanılır).")]
@@ -37,6 +42,10 @@ public class MainMenu : MonoBehaviour
     [Header("Oyun başlangıcı")]
     [Tooltip("Menüde arka planda toplanan kaynaklar, kamera oyuna inince sıfırlanır.")]
     [SerializeField] bool resetResourcesOnPlay = true;
+
+    // Oyun sonu ekranı butonlarını bunlardan kopyalar (aynı görünüm).
+    public Button PlayButtonTemplate => playButton;
+    public Button QuitButtonTemplate => quitButton;
 
     CanvasGroup currentPage;
     Coroutine pageSwitch;
@@ -68,6 +77,12 @@ public class MainMenu : MonoBehaviour
         SetVisible(settingsPage, false);
         SetVisible(mainPage, true);
         currentPage = mainPage;
+        if (PlayOnLoad)
+        {
+            PlayOnLoad = false;
+            Play();
+            return;
+        }
         StartCoroutine(Entrance());
     }
 
