@@ -134,13 +134,28 @@ namespace Tsunami
         public event Action ScenarioChanged;
         public event Action ParametersChanged;
 
-        void OnEnable() => MainMenu.GameStarted += OnGameStarted;
-        void OnDisable() => MainMenu.GameStarted -= OnGameStarted;
+        void OnEnable()
+        {
+            MainMenu.GameStarted += OnGameStarted;
+            TutorialHints.TsunamiAllowed += OnTutorialAllowed;
+        }
+
+        void OnDisable()
+        {
+            MainMenu.GameStarted -= OnGameStarted;
+            TutorialHints.TsunamiAllowed -= OnTutorialAllowed;
+        }
 
         void OnGameStarted()
         {
             gameStarted = true;
             ScheduleRelease();
+        }
+
+        // The tutorial holds the countdown until it reaches the wall step (or is skipped).
+        void OnTutorialAllowed()
+        {
+            if (!ReleaseScheduled) ScheduleRelease();
         }
 
         void Start()
@@ -180,11 +195,14 @@ namespace Tsunami
             if (timer <= 0f) BeginRun();
         }
 
-        /// <summary>Starts a new random countdown to the automatic release (when enabled and the game has started).</summary>
+        /// <summary>
+        /// Starts a new random countdown to the automatic release (when enabled, the game has started and the
+        /// tutorial does not hold it).
+        /// </summary>
         public void ScheduleRelease()
         {
             releaseScheduled = false;
-            if (!autoRelease || !gameStarted || State != TsunamiState.Idle) return;
+            if (!autoRelease || !gameStarted || TutorialHints.HoldsTsunami || State != TsunamiState.Idle) return;
             float min = Mathf.Min(releaseDelayMin, releaseDelayMax), max = Mathf.Max(releaseDelayMin, releaseDelayMax);
             releaseRemaining = UnityEngine.Random.Range(min, max);
             releaseScheduled = true;

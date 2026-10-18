@@ -5,13 +5,50 @@ using UnityEngine;
 // (11, 13) birleşip uzun sıra evler de olabilir. Birbirine değen ev hücreleri bir bina; bina, her 4 hücresi için bir
 // ev sayılır ve her evin bir kapısı (binanın yanındaki düz zemin hücrelerinden biri) olur: işçi orada doğar, tsunamide
 // oraya koşup içeri girer. Harita her oyunda rastgele olduğu için ev sayısı (işçi sınırı) da her oyunda farklıdır.
+// Ev ya ayaktadır ya yıkıktır: su değen ev yıkılır (VillageFloodTracker karar verir), binadaki bütün evlerle birlikte;
+// MapView evi parçalayıp karolarını batık modelle değiştirir. Tsunami sıfırlanınca evler yeniden ayağa kalkar.
 public static class Houses
 {
+    public static event System.Action<House> Destroyed;
+    public static event System.Action<House> Repaired;
+
     public class House
     {
         public readonly List<Vector3> Doors = new();
         public Vector3 Center;
         public Gatherer Resident;
+        // Bu evin kapladığı ev karoları (World hücresi) ve hücre ortaları; yıkılınca MapView bu karoları değiştirir.
+        public readonly List<Vector2Int> Cells = new();
+        public readonly List<Vector3> CellCenters = new();
+
+        public bool IsDestroyed { get; private set; }
+        // Evi yıkan suyun akış hızı (m/s, dünya yönünde); parçalar bu yöne savrulur.
+        public Vector3 Impact { get; private set; }
+        // Aynı binadaki evler (kendisi dahil); bina hep bütün olarak yıkılır.
+        public IReadOnlyList<House> Building => (IReadOnlyList<House>)building ?? new[] { this };
+        internal List<House> building;
+
+        public void Destroy(Vector3 impact = default)
+        {
+            if (IsDestroyed)
+                return;
+            foreach (var home in building ?? new List<House> { this })
+            {
+                if (home.IsDestroyed)
+                    continue;
+                home.IsDestroyed = true;
+                home.Impact = impact;
+                Destroyed?.Invoke(home);
+            }
+        }
+
+        public void Repair()
+        {
+            if (!IsDestroyed)
+                return;
+            IsDestroyed = false;
+            Repaired?.Invoke(this);
+        }
 
         public Vector3 RandomDoor() => Doors.Count > 0 ? Doors[Random.Range(0, Doors.Count)] : Center;
 
@@ -50,6 +87,28 @@ public static class Houses
 
     public static int Count => All.Count;
 
+    public static int DestroyedCount
+    {
+        get
+        {
+            var count = 0;
+            foreach (var house in All)
+                if (house.IsDestroyed)
+                    count++;
+            return count;
+        }
+    }
+
+    // Kurulmuş evler; listeyi kurmaz (harita henüz çözülmemişken erken kurulup boş kalmasın diye).
+    public static IReadOnlyList<House> Built => all;
+
+    // Tsunami sıfırlanınca bütün evler onarılır.
+    public static void RepairAll()
+    {
+        foreach (var house in all)
+            house.Repair();
+    }
+
     public static int Occupied
     {
         get
@@ -62,12 +121,12 @@ public static class Houses
         }
     }
 
-    // Boş bir ev (rastgele); hepsi doluysa null.
+    // Boş ve yıkılmamış bir ev (rastgele); yoksa null.
     public static House RandomFree()
     {
         var free = new List<House>();
         foreach (var house in All)
-            if (house.Resident == null)
+            if (house.Resident == null && !house.IsDestroyed)
                 free.Add(house);
         return free.Count > 0 ? free[Random.Range(0, free.Count)] : null;
     }
@@ -95,13 +154,13 @@ public static class Houses
 
                 // Kapı hücresi -> dokunduğu ev hücresi.
                 var doors = new Dictionary<Vector2Int, Vector2Int>();
-                var cells = 0;
+                var cells = new List<Vector2Int>();
                 seen[y * width + x] = true;
                 stack.Push(new Vector2Int(x, y));
                 while (stack.Count > 0)
                 {
                     var cell = stack.Pop();
-                    cells++;
+                    cells.Add(cell);
                     foreach (var step in Steps)
                     {
                         var next = cell + step;
@@ -128,7 +187,9 @@ public static class Houses
                     middle += pair.Key;
                 middle /= Mathf.Max(1, doorList.Count);
                 doorList.Sort((a, b) => Angle(a.Key, middle).CompareTo(Angle(b.Key, middle)));
-                int homes = Mathf.Max(1, cells / 4);
+                int homes = Mathf.Max(1, cells.Count / 4);
+                int firstHome = all.Count;
+                var building = new List<House>();
                 for (int i = 0; i < homes; i++)
                 {
                     var house = new House();
@@ -140,7 +201,21 @@ public static class Houses
                     }
                     else
                         house.Center = world.CellCenter(x, y);
+                    house.building = building;
+                    building.Add(house);
                     all.Add(house);
+                }
+
+                // Binanın hücreleri, ortası (kapısının dokunduğu hücre) en yakın olan eve düşer.
+                foreach (var cell in cells)
+                {
+                    var center = world.CellCenter(cell.x, cell.y);
+                    var owner = all[firstHome];
+                    for (int i = firstHome + 1; i < all.Count; i++)
+                        if ((all[i].Center - center).sqrMagnitude < (owner.Center - center).sqrMagnitude)
+                            owner = all[i];
+                    owner.Cells.Add(cell);
+                    owner.CellCenters.Add(center);
                 }
             }
     }
