@@ -90,6 +90,51 @@ namespace IdleTown.Tests
         }
 
         [Test]
+        public void CliffConnectionsSpreadTheRiseAndKeepASolidFoundationAndSharedEndpoints()
+        {
+            var ground = new GameObject("Cliff surface", typeof(MeshCollider)); ground.transform.SetParent(root.transform);
+            terrainMesh = new Mesh();
+            terrainMesh.vertices = new[] { new Vector3(0,0,0),new Vector3(2.95f,0,0),new Vector3(2.95f,6,0),new Vector3(16,6,0),
+                new Vector3(0,0,16),new Vector3(2.95f,0,16),new Vector3(2.95f,6,16),new Vector3(16,6,16) };
+            terrainMesh.triangles = new[] { 0,4,1,1,4,5,1,5,2,2,5,6,2,6,3,3,6,7 };
+            terrainMesh.RecalculateNormals(); terrainMesh.RecalculateBounds();
+            ground.GetComponent<MeshCollider>().sharedMesh = terrainMesh;
+            var surface = root.AddComponent<WallTerrainSurface>(); surface.Configure(new Collider[] { ground.GetComponent<MeshCollider>() });
+            controller.ConfigureTerrain(surface); Physics.SyncTransforms();
+            var a = new Vector2Int(2,2); var b = new Vector2Int(3,2); var c = new Vector2Int(4,2);
+            Assert.That(controller.TryBuild(a,b,out var reason), Is.True, reason);
+            Assert.That(controller.TryBuild(b,c,out reason), Is.True, reason);
+            Assert.That(controller.TryBuild(a,b,1,WallTier.Timber,out reason), Is.True, reason);
+            controller.TryGetWallInstance(new WallEdge(a,b),out var wall);
+            controller.TryGetWallInstance(new WallEdge(b,c),out var next);
+            controller.TryGetWallInstance(new WallEdge(a,b),1,out var upper);
+            var slope = wall.GetComponent<WallSlopeGeometry>();
+            Assert.That(slope.GroundProfile, Is.Not.Null, "The smoothed ramp needs a solid footing to the actual cliff.");
+            Assert.That(slope.Profile[0], Is.EqualTo(slope.GroundProfile[0]).Within(.001f));
+            Assert.That(slope.Profile[slope.Profile.Length-1], Is.EqualTo(slope.GroundProfile[slope.Profile.Length-1]).Within(.001f));
+            for (int i = 1; i < slope.Profile.Length; i++)
+                Assert.That(Mathf.Abs(slope.Profile[i]-slope.Profile[i-1]), Is.LessThan(.5f), "No needle-shaped last strip.");
+            var collider = wall.GetComponent<MeshCollider>();
+            foreach (var vertex in collider.sharedMesh.vertices)
+                if (vertex.y - slope.BaseHeightOffset(vertex.z) < 0)
+                {
+                    var point = wall.transform.TransformPoint(vertex);
+                    Assert.That(surface.Sample(point,out var hit), Is.True);
+                    Assert.That(point.y, Is.LessThanOrEqualTo(hit.y + .01f), "The footing may embed in the cliff but must never float above it.");
+                }
+            Assert.That(collider.Raycast(new Ray(new Vector3(2.94f,.5f,0),Vector3.forward),out _,4), Is.True,
+                "The low side immediately before the cliff must have no daylight opening under the ramp.");
+            var join = wall.transform.TransformPoint(new Vector3(0,.5f,.5f)); join.y += slope.HeightOffset(.5f)*2;
+            var nextJoin = next.transform.TransformPoint(new Vector3(0,.5f,-.5f));
+            Assert.That(Vector3.Distance(join,nextJoin), Is.LessThan(.01f));
+            Assert.That(upper.GetComponent<WallSlopeGeometry>().GroundProfile, Is.Null, "Upper storeys must not duplicate the footing.");
+            Assert.That(upper.transform.position.y-wall.transform.position.y, Is.EqualTo(2f).Within(.001f));
+            var visual = wall.GetComponentInChildren<MeshFilter>().sharedMesh;
+            Assert.That(visual.subMeshCount, Is.EqualTo(3));
+            Assert.That(visual.bounds.min.y, Is.LessThan(-1f), "The visible core must extend down to the low terrain too.");
+        }
+
+        [Test]
         public void TerrainDoesNotHideBuildingsOrAllowWallsBeyondItsFootprint()
         {
             CreateSlope();
@@ -153,6 +198,82 @@ namespace IdleTown.Tests
             world.Set(2,3,7);
             Assert.That(controller.TryBuild(new Vector2Int(2,4), new Vector2Int(3,4), out _), Is.False);
             Assert.That(controller.Walls.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void MainMapAutomaticallyFollowsSummitsWithinAnEdgeAndKeepsFloorsTogether()
+        {
+            // Both ends are flat, but a ridge rises inside the edge. Endpoint-only sampling buried it.
+            terrainMesh = new Mesh();
+            terrainMesh.vertices = new[] { new Vector3(0,0,0), new Vector3(.5f,1,0), new Vector3(1,0,0),
+                new Vector3(0,0,-1), new Vector3(.5f,1,-1), new Vector3(1,0,-1) };
+            terrainMesh.triangles = new[] { 0,1,3,1,4,3,1,2,4,2,5,4 };
+            terrainMesh.RecalculateNormals(); terrainMesh.RecalculateBounds();
+            CreateMainMap("slope_test", terrainMesh);
+            var a = new Vector2Int(2,2); var b = new Vector2Int(3,2);
+            Assert.That(controller.TryBuild(a, b, out var reason), Is.True, reason);
+            Assert.That(controller.TryBuild(a, b, 1, WallTier.Timber, out reason), Is.True, reason);
+            controller.TryGetWallInstance(new WallEdge(a,b), out var wall);
+            controller.TryGetWallInstance(new WallEdge(a,b), 1, out var upper);
+            var surface = root.GetComponent<WallTerrainSurface>();
+            var slope = wall.GetComponent<WallSlopeGeometry>();
+            Assert.That(slope.Profile, Is.Not.Null, "A summit needs intermediate terrain samples.");
+            foreach (var vertex in wall.GetComponent<MeshCollider>().sharedMesh.vertices)
+                if (vertex.y - slope.HeightOffset(vertex.z) < 0)
+                {
+                    var point = wall.transform.TransformPoint(vertex);
+                    Assert.That(surface.Sample(point, out var ground), Is.True);
+                    Assert.That(point.y, Is.EqualTo(ground.y).Within(.01f));
+                }
+            Assert.That(wall.transform.position.y + 2f, Is.EqualTo(upper.transform.position.y).Within(.001f));
+            var filter = wall.GetComponentInChildren<MeshFilter>();
+            Assert.That(filter.sharedMesh.vertexCount, Is.GreaterThan(artVertexCount()));
+            int artVertexCount() { using var art = new WallArt(); return art.Panel(WallTier.Timber, .117f).vertexCount; }
+        }
+
+        [Test]
+        public void TreesAllowConstructionWithoutLiftingWallsToTheCanopyButStoneStillBlocks()
+        {
+            terrainMesh = new Mesh();
+            // Tree plate at zero, canopy at three metres. Only the plate is construction terrain.
+            terrainMesh.vertices = new[] { new Vector3(0,0,0), new Vector3(1,0,0), new Vector3(0,0,-1), new Vector3(1,0,-1),
+                new Vector3(0,3,0), new Vector3(1,3,0), new Vector3(0,3,-1), new Vector3(1,3,-1) };
+            terrainMesh.triangles = new[] { 0,1,2,1,3,2,4,5,6,5,7,6 };
+            terrainMesh.RecalculateNormals(); terrainMesh.RecalculateBounds();
+            CreateMainMap("tree_test", terrainMesh);
+            var tree = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            tree.transform.SetParent(root.transform); tree.transform.position = new Vector3(2.5f,1,2);
+            var node = tree.AddComponent<ResourceNode>();
+            Assert.That(node.Type, Is.EqualTo(ResourceType.Wood));
+            Assert.That(controller.TryBuild(new Vector2Int(2,2), new Vector2Int(3,2), out var reason), Is.True, reason);
+            controller.TryGetWallInstance(new WallEdge(new Vector2Int(2,2),new Vector2Int(3,2)), out var wall);
+            Assert.That(wall.transform.position.y, Is.EqualTo(1f).Within(.001f));
+            var stone = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            stone.transform.SetParent(root.transform); stone.transform.position = new Vector3(4.5f,1,2);
+            var resource = stone.AddComponent<ResourceNode>();
+            var settings = new UnityEditor.SerializedObject(resource);
+            settings.FindProperty("type").enumValueIndex = (int)ResourceType.Stone;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(controller.TryBuild(new Vector2Int(4,2), new Vector2Int(5,2), out _), Is.False);
+        }
+
+        void CreateMainMap(string name, Mesh mesh)
+        {
+            var world = root.GetComponent<World>();
+            typeof(World).GetMethod("Awake", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(world, null);
+            var tile = new GameObject(name, typeof(MeshFilter)); tile.transform.SetParent(root.transform);
+            tile.GetComponent<MeshFilter>().sharedMesh = mesh;
+            var map = root.AddComponent<MapView>();
+            var settings = new UnityEditor.SerializedObject(map);
+            settings.FindProperty("world").objectReferenceValue = world;
+            settings.FindProperty("createColliders").boolValue = true;
+            var modules = settings.FindProperty("modules"); modules.arraySize = 1;
+            modules.GetArrayElementAtIndex(0).FindPropertyRelative("Id").intValue = 0;
+            modules.GetArrayElementAtIndex(0).FindPropertyRelative("Prefab").objectReferenceValue = tile;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            typeof(MapView).GetMethod("Start", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(map, null);
+            controller.Configure(world, null); controller.SetResourceStore(store);
+            Physics.SyncTransforms();
         }
 
         [Test]

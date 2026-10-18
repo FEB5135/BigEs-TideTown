@@ -16,10 +16,21 @@ namespace IdleTown.Construction
         public void Configure(World targetWorld, WallTerrainSurface surface)
         { world = targetWorld; terrainSurface = surface; }
 
-        void Awake()
+        // MapView builds the landscape in Start at execution order -25. Awake was too early,
+        // and left the main scene's grid on the flat plane even after walls followed the hills.
+        void Start()
         {
             if (world == null)
                 return;
+            if (terrainSurface == null && world.TryGetComponent<MapView>(out var map))
+            {
+                terrainSurface = world.GetComponent<WallTerrainSurface>();
+                if (terrainSurface == null)
+                {
+                    terrainSurface = world.gameObject.AddComponent<WallTerrainSurface>();
+                    terrainSurface.ConfigureMap(map);
+                }
+            }
 
             var verticalCount = world.Width + 1;
             var horizontalCount = world.Height + 1;
@@ -47,9 +58,14 @@ namespace IdleTown.Construction
                 {
                     var a = world.transform.TransformPoint(new Vector3(x * world.CellSize, 0, z * world.CellSize));
                     var b = world.transform.TransformPoint(new Vector3(bx * world.CellSize, 0, bz * world.CellSize));
-                    if (!terrainSurface.Sample(a, out a) || !terrainSurface.Sample(b, out b)) return;
-                    conformed.Add(transform.InverseTransformPoint(a + Vector3.up * .035f));
-                    conformed.Add(transform.InverseTransformPoint(b + Vector3.up * .035f));
+                    for (int section = 0; section < 2; section++)
+                    {
+                        var start = Vector3.Lerp(a, b, section * .5f);
+                        var end = Vector3.Lerp(a, b, (section + 1) * .5f);
+                        if (!terrainSurface.Sample(start, out start) || !terrainSurface.Sample(end, out end)) continue;
+                        conformed.Add(transform.InverseTransformPoint(start + Vector3.up * .035f));
+                        conformed.Add(transform.InverseTransformPoint(end + Vector3.up * .035f));
+                    }
                 }
                 for (int x = 0; x <= world.Width; x++)
                     for (int z = 0; z < world.Height; z++) Add(x, z, x, z + 1);
@@ -62,7 +78,7 @@ namespace IdleTown.Construction
             for (var i = 0; i < indices.Length; i++)
                 indices[i] = i;
 
-            mesh = new Mesh { name = "Demo Grid Mesh" };
+            mesh = new Mesh { name = "Demo Grid Mesh", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.vertices = vertices;
             mesh.SetIndices(indices, MeshTopology.Lines, 0);
             mesh.RecalculateBounds();

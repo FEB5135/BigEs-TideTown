@@ -60,7 +60,8 @@ namespace Tsunami
             if (slope != null)
             {
                 var filter = standingSeal.GetComponent<MeshFilter>();
-                standingSeal.AddComponent<WallSlopeGeometry>().Configure(filter, filter.sharedMesh, slope.Rise, false);
+                standingSeal.AddComponent<WallSlopeGeometry>().Configure(filter, filter.sharedMesh, slope.Rise, false,
+                    slope.Profile, slope.GroundProfile);
             }
             Vector3 min = Vector3.positiveInfinity, max = Vector3.negativeInfinity;
             foreach (var source in originals)

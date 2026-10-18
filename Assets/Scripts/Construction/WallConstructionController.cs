@@ -453,7 +453,7 @@ namespace IdleTown.Construction
                         (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1);
                     var local = box.center + Vector3.Scale(box.size * .5f + padding, signs);
                     var slope = wall.GetComponent<WallSlopeGeometry>();
-                    if (slope != null) local.y += local.z * slope.Rise;
+                    if (slope != null) local.y += (corner & 2) == 0 ? slope.BaseHeightOffset(local.z) : slope.HeightOffset(local.z);
                     renderer.SetPosition(i, box.transform.TransformPoint(local));
                 }
             }
@@ -758,6 +758,12 @@ namespace IdleTown.Construction
             resourceStore = resourceStoreSource as IWallResourceStore;
             if (inputCamera == null)
                 inputCamera = Camera.main;
+            if (terrainSurface == null && world != null && world.TryGetComponent<MapView>(out var map))
+            {
+                terrainSurface = world.GetComponent<WallTerrainSurface>();
+                if (terrainSurface == null) terrainSurface = world.gameObject.AddComponent<WallTerrainSurface>();
+                terrainSurface.ConfigureMap(map);
+            }
         }
 
         void CancelSelection()
@@ -1042,8 +1048,12 @@ namespace IdleTown.Construction
                 for (var overlapIndex = 0; overlapIndex < count; overlapIndex++)
                 {
                     var overlap = overlapBuffer[overlapIndex];
+                    var resource = overlap.GetComponentInParent<ResourceNode>();
+                    if (resource != null && resource.Type == ResourceType.Wood) continue;
+                    if (terrainSurface != null && terrainSurface.Contains(overlap)) continue;
                     var map = overlap.GetComponentInParent<MapView>();
-                    if (map != null && map.IsConstructionGroundPath(start, end, JointHalfWidth + obstaclePadding)) continue;
+                    if (map != null && map.OwnsSurface(overlap) &&
+                        map.IsConstructionGroundPath(start, end, JointHalfWidth + obstaclePadding)) continue;
                     if (map == null && terrainSurface != null && terrainSurface.Contains(overlap)) continue;
                     // Picking/collection triggers are not solid buildings. Explicit trigger layers opt in.
                     if (overlap.isTrigger && (obstacleLayers.value & (1 << overlap.gameObject.layer)) == 0)
@@ -1099,9 +1109,12 @@ namespace IdleTown.Construction
             if (instance.GetComponentInChildren<Collider>() == null)
                 instance.AddComponent<BoxCollider>();
             if (terrainSurface != null && wallPrefab == null)
+            {
+                var profile = TerrainProfile(edge, out var ground);
                 instance.AddComponent<WallSlopeGeometry>().Configure(instance.GetComponentInChildren<MeshFilter>(),
                     instance.GetComponentInChildren<MeshFilter>().sharedMesh,
-                    Vector3.Dot(direction, world.transform.up) / wallHeight, true);
+                    Vector3.Dot(direction, world.transform.up) / wallHeight, true, profile, record.Floor == 0 ? ground : null);
+            }
             var metadata = instance.GetComponent<WallSegment>() ?? instance.AddComponent<WallSegment>();
             metadata.Configure(record);
 
@@ -1151,7 +1164,9 @@ namespace IdleTown.Construction
                 {
                     var slope = ghost.GetComponent<WallSlopeGeometry>();
                     if (slope == null) slope = ghost.AddComponent<WallSlopeGeometry>();
-                    slope.Configure(filter, panel, Vector3.Dot(b - a, world.transform.up) / wallHeight, false);
+                    var profile = TerrainProfile(edge, out var ground);
+                    slope.Configure(filter, panel, Vector3.Dot(b - a, world.transform.up) / wallHeight, false,
+                        profile, selectedFloor == 0 ? ground : null);
                 }
                 else filter.sharedMesh = panel;
             }
@@ -1330,6 +1345,28 @@ namespace IdleTown.Construction
             var ground = world.transform.TransformPoint(new Vector3(node.x * world.CellSize, 0, node.y * world.CellSize));
             if (terrainSurface != null && terrainSurface.Sample(ground, out var sampled)) ground = sampled;
             return ground + world.transform.TransformVector(new Vector3(0, y, 0));
+        }
+
+        float[] TerrainProfile(WallEdge edge, out float[] groundProfile)
+        {
+            groundProfile = null;
+            if (terrainSurface == null) return null;
+            var a = NodePosition(edge.A, 0);
+            var b = NodePosition(edge.B, 0);
+            var center = (a + b) * .5f;
+            const int sections = 8;
+            var profile = new float[sections + 1];
+            bool curved = false;
+            for (int i = 0; i <= sections; i++)
+            {
+                var line = Vector3.Lerp(a, b, i / (float)sections);
+                if (!terrainSurface.Sample(line, out var sample)) sample = line;
+                profile[i] = Vector3.Dot(sample - center, world.transform.up) / wallHeight;
+                curved |= Mathf.Abs(Vector3.Dot(sample - line, world.transform.up)) > .002f;
+            }
+            var smooth = WallSlopeGeometry.SmoothCliffProfile(profile);
+            if (!ReferenceEquals(smooth, profile)) { groundProfile = profile; return smooth; }
+            return curved ? profile : null;
         }
 
         static Material CreateColorMaterial(Color color)

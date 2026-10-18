@@ -18,6 +18,24 @@ public class MapView : MonoBehaviour
     CellDraw[] cells;
     GameObject defaultPrefab;
     bool filling;
+    readonly Dictionary<Mesh, Mesh> treeGroundMeshes = new();
+
+    public IEnumerable<Collider> ConstructionSurfaces
+    {
+        get { foreach (var chunk in chunks.Values) if (chunk.GroundCollider != null) yield return chunk.GroundCollider; }
+    }
+
+    public bool OwnsSurface(Collider collider)
+    {
+        if (collider.gameObject == gameObject) return true;
+        foreach (var chunk in chunks.Values)
+            if (chunk.Collider == collider || chunk.GroundCollider == collider) return true;
+        return false;
+    }
+
+    static bool IsLandscape(string name) => name.StartsWith("ground_") || name.StartsWith("slope_") ||
+        name.StartsWith("cornerslope_") || name.StartsWith("innercornerslope_") ||
+        name.StartsWith("tree_") || name == "sand" || name.StartsWith("sand_");
 
     public bool IsConstructionGround(Vector3 position)
     {
@@ -32,8 +50,7 @@ public class MapView : MonoBehaviour
             if (module.Id != id || module.Prefab == null) continue;
             found = true;
             string name = module.Prefab.name;
-            if (!(name.StartsWith("ground_") || name.StartsWith("slope_") ||
-                  name.StartsWith("cornerslope_") || name.StartsWith("innercornerslope_"))) return false;
+            if (!IsLandscape(name)) return false;
         }
         return found;
     }
@@ -43,7 +60,7 @@ public class MapView : MonoBehaviour
         if (world == null) return false;
         var across = Vector3.Cross(world.transform.up, b - a).normalized * padding;
         int samples = Mathf.Max(2, Mathf.CeilToInt(Vector3.Distance(a, b) / (world.CellSize * .2f)));
-        // Sample both sides of grid edges: a neighbouring house/tree tile must still block.
+        // Vegetation is allowed; a neighbouring building tile must still block.
         for (int i = 0; i <= samples; i++)
         {
             var point = Vector3.Lerp(a, b, Mathf.Lerp(.001f, .999f, i / (float)samples));
@@ -107,8 +124,10 @@ public class MapView : MonoBehaviour
         foreach (var chunk in chunks.Values)
         {
             if (chunk.Mesh != null)
-                Destroy(chunk.Mesh);
+                ReleaseMesh(chunk.Mesh);
+            if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
         }
+        foreach (var mesh in treeGroundMeshes.Values) if (mesh != null) ReleaseMesh(mesh);
     }
 
     void Refresh(int x, int y)
@@ -157,12 +176,19 @@ public class MapView : MonoBehaviour
                 Filter = chunkObject.AddComponent<MeshFilter>(),
                 Renderer = chunkObject.AddComponent<MeshRenderer>()
             };
+            // The visual chunk also contains roofs and tree canopies. Picking and height sampling
+            // need a separate mesh containing only the actual landscape, even without solid colliders.
+            var groundObject = new GameObject("Construction terrain");
+            groundObject.transform.SetParent(chunkObject.transform, false);
+            chunk.GroundCollider = groundObject.AddComponent<MeshCollider>();
+            groundObject.layer = 2; // Ignore Raycast: ordinary picking keeps using the original chunk.
             if (createColliders)
                 chunk.Collider = chunkObject.AddComponent<MeshCollider>();
             chunks.Add(key, chunk);
         }
 
         var combines = new List<CombineInstance>();
+        var groundCombines = new List<CombineInstance>();
         Material chunkMaterial = material;
         var x0 = key.x * chunkSize;
         var y0 = key.y * chunkSize;
@@ -201,6 +227,18 @@ public class MapView : MonoBehaviour
                         mesh = source,
                         transform = draw.Local * LocalToRoot(filter.transform, draw.Prefab.transform)
                     });
+                    if (IsLandscape(draw.Prefab.name))
+                    {
+                        var landscape = draw.Prefab.name.StartsWith("tree_") ? TreeGround(source) : source;
+                        if (landscape != null)
+                            for (int submesh = 0; submesh < landscape.subMeshCount; submesh++)
+                            groundCombines.Add(new CombineInstance
+                            {
+                                mesh = landscape,
+                                subMeshIndex = submesh,
+                                transform = draw.Local * LocalToRoot(filter.transform, draw.Prefab.transform)
+                            });
+                    }
                 }
             }
         }
@@ -208,7 +246,16 @@ public class MapView : MonoBehaviour
         if (chunk.Collider != null)
             chunk.Collider.sharedMesh = null;
         if (chunk.Mesh != null)
-            Destroy(chunk.Mesh);
+            ReleaseMesh(chunk.Mesh);
+        chunk.GroundCollider.sharedMesh = null;
+        if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
+        chunk.GroundMesh = null;
+        if (groundCombines.Count > 0)
+        {
+            chunk.GroundMesh = new Mesh { name = "Construction landscape", indexFormat = IndexFormat.UInt32 };
+            chunk.GroundMesh.CombineMeshes(groundCombines.ToArray(), true, true);
+            chunk.GroundCollider.sharedMesh = chunk.GroundMesh;
+        }
 
         if (combines.Count == 0)
         {
@@ -238,6 +285,34 @@ public class MapView : MonoBehaviour
         }
 
         return matrix;
+    }
+
+    Mesh TreeGround(Mesh source)
+    {
+        if (treeGroundMeshes.TryGetValue(source, out var cached)) return cached;
+        // Team tree tiles contain a ground plate at local y=0, plus trunks and crowns.
+        // Retain only plate triangles so a wall never climbs to a treetop.
+        var vertices = source.vertices;
+        var triangles = new List<int>();
+        var indices = source.triangles;
+        for (int i = 0; i < indices.Length; i += 3)
+            if (Mathf.Abs(vertices[indices[i]].y) < .001f &&
+                Mathf.Abs(vertices[indices[i + 1]].y) < .001f &&
+                Mathf.Abs(vertices[indices[i + 2]].y) < .001f)
+            { triangles.Add(indices[i]); triangles.Add(indices[i + 1]); triangles.Add(indices[i + 2]); }
+        Mesh mesh = null;
+        if (triangles.Count > 0)
+        {
+            mesh = new Mesh { name = source.name + " ground", indexFormat = source.indexFormat };
+            mesh.vertices = vertices; mesh.triangles = triangles.ToArray(); mesh.RecalculateBounds();
+        }
+        treeGroundMeshes.Add(source, mesh);
+        return mesh;
+    }
+
+    static void ReleaseMesh(Mesh mesh)
+    {
+        if (Application.isPlaying) Destroy(mesh); else DestroyImmediate(mesh);
     }
 
     GameObject Pick(int id, int x, int y)
@@ -278,6 +353,8 @@ public class MapView : MonoBehaviour
         public MeshRenderer Renderer;
         public Mesh Mesh;
         public MeshCollider Collider;
+        public Mesh GroundMesh;
+        public MeshCollider GroundCollider;
     }
 
     [Serializable]
