@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -13,17 +15,27 @@ public class MapView : MonoBehaviour
     [SerializeField] Module[] modules;
     [SerializeField, Tooltip("Sunken models drawn in place of a house's tiles once the tsunami destroys it.")]
     Ruin[] ruins;
+    [SerializeField, Tooltip("Chunks rebuilt per frame for changes that may wait (fallen houses). Changes to the World's " +
+        "cells (felled trees...) are always rebuilt in the same frame.")]
+    int rebuildsPerFrame = 2;
 
     readonly Dictionary<int, List<Variant>> variants = new();
     readonly Dictionary<Vector2Int, Chunk> chunks = new();
     readonly HashSet<Vector2Int> dirtyChunks = new();
+    // Chunks whose rebuild can wait a few frames, oldest first (fallen houses: the break-apart effect covers them).
+    readonly List<Vector2Int> lazyChunks = new();
+    readonly HashSet<Vector2Int> groundDirty = new();
+    // Mesh colliders are cooked on worker threads (Physics.BakeMesh) and swapped in when ready.
+    readonly List<(MeshCollider collider, Mesh mesh)> baking = new();
+    readonly List<Mesh> releaseAfterBake = new();
+    JobHandle bakeHandle;
+    NativeArray<EntityId> bakeIds;
     CellDraw[] cells;
     GameObject defaultPrefab;
     bool filling;
     readonly Dictionary<Mesh, Mesh> treeGroundMeshes = new();
     readonly Dictionary<GameObject, GameObject> ruinOf = new();
     readonly HashSet<int> ruinedCells = new();
-    readonly HashSet<Vector2Int> ruinChunks = new();
     HouseCollapse collapse;
 
     public IEnumerable<Collider> ConstructionSurfaces
@@ -134,6 +146,26 @@ public class MapView : MonoBehaviour
 
         filling = false;
         RebuildDirty();
+        // The first map's colliders are needed right away (navigation, construction); cook them all in parallel.
+        StartBake();
+        FinishBake();
+    }
+
+    // Changes made during the frame are rebuilt once per chunk here, before the frame is drawn.
+    void LateUpdate()
+    {
+        if (cells == null)
+            return;
+        if (baking.Count > 0 && bakeHandle.IsCompleted)
+            FinishBake();
+        RebuildDirty();
+        for (int i = 0; i < rebuildsPerFrame && lazyChunks.Count > 0; i++)
+        {
+            Rebuild(lazyChunks[0]);
+            lazyChunks.RemoveAt(0);
+        }
+        if (baking.Count == 0)
+            StartBake();
     }
 
     void OnDestroy()
@@ -142,15 +174,23 @@ public class MapView : MonoBehaviour
             world.CellChanged -= Refresh;
         Houses.Destroyed -= OnHouseDestroyed;
         Houses.Repaired -= OnHouseRepaired;
+        bakeHandle.Complete();
+        if (bakeIds.IsCreated)
+            bakeIds.Dispose();
 
+        var meshes = new HashSet<Mesh>(releaseAfterBake);
         foreach (var chunk in chunks.Values)
         {
-            if (chunk.Collider != null && chunk.Collider.sharedMesh != null && chunk.Collider.sharedMesh != chunk.Mesh)
-                ReleaseMesh(chunk.Collider.sharedMesh);
-            if (chunk.Mesh != null)
-                ReleaseMesh(chunk.Mesh);
-            if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
+            meshes.Add(chunk.Mesh);
+            meshes.Add(chunk.GroundMesh);
+            if (chunk.Collider != null) meshes.Add(chunk.Collider.sharedMesh);
+            if (chunk.GroundCollider != null) meshes.Add(chunk.GroundCollider.sharedMesh);
         }
+        foreach (var (_, mesh) in baking)
+            meshes.Add(mesh);
+        foreach (var mesh in meshes)
+            if (mesh != null)
+                ReleaseMesh(mesh);
         foreach (var mesh in treeGroundMeshes.Values) if (mesh != null) ReleaseMesh(mesh);
     }
 
@@ -205,12 +245,12 @@ public class MapView : MonoBehaviour
         }
     }
 
-    // A house's tiles switch to (or back from) their sunken models; its chunks are rebuilt once.
+    // A house's tiles (the whole structure) switch to (or back from) their sunken models. Many houses fall at once;
+    // their chunks are rebuilt a few per frame, each once, while the break-apart effect plays over them.
     void SetRuined(List<Vector2Int> structure, bool ruined)
     {
         if (cells == null)
             return;
-        filling = true;
         foreach (var cell in structure)
         {
             if (!world.InBounds(cell.x, cell.y))
@@ -222,28 +262,28 @@ public class MapView : MonoBehaviour
                 continue;
             var index = cell.y * world.Width + cell.x;
             if (ruined ? ruinedCells.Add(index) : ruinedCells.Remove(index))
-                Refresh(cell.x, cell.y);
+            {
+                SetDraw(cell.x, cell.y);
+                var key = new Vector2Int(cell.x / chunkSize, cell.y / chunkSize);
+                if (!dirtyChunks.Contains(key) && !lazyChunks.Contains(key))
+                    lazyChunks.Add(key);
+            }
         }
-        filling = false;
-        // Many houses can fall in the same frame: their chunks are redrawn once, in LateUpdate.
-        ruinChunks.UnionWith(dirtyChunks);
-        dirtyChunks.Clear();
-    }
-
-    // A fallen house changes neither the ground nor where things can be clicked enough to matter, so only the
-    // drawn mesh is rebuilt; cooking the chunk's mesh colliders again is what made the game stutter.
-    void LateUpdate()
-    {
-        if (ruinChunks.Count == 0)
-            return;
-        foreach (var key in ruinChunks)
-            Rebuild(key, false);
-        ruinChunks.Clear();
     }
 
     void Refresh(int x, int y)
     {
+        var key = new Vector2Int(x / chunkSize, y / chunkSize);
+        dirtyChunks.Add(key);
+        lazyChunks.Remove(key);
+        SetDraw(x, y);
+    }
+
+    // Works out what the cell draws. A change to or from a landscape tile also changes the construction ground.
+    void SetDraw(int x, int y)
+    {
         var index = y * world.Width + x;
+        var before = cells[index].Prefab;
         world.Get(x, y, out var id, out var rotation);
         var prefab = Pick(id, x, y);
         if (prefab != null && ruinedCells.Contains(index) && ruinOf.TryGetValue(prefab, out var ruin))
@@ -265,20 +305,21 @@ public class MapView : MonoBehaviour
             };
         }
 
-        dirtyChunks.Add(new Vector2Int(x / chunkSize, y / chunkSize));
-        if (!filling)
-            RebuildDirty();
+        if ((before != null && IsLandscape(before.name)) || (prefab != null && IsLandscape(prefab.name)))
+            groundDirty.Add(new Vector2Int(x / chunkSize, y / chunkSize));
     }
 
     void RebuildDirty()
     {
+        if (filling)
+            return;
         foreach (var key in dirtyChunks)
             Rebuild(key);
 
         dirtyChunks.Clear();
     }
 
-    void Rebuild(Vector2Int key, bool colliders = true)
+    void Rebuild(Vector2Int key)
     {
         if (!chunks.TryGetValue(key, out var chunk))
         {
@@ -300,6 +341,7 @@ public class MapView : MonoBehaviour
             chunks.Add(key, chunk);
         }
 
+        bool ground = groundDirty.Remove(key);
         var combines = new List<CombineInstance>();
         var groundCombines = new List<CombineInstance>();
         Material chunkMaterial = material;
@@ -340,7 +382,7 @@ public class MapView : MonoBehaviour
                         mesh = source,
                         transform = draw.Local * LocalToRoot(filter.transform, draw.Prefab.transform)
                     });
-                    if (colliders && IsLandscape(draw.Prefab.name))
+                    if (ground && IsLandscape(draw.Prefab.name))
                     {
                         var landscape = draw.Prefab.name.StartsWith("tree_") ? TreeGround(source) : source;
                         if (landscape != null)
@@ -356,41 +398,122 @@ public class MapView : MonoBehaviour
             }
         }
 
-        if (colliders)
+        // Each collider keeps its old mesh until the new one is cooked (see StartBake/FinishBake).
+        if (ground)
         {
-            chunk.GroundCollider.sharedMesh = null;
-            if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
-            chunk.GroundMesh = null;
+            Mesh groundMesh = null;
             if (groundCombines.Count > 0)
             {
-                chunk.GroundMesh = new Mesh { name = "Construction landscape", indexFormat = IndexFormat.UInt32 };
-                chunk.GroundMesh.CombineMeshes(groundCombines.ToArray(), true, true);
-                chunk.GroundCollider.sharedMesh = chunk.GroundMesh;
+                groundMesh = new Mesh { name = "Construction landscape", indexFormat = IndexFormat.UInt32 };
+                groundMesh.CombineMeshes(groundCombines.ToArray(), true, true);
             }
+            Replace(chunk, ref chunk.GroundMesh, groundMesh);
         }
 
-        var oldMesh = chunk.Mesh;
         Mesh mesh = null;
         if (combines.Count > 0)
         {
             mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
             mesh.CombineMeshes(combines.ToArray(), true, true);
         }
-        chunk.Mesh = mesh;
+        Replace(chunk, ref chunk.Mesh, mesh);
         chunk.Filter.sharedMesh = mesh;
         chunk.Renderer.enabled = mesh != null;
         if (mesh != null)
             chunk.Renderer.sharedMaterial = chunkMaterial;
-        // Without a collider rebuild the collider keeps the previous mesh; it is released once nothing uses it.
-        if (colliders && chunk.Collider != null)
+    }
+
+    void Replace(Chunk chunk, ref Mesh slot, Mesh mesh)
+    {
+        var old = slot;
+        slot = mesh;
+        Release(chunk, old);
+    }
+
+    // A mesh is destroyed once no renderer, collider or bake job of the chunk uses it any more.
+    void Release(Chunk chunk, Mesh mesh)
+    {
+        if (mesh == null || mesh == chunk.Mesh || mesh == chunk.GroundMesh)
+            return;
+        if ((chunk.Collider != null && chunk.Collider.sharedMesh == mesh) || chunk.GroundCollider.sharedMesh == mesh)
+            return;
+        foreach (var (_, baked) in baking)
+            if (baked == mesh)
+            {
+                releaseAfterBake.Add(mesh);
+                return;
+            }
+        ReleaseMesh(mesh);
+    }
+
+    // Cooks the collision data of every chunk whose collider is out of date, all chunks in parallel.
+    void StartBake()
+    {
+        foreach (var chunk in chunks.Values)
         {
-            var oldCollider = chunk.Collider.sharedMesh;
-            chunk.Collider.sharedMesh = mesh;
-            if (oldCollider != null && oldCollider != oldMesh)
-                ReleaseMesh(oldCollider);
+            if (chunk.Collider != null && chunk.Collider.sharedMesh != chunk.Mesh)
+                Queue(chunk, chunk.Collider, chunk.Mesh);
+            if (chunk.GroundCollider.sharedMesh != chunk.GroundMesh)
+                Queue(chunk, chunk.GroundCollider, chunk.GroundMesh);
         }
-        if (oldMesh != null && (chunk.Collider == null || chunk.Collider.sharedMesh != oldMesh))
-            ReleaseMesh(oldMesh);
+        if (baking.Count == 0)
+            return;
+        bakeIds = new NativeArray<EntityId>(baking.Count, Allocator.Persistent);
+        for (int i = 0; i < baking.Count; i++)
+            bakeIds[i] = baking[i].mesh.GetEntityId();
+        bakeHandle = new BakeJob { meshIds = bakeIds }.Schedule(baking.Count, 1);
+        JobHandle.ScheduleBatchedJobs();
+    }
+
+    // An emptied chunk drops its collider mesh at once; there is nothing to cook.
+    void Queue(Chunk chunk, MeshCollider collider, Mesh mesh)
+    {
+        if (mesh != null)
+        {
+            baking.Add((collider, mesh));
+            return;
+        }
+        var old = collider.sharedMesh;
+        collider.sharedMesh = null;
+        Release(chunk, old);
+    }
+
+    void FinishBake()
+    {
+        bakeHandle.Complete();
+        if (bakeIds.IsCreated)
+            bakeIds.Dispose();
+        var done = new List<(MeshCollider collider, Mesh mesh)>(baking);
+        baking.Clear();
+        foreach (var (collider, mesh) in done)
+        {
+            var old = collider.sharedMesh;
+            collider.sharedMesh = mesh; // uses the cooked data
+            foreach (var chunk in chunks.Values)
+                if (chunk.Collider == collider || chunk.GroundCollider == collider)
+                {
+                    Release(chunk, old);
+                    break;
+                }
+        }
+        var waiting = new List<Mesh>(releaseAfterBake);
+        releaseAfterBake.Clear();
+        foreach (var mesh in waiting)
+        {
+            bool used = false;
+            foreach (var chunk in chunks.Values)
+                used |= mesh == chunk.Mesh || mesh == chunk.GroundMesh || mesh == chunk.GroundCollider.sharedMesh ||
+                        (chunk.Collider != null && chunk.Collider.sharedMesh == mesh);
+            if (!used)
+                ReleaseMesh(mesh);
+        }
+    }
+
+    struct BakeJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<EntityId> meshIds;
+
+        public void Execute(int index) => Physics.BakeMesh(meshIds[index], false);
     }
 
     static Matrix4x4 LocalToRoot(Transform from, Transform root)

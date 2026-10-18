@@ -25,6 +25,10 @@ public class TutorialHints : MonoBehaviour
     public static bool HoldsTsunami { get; private set; }
     public static event Action TsunamiAllowed;
 
+    // Kartın yazı tipi ve paneli (oyun sonu ekranı da aynı görünümü kullanır).
+    public Font CardFont => font;
+    public Sprite CardSprite => panelSprite;
+
     [SerializeField] Font font;
     [SerializeField] Sprite panelSprite;
     [Tooltip("Yükseltme ve fırtına gibi bilgi adımlarının kendiliğinden geçme süresi (sn).")]

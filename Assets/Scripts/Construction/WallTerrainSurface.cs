@@ -65,5 +65,38 @@ namespace IdleTown.Construction
             point = found ? hit.point : position;
             return found;
         }
+
+        // Sample for many points at once (the construction grid). The surfaces, their highest point and their layers
+        // are gathered once and each point is one physics query, instead of a raycast against every surface.
+        public void SampleMany(Vector3[] positions, Vector3[] points, bool[] found)
+        {
+            var set = new HashSet<Collider>();
+            float top = float.NegativeInfinity;
+            int mask = 0;
+            foreach (var collider in Surfaces)
+            {
+                if (collider == null) continue;
+                top = Mathf.Max(top, collider.bounds.max.y);
+                if (!collider.enabled || !collider.gameObject.activeInHierarchy) continue;
+                set.Add(collider);
+                mask |= 1 << collider.gameObject.layer;
+            }
+            var hits = new RaycastHit[32];
+            for (int i = 0; i < positions.Length; i++)
+            {
+                var position = positions[i];
+                var ray = new Ray(new Vector3(position.x, Mathf.Max(position.y, top) + 10f, position.z), Vector3.down);
+                int count = set.Count > 0 ? Physics.RaycastNonAlloc(ray, hits, float.PositiveInfinity, mask, QueryTriggerInteraction.Collide) : 0;
+                float distance = float.PositiveInfinity;
+                points[i] = position;
+                for (int h = 0; h < count; h++)
+                    if (hits[h].distance < distance && set.Contains(hits[h].collider))
+                    {
+                        distance = hits[h].distance;
+                        points[i] = hits[h].point;
+                    }
+                found[i] = !float.IsPositiveInfinity(distance);
+            }
+        }
     }
 }
