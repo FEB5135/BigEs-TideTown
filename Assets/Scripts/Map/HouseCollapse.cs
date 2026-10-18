@@ -7,12 +7,14 @@ using UnityEngine;
 public class HouseCollapse : MonoBehaviour
 {
     [SerializeField, Tooltip("Each tile model is cut into this many pieces along x, y, z.")]
-    Vector3Int cuts = new(3, 3, 3);
+    Vector3Int cuts = new(2, 1, 2);
     [SerializeField] float shakeTime = 0.25f;
-    [SerializeField] float lifetime = 5f;
+    [SerializeField] float lifetime = 4f;
     [SerializeField, Tooltip("How strongly the water's flow throws the pieces.")]
     float flowThrow = 0.7f;
-    [SerializeField] int maxPieces = 3000;
+    [SerializeField] int maxPieces = 600;
+    [SerializeField, Tooltip("Pieces made ready when the game starts, so a falling village does not create objects.")]
+    int prewarm = 300;
 
     class Piece
     {
@@ -33,13 +35,20 @@ public class HouseCollapse : MonoBehaviour
     Material material;
 
     // The house models are open shells; cut apart, their insides show, so the pieces are drawn from both sides.
-    public void Init(Material houseMaterial)
+    // The house meshes are cut and the pieces created up front, at load time, not while the village falls.
+    public void Init(Material houseMaterial, IEnumerable<Mesh> houseMeshes)
     {
-        if (houseMaterial == null)
-            return;
-        material = new Material(houseMaterial) { name = houseMaterial.name + " (pieces)" };
-        material.SetFloat("_Cull", 0f);
-        material.doubleSidedGI = true;
+        if (houseMaterial != null)
+        {
+            material = new Material(houseMaterial) { name = houseMaterial.name + " (pieces)" };
+            material.SetFloat("_Cull", 0f);
+            material.doubleSidedGI = true;
+        }
+        foreach (var mesh in houseMeshes)
+            if (mesh != null && mesh.isReadable)
+                Fragments(mesh);
+        for (int i = pool.Count; i < Mathf.Min(prewarm, maxPieces); i++)
+            Give(Create());
     }
 
     // One tile of a falling house: its mesh drawn with `world` (cell position, rotation and scale). `origin` is the
@@ -191,15 +200,20 @@ public class HouseCollapse : MonoBehaviour
         return cached;
     }
 
+    GameObject Create()
+    {
+        var piece = new GameObject("House piece", typeof(MeshFilter), typeof(MeshRenderer));
+        piece.transform.SetParent(transform, false);
+        var renderer = piece.GetComponent<MeshRenderer>();
+        renderer.sharedMaterial = material;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        return piece;
+    }
+
     GameObject Take(Mesh mesh)
     {
-        var piece = pool.Count > 0 ? pool.Pop() : null;
-        if (piece == null)
-        {
-            piece = new GameObject("House piece", typeof(MeshFilter), typeof(MeshRenderer));
-            piece.transform.SetParent(transform, false);
-            piece.GetComponent<MeshRenderer>().sharedMaterial = material;
-        }
+        var piece = pool.Count > 0 ? pool.Pop() : Create();
         piece.GetComponent<MeshFilter>().sharedMesh = mesh;
         piece.SetActive(true);
         return piece;

@@ -23,6 +23,7 @@ public class MapView : MonoBehaviour
     readonly Dictionary<Mesh, Mesh> treeGroundMeshes = new();
     readonly Dictionary<GameObject, GameObject> ruinOf = new();
     readonly HashSet<int> ruinedCells = new();
+    readonly HashSet<Vector2Int> ruinChunks = new();
     HouseCollapse collapse;
 
     public IEnumerable<Collider> ConstructionSurfaces
@@ -116,7 +117,11 @@ public class MapView : MonoBehaviour
         world.CellChanged += Refresh;
         collapse = new GameObject("House Collapse").AddComponent<HouseCollapse>();
         collapse.transform.SetParent(transform, false);
-        collapse.Init(material);
+        var houseMeshes = new List<Mesh>();
+        foreach (var intact in ruinOf.Keys)
+            foreach (var filter in intact.GetComponentsInChildren<MeshFilter>())
+                houseMeshes.Add(filter.sharedMesh);
+        collapse.Init(material, houseMeshes);
         Houses.Destroyed += OnHouseDestroyed;
         Houses.Repaired += OnHouseRepaired;
         filling = true;
@@ -140,6 +145,8 @@ public class MapView : MonoBehaviour
 
         foreach (var chunk in chunks.Values)
         {
+            if (chunk.Collider != null && chunk.Collider.sharedMesh != null && chunk.Collider.sharedMesh != chunk.Mesh)
+                ReleaseMesh(chunk.Collider.sharedMesh);
             if (chunk.Mesh != null)
                 ReleaseMesh(chunk.Mesh);
             if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
@@ -199,7 +206,20 @@ public class MapView : MonoBehaviour
                 Refresh(cell.x, cell.y);
         }
         filling = false;
-        RebuildDirty();
+        // Many houses can fall in the same frame: their chunks are redrawn once, in LateUpdate.
+        ruinChunks.UnionWith(dirtyChunks);
+        dirtyChunks.Clear();
+    }
+
+    // A fallen house changes neither the ground nor where things can be clicked enough to matter, so only the
+    // drawn mesh is rebuilt; cooking the chunk's mesh colliders again is what made the game stutter.
+    void LateUpdate()
+    {
+        if (ruinChunks.Count == 0)
+            return;
+        foreach (var key in ruinChunks)
+            Rebuild(key, false);
+        ruinChunks.Clear();
     }
 
     void Refresh(int x, int y)
@@ -239,7 +259,7 @@ public class MapView : MonoBehaviour
         dirtyChunks.Clear();
     }
 
-    void Rebuild(Vector2Int key)
+    void Rebuild(Vector2Int key, bool colliders = true)
     {
         if (!chunks.TryGetValue(key, out var chunk))
         {
@@ -301,7 +321,7 @@ public class MapView : MonoBehaviour
                         mesh = source,
                         transform = draw.Local * LocalToRoot(filter.transform, draw.Prefab.transform)
                     });
-                    if (IsLandscape(draw.Prefab.name))
+                    if (colliders && IsLandscape(draw.Prefab.name))
                     {
                         var landscape = draw.Prefab.name.StartsWith("tree_") ? TreeGround(source) : source;
                         if (landscape != null)
@@ -317,36 +337,41 @@ public class MapView : MonoBehaviour
             }
         }
 
-        if (chunk.Collider != null)
-            chunk.Collider.sharedMesh = null;
-        if (chunk.Mesh != null)
-            ReleaseMesh(chunk.Mesh);
-        chunk.GroundCollider.sharedMesh = null;
-        if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
-        chunk.GroundMesh = null;
-        if (groundCombines.Count > 0)
+        if (colliders)
         {
-            chunk.GroundMesh = new Mesh { name = "Construction landscape", indexFormat = IndexFormat.UInt32 };
-            chunk.GroundMesh.CombineMeshes(groundCombines.ToArray(), true, true);
-            chunk.GroundCollider.sharedMesh = chunk.GroundMesh;
+            chunk.GroundCollider.sharedMesh = null;
+            if (chunk.GroundMesh != null) ReleaseMesh(chunk.GroundMesh);
+            chunk.GroundMesh = null;
+            if (groundCombines.Count > 0)
+            {
+                chunk.GroundMesh = new Mesh { name = "Construction landscape", indexFormat = IndexFormat.UInt32 };
+                chunk.GroundMesh.CombineMeshes(groundCombines.ToArray(), true, true);
+                chunk.GroundCollider.sharedMesh = chunk.GroundMesh;
+            }
         }
 
-        if (combines.Count == 0)
+        var oldMesh = chunk.Mesh;
+        Mesh mesh = null;
+        if (combines.Count > 0)
         {
-            chunk.Mesh = null;
-            chunk.Filter.sharedMesh = null;
-            chunk.Renderer.enabled = false;
-            return;
+            mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
+            mesh.CombineMeshes(combines.ToArray(), true, true);
         }
-
-        var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
-        mesh.CombineMeshes(combines.ToArray(), true, true);
         chunk.Mesh = mesh;
         chunk.Filter.sharedMesh = mesh;
-        if (chunk.Collider != null)
+        chunk.Renderer.enabled = mesh != null;
+        if (mesh != null)
+            chunk.Renderer.sharedMaterial = chunkMaterial;
+        // Without a collider rebuild the collider keeps the previous mesh; it is released once nothing uses it.
+        if (colliders && chunk.Collider != null)
+        {
+            var oldCollider = chunk.Collider.sharedMesh;
             chunk.Collider.sharedMesh = mesh;
-        chunk.Renderer.enabled = true;
-        chunk.Renderer.sharedMaterial = chunkMaterial;
+            if (oldCollider != null && oldCollider != oldMesh)
+                ReleaseMesh(oldCollider);
+        }
+        if (oldMesh != null && (chunk.Collider == null || chunk.Collider.sharedMesh != oldMesh))
+            ReleaseMesh(oldMesh);
     }
 
     static Matrix4x4 LocalToRoot(Transform from, Transform root)
