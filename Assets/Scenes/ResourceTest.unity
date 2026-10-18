@@ -30723,7 +30723,7 @@ MonoBehaviour:
   woodCost: 1
   stoneCost: 1
   constructionModeActive: 0
-  wallHeight: 1.25
+  wallHeight: 2
   wallThickness: 0.18
 --- !u!21 &1233469701
 Material:

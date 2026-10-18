@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using IdleTown.Construction;
 
 namespace Tsunami
 {
@@ -11,6 +12,7 @@ namespace Tsunami
         readonly List<Vector3> sizes = new List<Vector3>(12);
         Renderer[] sources;
         float damage;
+        GameObject standingSeal;
         public Renderer[] SourceRenderers => sources ??= GetComponentsInChildren<Renderer>(true);
         public int FragmentCount => fragments.Count;
 
@@ -21,9 +23,11 @@ namespace Tsunami
             {
                 foreach (var source in SourceRenderers) if (source) source.enabled = true;
                 foreach (var fragment in fragments) if (fragment) fragment.SetActive(false);
+                if (standingSeal != null) standingSeal.SetActive(false);
                 return;
             }
             EnsureFragments();
+            if (standingSeal != null) standingSeal.SetActive(true);
             foreach (var source in SourceRenderers) if (source) source.enabled = false;
             int stage = damage < .4f ? 1 : damage < .7f ? 2 : 3;
             for (int i = 0; i < fragments.Count; i++)
@@ -44,6 +48,21 @@ namespace Tsunami
             if (fragments.Count > 0) return;
             var originals = SourceRenderers;
             if (originals.Length == 0) return;
+            standingSeal = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            standingSeal.name = "Standing wall seal";
+            standingSeal.transform.SetParent(transform, false);
+            standingSeal.transform.localScale = new Vector3(.72f, 1f, 1f);
+            standingSeal.GetComponent<Renderer>().sharedMaterial = originals[0].sharedMaterial;
+            var sealCollider = standingSeal.GetComponent<Collider>();
+            sealCollider.enabled = false;
+            if (Application.isPlaying) Destroy(sealCollider); else DestroyImmediate(sealCollider);
+            var slope = GetComponent<WallSlopeGeometry>();
+            if (slope != null)
+            {
+                var filter = standingSeal.GetComponent<MeshFilter>();
+                standingSeal.AddComponent<WallSlopeGeometry>().Configure(filter, filter.sharedMesh, slope.Rise, false,
+                    slope.Profile, slope.GroundProfile);
+            }
             Vector3 min = Vector3.positiveInfinity, max = Vector3.negativeInfinity;
             foreach (var source in originals)
             {
@@ -76,6 +95,7 @@ namespace Tsunami
         public IReadOnlyList<GameObject> DetachFragments()
         {
             EnsureFragments();
+            if (standingSeal != null) standingSeal.SetActive(false);
             foreach (var source in SourceRenderers) if (source) source.enabled = false;
             foreach (var piece in fragments)
             {

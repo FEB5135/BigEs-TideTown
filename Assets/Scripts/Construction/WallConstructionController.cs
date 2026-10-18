@@ -19,9 +19,10 @@ namespace IdleTown.Construction
         [SerializeField] MonoBehaviour resourceStoreSource;
         [SerializeField] Camera inputCamera;
         [SerializeField] GameObject wallPrefab;
+        [SerializeField] WallTerrainSurface terrainSurface;
 
         [Header("Placement blocking")]
-        [Tooltip("Only colliders on these dedicated non-wall layers block construction. Keep ground and walls out of this mask.")]
+        [Tooltip("Additional trigger layers that block construction. Solid structures always block, even when this mask is empty.")]
         [SerializeField] LayerMask obstacleLayers;
         [SerializeField, Min(0f)] float obstaclePadding = 0.04f;
 
@@ -37,13 +38,15 @@ namespace IdleTown.Construction
         [Header("Floors")]
         [Tooltip("Local-space height of the bottom of floor 1 relative to World.")]
         [SerializeField] float floorZeroBaseHeight;
-        [SerializeField, Min(1)] int maxFloors = 3;
+        [SerializeField, Min(1)] int maxFloors = 10;
 
         [Header("Input mode")]
         [SerializeField] bool constructionModeActive = true;
 
         [Header("Generated wall geometry")]
-        [SerializeField, Min(0.01f)] float wallHeight = 1.25f;
+        public const float StoreyHeight = 2f;
+        public const float MaximumWallHeight = 20f;
+        [SerializeField, Min(0.01f)] float wallHeight = StoreyHeight;
         [SerializeField, Min(0.01f)] float wallThickness = 0.18f;
 
         readonly WallConstructionModel model = new();
@@ -55,6 +58,21 @@ namespace IdleTown.Construction
         Material timberWallMaterial;
         Material stoneWallMaterial;
         Material reinforcedWallMaterial;
+        readonly WallArt art = new();
+        readonly List<GameObject> previewGhosts = new();
+        readonly HashSet<Vector2Int> previewNodes = new();
+        readonly Dictionary<Vector2Int, float> previewNodeFill = new();
+        readonly Dictionary<(Vector2Int node, int floor), GameObject> jointPosts = new();
+        Material ghostMaterial;
+        Collider[] overlapBuffer = new Collider[32];
+        GUIStyle titleStyle, labelStyle, buttonStyle, statusStyle;
+        bool upArrowHeld, downArrowHeld;
+        bool demolitionMode;
+        bool demolitionKeyHeld;
+        readonly List<LineRenderer> demolitionOutlines = new();
+        Material demolitionOutlineMaterial;
+        static readonly int[] OutlineCorners = { 0, 1, 3, 2, 0, 4, 5, 1, 5, 7, 3, 7, 6, 2, 6, 4 };
+        public bool DemolitionMode => demolitionMode;
         bool hasStart;
         Vector2Int startNode;
         string status = "İlk düğümü seçin.";
@@ -76,6 +94,13 @@ namespace IdleTown.Construction
         public IReadOnlyCollection<WallEdge> Edges => model.Edges;
         public IReadOnlyCollection<WallRecord> Walls => model.Walls;
         public int SelectedFloor => selectedFloor;
+        public int MaxFloors => maxFloors;
+        public void ConfigureTerrain(WallTerrainSurface surface, int floors = 10)
+        {
+            terrainSurface = surface;
+            maxFloors = Mathf.Max(1, floors);
+            NormalizeConfiguration();
+        }
         public WallTier SelectedTier => selectedTier;
         public bool ConstructionModeActive => constructionModeActive;
         public LayerMask ObstacleLayers
@@ -127,7 +152,8 @@ namespace IdleTown.Construction
             stoneTierStoneCost = Mathf.Max(stoneCost, stoneTierStoneCost);
             reinforcedWoodCost = Mathf.Max(stoneTierWoodCost, reinforcedWoodCost);
             reinforcedStoneCost = Mathf.Max(stoneTierStoneCost, reinforcedStoneCost);
-            maxFloors = Mathf.Max(1, maxFloors);
+            wallHeight = StoreyHeight;
+            maxFloors = Mathf.Clamp(maxFloors, 1, Mathf.FloorToInt(MaximumWallHeight / StoreyHeight));
             selectedFloor = Mathf.Clamp(selectedFloor, 0, maxFloors - 1);
             wallHeight = Mathf.Max(0.01f, wallHeight);
             wallThickness = Mathf.Max(0.01f, wallThickness);
@@ -148,11 +174,7 @@ namespace IdleTown.Construction
 
             if (keyboard != null)
             {
-                if (keyboard.pageUpKey.wasPressedThisFrame)
-                    SetSelectedFloor(selectedFloor + 1);
-                else if (keyboard.pageDownKey.wasPressedThisFrame)
-                    SetSelectedFloor(selectedFloor - 1);
-                else if (keyboard.digit1Key.wasPressedThisFrame)
+                if (keyboard.digit1Key.wasPressedThisFrame)
                     SetSelectedTier(WallTier.Timber);
                 else if (keyboard.digit2Key.wasPressedThisFrame)
                     SetSelectedTier(WallTier.Stone);
@@ -162,6 +184,7 @@ namespace IdleTown.Construction
 
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
+                if (demolitionMode) SetDemolitionMode(false);
                 CancelSelection();
                 return;
             }
@@ -174,6 +197,14 @@ namespace IdleTown.Construction
             }
 
             var pointerOverPanel = mouse != null && IsPointerOverConstructionUi(mouse.position.ReadValue());
+            if (demolitionMode)
+            {
+                RefreshDemolitionPreview(mouse != null && !pointerOverPanel
+                    ? FindDemolitionTarget(mouse.position.ReadValue()) : null);
+                if (mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverPanel)
+                    TryDemolishAt(mouse.position.ReadValue());
+                return;
+            }
             var hoveredNode = default(Vector2Int);
             var hasNode = mouse != null && TryGetNode(mouse.position.ReadValue(), out hoveredNode);
             if (hasStart && !pointerOverPanel)
@@ -200,23 +231,59 @@ namespace IdleTown.Construction
 
         void OnGUI()
         {
-            GUILayout.BeginArea(ConstructionPanelRect, GUI.skin.box);
-            GUILayout.Label("DUVAR İNŞASI");
-            if (GUILayout.Button(constructionModeActive ? "Mod: İnşa (B ile toplamaya geç)" : "Mod: Toplama (B ile inşaata geç)"))
+            // Arrows have one input route, latched until release to ignore key repeat.
+            var input = Event.current;
+            if ((input.type == EventType.KeyDown || input.type == EventType.KeyUp) && input.keyCode == KeyCode.N)
+            {
+                HandleDemolitionKey(input.type == EventType.KeyDown);
+                input.Use();
+            }
+            if ((input.type == EventType.KeyDown || input.type == EventType.KeyUp) &&
+                HandleFloorKey(input.keyCode, input.type == EventType.KeyDown))
+                input.Use();
+            EnsureStyles();
+            var oldColor = GUI.color;
+            var oldBackground = GUI.backgroundColor;
+            var oldContent = GUI.contentColor;
+            GUI.color = new Color(.075f, .12f, .14f, .96f);
+            GUI.DrawTexture(ConstructionPanelRect, Texture2D.whiteTexture);
+            GUI.color = new Color(.82f, .65f, .36f);
+            GUI.DrawTexture(new Rect(16, 16, 470, 3), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUILayout.BeginArea(new Rect(30, 28, 442, 366));
+            GUILayout.Label("DUVAR ATÖLYESİ", titleStyle);
+            if (GUILayout.Button(constructionModeActive ? "İNŞA MODU    ·    B: toplamaya geç" : "TOPLAMA MODU    ·    B: inşaata geç", buttonStyle))
                 SetConstructionMode(!constructionModeActive);
             if (!constructionModeActive)
             {
-                GUILayout.Label("Kaynak toplamak için dünyadaki kaynaklara sol tıklayın.");
+                GUILayout.Label("Kaynaklara sol tıkla. N: silme moduna geç.", labelStyle);
                 GUILayout.EndArea();
+                GUI.backgroundColor = oldBackground;
+                GUI.contentColor = oldContent;
+                GUI.color = oldColor;
                 return;
             }
-            GUILayout.Label("Sol tık: başlangıç / bitiş   •   Enter: ön izlemeyi inşa et");
-            GUILayout.Label("Sağ tık/Esc: iptal   •   PageUp/PageDown: kat   •   1/2/3: seviye");
+            if (GUILayout.Button(demolitionMode ? "SİLME MODU AÇIK · N: inşa moduna dön" : "SİLME MODUNU AÇ · N", buttonStyle))
+                SetDemolitionMode(!demolitionMode);
+            if (demolitionMode)
+            {
+                GUILayout.Label("Sarı çerçeveli duvarı silmek için sol tıkla.", labelStyle);
+                GUILayout.Label("Bağlı üst katlar da kalkar. Kaynak iadesi yok.", labelStyle);
+                GUILayout.Label(status, statusStyle);
+                GUILayout.EndArea();
+                GUI.backgroundColor = oldBackground;
+                GUI.contentColor = oldContent;
+                GUI.color = oldColor;
+                return;
+            }
+            GUILayout.Label("Sol tık: başlangıç / bitiş   ·   Enter: inşa et", labelStyle);
+            GUILayout.Label("Sağ tık / Esc: iptal   ·   ↑ ↓: kat   ·   1 2 3: seviye", labelStyle);
+            GUILayout.Space(5);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Kat -"))
+            if (GUILayout.Button("↓", buttonStyle, GUILayout.Width(48)))
                 SetSelectedFloor(selectedFloor - 1);
-            GUILayout.Label($"Kat {selectedFloor + 1}/{maxFloors} — dünya yüksekliği {FloorBaseHeight(selectedFloor):0.##}–{FloorBaseHeight(selectedFloor + 1):0.##} m");
-            if (GUILayout.Button("Kat +"))
+            GUILayout.Label($"KAT {selectedFloor + 1} / {maxFloors}     {FloorBaseHeight(selectedFloor):0.##} m", labelStyle);
+            if (GUILayout.Button("↑", buttonStyle, GUILayout.Width(48)))
                 SetSelectedFloor(selectedFloor + 1);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
@@ -224,32 +291,45 @@ namespace IdleTown.Construction
             DrawTierButton(WallTier.Stone, "2 Taş");
             DrawTierButton(WallTier.Reinforced, "3 Güçlendirilmiş");
             GUILayout.EndHorizontal();
-            var selectedCost = CostFor(selectedTier);
-            GUILayout.Label($"Seçim: {TierName(selectedTier)} — kümülatif kenar bedeli {selectedCost.Wood} odun / {selectedCost.Stone} taş");
             if (resourceStore != null)
-                GUILayout.Label($"Merkez depo — Odun: {resourceStore.Wood}   Taş: {resourceStore.Stone}");
+                GUILayout.Label($"DEPO      {resourceStore.Wood} odun     ·     {resourceStore.Stone} taş", labelStyle);
             else
-                GUILayout.Label("Merkez depo bağlantısı yok (IWallResourceStore gerekli).");
+                GUILayout.Label("Kaynak deposu bağlı değil.", labelStyle);
 
-            GUILayout.Label($"Kalıcı duvar — {model.Walls.Count} katlı parça");
+            GUILayout.Label($"{model.Walls.Count} duvar parçası    ·    {TierName(selectedTier)}", labelStyle);
             if (hasStart)
-                GUILayout.Label($"Ön izleme (henüz inşa edilmedi) — {previewPath.Count} parça, {previewWood} odun, {previewStone} taş");
+                GUILayout.Label($"Ön izleme: {previewPath.Count} parça  /  {previewWood} odun · {previewStone} taş", labelStyle);
+            else
+                GUILayout.Label("Başlangıç noktasını seçerek bir duvar çiz.", labelStyle);
 
             var wasEnabled = GUI.enabled;
-            GUI.enabled = hasStart && hasLastValidPreviewEndpoint;
+            GUI.enabled = hasStart && hasLastValidPreviewEndpoint && (!hasPreviewEndpoint || previewValid);
             var buildButtonLabel = hasLastValidPreviewEndpoint
-                ? $"İnşa Et — son geçerli: {lastValidPreviewCount} parça, {lastValidPreviewWood} odun, {lastValidPreviewStone} taş"
-                : "İnşa Et — geçerli ön izleme gerekli";
-            if (GUILayout.Button(buildButtonLabel))
+                ? $"İNŞA ET   ·   {lastValidPreviewCount} parça / {lastValidPreviewWood} odun · {lastValidPreviewStone} taş"
+                : "İNŞA ET   ·   Geçerli bir yol seç";
+            GUI.backgroundColor = new Color(.4f, .77f, .61f);
+            if (GUILayout.Button(buildButtonLabel, buttonStyle))
                 ConfirmLastValidPreview();
             GUI.enabled = wasEnabled;
-
-            var oldColor = GUI.contentColor;
-            GUI.contentColor = hasStart && !previewValid ? new Color(1f, 0.45f, 0.35f) : Color.white;
-            GUILayout.Label($"Durum: {status}");
-            GUILayout.Label($"Son onay: {confirmationStatus}");
-            GUI.contentColor = oldColor;
+            GUI.backgroundColor = oldBackground;
+            GUI.contentColor = hasStart && !previewValid ? new Color(1f, .47f, .4f) : new Color(.6f, .92f, .74f);
+            GUILayout.Label(status, statusStyle);
+            GUI.contentColor = new Color(.67f, .74f, .76f);
+            GUILayout.Label(confirmationStatus, statusStyle);
+            GUI.contentColor = oldContent;
             GUILayout.EndArea();
+            GUI.color = oldColor;
+        }
+
+        void EnsureStyles()
+        {
+            if (titleStyle != null) return;
+            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, fixedHeight = 30 };
+            titleStyle.normal.textColor = new Color(.92f, .79f, .54f);
+            labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fixedHeight = 21 };
+            labelStyle.normal.textColor = new Color(.86f, .9f, .88f);
+            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 15, fixedHeight = 26 };
+            statusStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true };
         }
 
         public void Configure(World targetWorld, MonoBehaviour resources, Camera camera = null)
@@ -272,8 +352,137 @@ namespace IdleTown.Construction
             if (constructionModeActive == active)
                 return;
             constructionModeActive = active;
+            demolitionMode = false;
             CancelSelection();
             status = active ? "İnşa modu: ilk düğümü seçin." : "Toplama modu etkin.";
+        }
+
+        internal bool HandleFloorKey(KeyCode key, bool pressed)
+        {
+            if (key != KeyCode.UpArrow && key != KeyCode.DownArrow) return false;
+            ref bool held = ref (key == KeyCode.UpArrow ? ref upArrowHeld : ref downArrowHeld);
+            bool wasHeld = held;
+            held = pressed;
+            if (constructionModeActive && pressed && !wasHeld)
+                SetSelectedFloor(selectedFloor + (key == KeyCode.UpArrow ? 1 : -1));
+            return constructionModeActive;
+        }
+
+        void OnApplicationFocus(bool focused)
+        {
+            if (!focused)
+            {
+                upArrowHeld = downArrowHeld = demolitionKeyHeld = false;
+                ClearDemolitionPreview();
+            }
+        }
+
+        internal void HandleDemolitionKey(bool pressed)
+        {
+            bool wasHeld = demolitionKeyHeld;
+            demolitionKeyHeld = pressed;
+            if (pressed && !wasHeld) SetDemolitionMode(!demolitionMode);
+        }
+
+        public void SetDemolitionMode(bool active)
+        {
+            CancelSelection();
+            if (active) constructionModeActive = true;
+            demolitionMode = active;
+            status = active ? "Silmek için bir duvara tıkla." : "İlk düğümü seçin.";
+        }
+
+        internal bool TryDemolishAt(Vector2 screenPosition)
+            => TryDemolishWall(FindDemolitionTarget(screenPosition));
+
+        WallSegment FindDemolitionTarget(Vector2 screenPosition)
+        {
+            var camera = inputCamera != null ? inputCamera : Camera.main;
+            if (camera == null) return null;
+            Physics.SyncTransforms();
+            if (!Physics.Raycast(camera.ScreenPointToRay(screenPosition), out var hit, Mathf.Infinity,
+                ~0, QueryTriggerInteraction.Ignore)) return null;
+            var segment = hit.collider.GetComponentInParent<WallSegment>();
+            return IsOwnedWall(segment) ? segment : null;
+        }
+
+        bool IsOwnedWall(WallSegment segment) => segment != null &&
+            TryGetWallInstance(segment.Edge, segment.Floor, out var owned) && owned == segment.gameObject;
+
+        internal void RefreshDemolitionPreview(WallSegment target)
+        {
+            ClearDemolitionPreview();
+            if (!constructionModeActive || !demolitionMode) return;
+            if (!IsOwnedWall(target))
+            {
+                status = "Ön izleme için fareni bir duvarın üzerine getir.";
+                return;
+            }
+            int count = 0;
+            for (int floor = target.Floor; floor < maxFloors; floor++)
+            {
+                if (!TryGetWallInstance(target.Edge, floor, out var wall)) continue;
+                var box = wall.GetComponent<BoxCollider>();
+                if (box == null) continue;
+                if (count == demolitionOutlines.Count)
+                {
+                    if (demolitionOutlineMaterial == null)
+                        demolitionOutlineMaterial = WallArt.Material(new Color(1f, .82f, .04f), true);
+                    var outline = new GameObject("Demolition Outline");
+                    outline.transform.SetParent(transform, false);
+                    var line = outline.AddComponent<LineRenderer>();
+                    line.sharedMaterial = demolitionOutlineMaterial;
+                    line.useWorldSpace = true;
+                    line.widthMultiplier = .045f;
+                    line.numCornerVertices = 3;
+                    line.numCapVertices = 3;
+                    line.startColor = line.endColor = new Color(1f, .82f, .04f);
+                    demolitionOutlines.Add(line);
+                }
+                var renderer = demolitionOutlines[count++];
+                renderer.gameObject.SetActive(true);
+                renderer.positionCount = OutlineCorners.Length;
+                // Include the shared end posts; local padding shrinks with the thin wall scale.
+                var scale = box.transform.lossyScale;
+                var padding = new Vector3(.14f / Mathf.Max(.001f, Mathf.Abs(scale.x)),
+                    .04f / Mathf.Max(.001f, Mathf.Abs(scale.y)),
+                    .14f / Mathf.Max(.001f, Mathf.Abs(scale.z)));
+                for (int i = 0; i < OutlineCorners.Length; i++)
+                {
+                    int corner = OutlineCorners[i];
+                    var signs = new Vector3((corner & 1) == 0 ? -1 : 1,
+                        (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1);
+                    var local = box.center + Vector3.Scale(box.size * .5f + padding, signs);
+                    var slope = wall.GetComponent<WallSlopeGeometry>();
+                    if (slope != null) local.y += (corner & 2) == 0 ? slope.BaseHeightOffset(local.z) : slope.HeightOffset(local.z);
+                    renderer.SetPosition(i, box.transform.TransformPoint(local));
+                }
+            }
+            status = $"{count} duvar parçası seçili · Sol tık: sil · N / Esc: çık";
+        }
+
+        void ClearDemolitionPreview()
+        {
+            foreach (var outline in demolitionOutlines)
+                if (outline != null) outline.gameObject.SetActive(false);
+        }
+
+        void OnDisable() => ClearDemolitionPreview();
+
+        internal bool TryDemolishWall(WallSegment segment)
+        {
+            if (!constructionModeActive || !demolitionMode || segment == null ||
+                !TryGetWallInstance(segment.Edge, segment.Floor, out var owned) || owned != segment.gameObject)
+            {
+                status = "Bu atölyede inşa edilmiş bir duvara tıkla.";
+                return false;
+            }
+            int before = model.Walls.Count;
+            if (!TryDetachDestroyedWall(segment.Edge, segment.Floor, out _)) return false;
+            ClearDemolitionPreview();
+            status = $"{before - model.Walls.Count} duvar parçası kaldırıldı.";
+            confirmationStatus = status;
+            return true;
         }
 
         public void SetSelectedFloor(int floor)
@@ -394,6 +603,13 @@ namespace IdleTown.Construction
 
                 reason = string.Empty;
                 NotifyWallBuilt(path, floor, tier, stagedWalls);
+                RebuildJointPosts();
+                if (Application.isPlaying)
+                    foreach (var built in stagedWalls)
+                    {
+                        var visual = built.transform.Find("Wall Art");
+                        if (visual != null) built.AddComponent<WallBuildReveal>().Begin(visual);
+                    }
                 return true;
             }
             finally
@@ -416,7 +632,9 @@ namespace IdleTown.Construction
             // Unsupported upper floors fall too. Detach top-down so event observers never see floating supports.
             for (int upper = maxFloors - 1; upper > floor; upper--)
                 DetachSingle(edge, upper, out _);
-            return DetachSingle(edge, floor, out instance);
+            var removed = DetachSingle(edge, floor, out instance);
+            if (removed) RebuildJointPosts();
+            return removed;
         }
 
         bool DetachSingle(WallEdge edge, int floor, out GameObject instance)
@@ -428,7 +646,12 @@ namespace IdleTown.Construction
             wallInstances.Remove(key);
 
             Transform oldParent = instance != null ? instance.transform.parent : null;
-            if (instance != null) instance.transform.SetParent(null, true);
+            if (instance != null)
+            {
+                // The standing barrier is gone immediately, even if a subscriber keeps its art as debris.
+                foreach (var collider in instance.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
+                instance.transform.SetParent(null, true);
+            }
             bool hasRemovalOwner = NotifyWallTierRemoved(record, instance);
             if (floor == 0) hasRemovalOwner |= NotifyWallRemoved(edge, instance);
             if (!hasRemovalOwner && instance != null)
@@ -473,6 +696,7 @@ namespace IdleTown.Construction
                 confirmationStatus = $"Başarısız: {reason}";
                 previewValid = false;
                 hasLastValidPreviewEndpoint = false;
+                RefreshPreview(endpoint);
                 return false;
             }
 
@@ -482,6 +706,7 @@ namespace IdleTown.Construction
                 confirmationStatus = $"Başarısız: {reason}";
                 previewValid = false;
                 hasLastValidPreviewEndpoint = false;
+                RefreshPreview(endpoint);
                 return false;
             }
 
@@ -492,6 +717,7 @@ namespace IdleTown.Construction
             previewValid = false;
             previewPath.Clear();
             previewLine.positionCount = 0;
+            HideGhosts();
             status = $"İnşa tamamlandı: Kat {selectedFloor + 1}, {TierName(selectedTier)}, {builtCount} parça; {spentWood} odun ve {spentStone} taş harcandı.";
             confirmationStatus = status;
             return true;
@@ -533,10 +759,17 @@ namespace IdleTown.Construction
             resourceStore = resourceStoreSource as IWallResourceStore;
             if (inputCamera == null)
                 inputCamera = Camera.main;
+            if (terrainSurface == null && world != null && world.TryGetComponent<MapView>(out var map))
+            {
+                terrainSurface = world.GetComponent<WallTerrainSurface>();
+                if (terrainSurface == null) terrainSurface = world.gameObject.AddComponent<WallTerrainSurface>();
+                terrainSurface.ConfigureMap(map);
+            }
         }
 
         void CancelSelection()
         {
+            ClearDemolitionPreview();
             hasStart = false;
             previewPath.Clear();
             previewValid = false;
@@ -544,6 +777,7 @@ namespace IdleTown.Construction
             hasLastValidPreviewEndpoint = false;
             if (previewLine != null)
                 previewLine.positionCount = 0;
+            HideGhosts();
             status = "İnşa iptal edildi. İlk düğümü seçin.";
             confirmationStatus = "Seçim iptal edildi; kaynak harcanmadı.";
         }
@@ -556,10 +790,18 @@ namespace IdleTown.Construction
 
             var plane = new Plane(world.transform.up, world.transform.position);
             var ray = inputCamera.ScreenPointToRay(screenPosition);
-            if (!plane.Raycast(ray, out var distance))
-                return false;
-
-            var local = world.transform.InverseTransformPoint(ray.GetPoint(distance));
+            Vector3 point;
+            if (terrainSurface != null)
+            {
+                if (!terrainSurface.Raycast(ray, out var hit)) return false;
+                point = hit.point;
+            }
+            else
+            {
+                if (!plane.Raycast(ray, out var distance)) return false;
+                point = ray.GetPoint(distance);
+            }
+            var local = world.transform.InverseTransformPoint(point);
             node = new Vector2Int(
                 Mathf.RoundToInt(local.x / world.CellSize),
                 Mathf.RoundToInt(local.z / world.CellSize));
@@ -577,6 +819,7 @@ namespace IdleTown.Construction
             if (!hoveredNode.HasValue)
             {
                 previewLine.positionCount = 0;
+                HideGhosts();
                 previewValid = false;
                 RevalidateCachedEndpoint();
                 status = "Harita sınırları içindeki bir düğüme gelin.";
@@ -660,6 +903,12 @@ namespace IdleTown.Construction
             if (!model.Validate(path, world.Width, world.Height, floor, tier, maxFloors, out reason))
                 return false;
 
+            if (terrainSurface != null)
+                foreach (var edge in path)
+                    if (!terrainSurface.Sample(NodePosition(edge.A, 0), out _) ||
+                        !terrainSurface.Sample(NodePosition(edge.B, 0), out _))
+                    { reason = "Duvarın iki ucu da arazi üzerinde olmalı."; return false; }
+
             if (!HasObstacleClearance(path, floor, out reason))
                 return false;
 
@@ -732,10 +981,19 @@ namespace IdleTown.Construction
             previewLine = previewObject.AddComponent<LineRenderer>();
             previewLine.useWorldSpace = true;
             previewLine.loop = false;
+            previewLine.positionCount = 0;
             previewLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             previewLine.receiveShadows = false;
             previewLine.widthMultiplier = wallThickness * 1.4f;
-            previewMaterial = CreateColorMaterial(new Color(0.2f, 1f, 0.35f, 0.85f));
+            // URP/Lit ignores LineRenderer vertex colors. Set the actual unlit material color, too.
+            previewMaterial = WallArt.Material(Color.white, true);
+            ghostMaterial = WallArt.Material(Color.green, true);
+            ghostMaterial.SetFloat("_Surface", 1);
+            ghostMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            ghostMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            ghostMaterial.SetFloat("_ZWrite", 0);
+            ghostMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            ghostMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             previewLine.sharedMaterial = previewMaterial;
         }
 
@@ -744,6 +1002,7 @@ namespace IdleTown.Construction
             if (previewPath.Count == 0)
             {
                 previewLine.positionCount = 0;
+                HideGhosts();
                 return;
             }
 
@@ -752,22 +1011,29 @@ namespace IdleTown.Construction
                 : new Color(1f, 0.18f, 0.12f, 0.9f);
             previewLine.startColor = color;
             previewLine.endColor = color;
-            previewLine.widthMultiplier = wallThickness * 1.4f;
-            previewLine.positionCount = previewPath.Count + 1;
+            previewMaterial.color = color;
+            var ghostColor = new Color(color.r, color.g, color.b, .38f);
+            ghostMaterial.color = ghostColor;
+            if (previewMaterial.HasProperty("_BaseColor")) previewMaterial.SetColor("_BaseColor", color);
+            if (ghostMaterial.HasProperty("_BaseColor")) ghostMaterial.SetColor("_BaseColor", ghostColor);
+            previewLine.widthMultiplier = wallThickness * .16f;
             var previewHeight = FloorBaseHeight(selectedFloor) + wallHeight + 0.05f;
-            previewLine.SetPosition(0, NodePosition(previewPath[0].A, previewHeight));
-            for (var i = 0; i < previewPath.Count; i++)
-                previewLine.SetPosition(i + 1, NodePosition(previewPath[i].B, previewHeight));
+            var capPoints = new List<Vector3>();
+            foreach (var edge in previewPath)
+            {
+                var profile = TerrainProfile(edge, out _);
+                var a = NodePosition(edge.A, previewHeight) + world.transform.up * EndpointFill(edge, profile, false);
+                var b = NodePosition(edge.B, previewHeight) + world.transform.up * EndpointFill(edge, profile, true);
+                if (capPoints.Count == 0 || (capPoints[capPoints.Count - 1] - a).sqrMagnitude > .0001f) capPoints.Add(a);
+                capPoints.Add(b);
+            }
+            previewLine.positionCount = capPoints.Count;
+            previewLine.SetPositions(capPoints.ToArray());
+            DrawGhosts();
         }
 
         bool HasObstacleClearance(IReadOnlyList<WallEdge> path, int floor, out string reason)
         {
-            if (obstacleLayers.value == 0)
-            {
-                reason = string.Empty;
-                return true;
-            }
-
             Physics.SyncTransforms();
 
             for (var i = 0; i < path.Count; i++)
@@ -776,32 +1042,40 @@ namespace IdleTown.Construction
                 var start = NodePosition(edge.A, FloorBaseHeight(floor) + wallHeight * 0.5f);
                 var end = NodePosition(edge.B, FloorBaseHeight(floor) + wallHeight * 0.5f);
                 var direction = end - start;
-                var rotation = Quaternion.LookRotation(direction.normalized, world.transform.up);
+                var rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(direction, world.transform.up).normalized, world.transform.up);
                 var halfExtents = new Vector3(
-                    wallThickness * 0.5f + obstaclePadding,
-                    Mathf.Max(0.01f, wallHeight * 0.45f),
-                    direction.magnitude * 0.5f + obstaclePadding);
+                    JointHalfWidth + obstaclePadding,
+                    Mathf.Max(0.001f, wallHeight * .5f - .015f) + Mathf.Abs(Vector3.Dot(direction, world.transform.up)) * .5f,
+                    Vector3.ProjectOnPlane(direction, world.transform.up).magnitude * .5f + JointHalfWidth + obstaclePadding);
 
-                var overlaps = Physics.OverlapBox(
-                    (start + end) * 0.5f,
-                    halfExtents,
-                    rotation,
-                    obstacleLayers,
-                    QueryTriggerInteraction.Collide);
-                var ownWall = wallInstances.TryGetValue(new WallInstanceKey(edge, floor), out var instance)
-                    ? instance
-                    : null;
-                var blocked = false;
-                for (var overlapIndex = 0; overlapIndex < overlaps.Length; overlapIndex++)
+                int count;
+                // Grow rather than silently miss a blocker in a dense scene.
+                while ((count = Physics.OverlapBoxNonAlloc((start + end) * .5f, halfExtents,
+                           overlapBuffer, rotation, ~0, QueryTriggerInteraction.Collide)) == overlapBuffer.Length)
+                    Array.Resize(ref overlapBuffer, overlapBuffer.Length * 2);
+                for (var overlapIndex = 0; overlapIndex < count; overlapIndex++)
                 {
-                    if (ownWall != null && overlaps[overlapIndex].transform.IsChildOf(ownWall.transform))
+                    var overlap = overlapBuffer[overlapIndex];
+                    var resource = overlap.GetComponentInParent<ResourceNode>();
+                    if (resource != null && resource.Type == ResourceType.Wood) continue;
+                    if (terrainSurface != null && terrainSurface.Contains(overlap)) continue;
+                    var map = overlap.GetComponentInParent<MapView>();
+                    if (map != null && map.OwnsSurface(overlap) &&
+                        map.IsConstructionGroundPath(start, end, JointHalfWidth + obstaclePadding)) continue;
+                    if (map == null && terrainSurface != null && terrainSurface.Contains(overlap)) continue;
+                    // Picking/collection triggers are not solid buildings. Explicit trigger layers opt in.
+                    if (overlap.isTrigger && (obstacleLayers.value & (1 << overlap.gameObject.layer)) == 0)
                         continue;
-                    blocked = true;
-                    break;
-                }
-                if (blocked)
-                {
-                    reason = "Duvar yolu korunan bir yapı veya engelle çakışıyor.";
+                    var segment = overlap.GetComponentInParent<WallSegment>();
+                    if (segment != null && wallInstances.TryGetValue(new WallInstanceKey(segment.Edge, segment.Floor), out var owned)
+                        && owned != null && overlap.transform.IsChildOf(owned.transform))
+                    {
+                        // The model already rejects duplicates and diagonal crossings. Adjacent panels and
+                        // the exact old panel in a tier upgrade may touch; unrelated walls may not overlap.
+                        if (segment.Floor != floor || segment.Edge.Equals(edge) || ShareNode(segment.Edge, edge))
+                            continue;
+                    }
+                    reason = $"Duvar yolu bir yapı veya engelle çakışıyor: {overlap.gameObject.name}.";
                     return false;
                 }
             }
@@ -817,7 +1091,8 @@ namespace IdleTown.Construction
             var start = NodePosition(edge.A, elevation);
             var end = NodePosition(edge.B, elevation);
             var direction = end - start;
-            var rotation = Quaternion.LookRotation(direction.normalized, world.transform.up);
+            var horizontal = Vector3.ProjectOnPlane(direction, world.transform.up);
+            var rotation = Quaternion.LookRotation(horizontal.normalized, world.transform.up);
             GameObject instance;
 
             if (wallPrefab != null)
@@ -827,17 +1102,27 @@ namespace IdleTown.Construction
             }
             else
             {
-                instance = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                instance = new GameObject("Wall");
                 stagedWalls.Add(instance);
                 instance.transform.SetParent(stagingParent, true);
                 instance.transform.SetPositionAndRotation((start + end) * 0.5f, rotation);
-                instance.GetComponent<Renderer>().sharedMaterial = MaterialFor(record.Tier);
+                var visual = new GameObject("Wall Art", typeof(MeshFilter), typeof(MeshRenderer));
+                visual.transform.SetParent(instance.transform, false);
+                visual.GetComponent<MeshFilter>().sharedMesh = art.Panel(record.Tier, PanelInset(edge, horizontal.magnitude));
+                visual.GetComponent<MeshRenderer>().sharedMaterials = art.Palette(record.Tier);
             }
 
             instance.name = $"Wall F{record.Floor + 1} {record.Tier} {edge.A.x},{edge.A.y} - {edge.B.x},{edge.B.y}";
-            instance.transform.localScale = new Vector3(wallThickness, wallHeight, direction.magnitude);
+            instance.transform.localScale = new Vector3(wallThickness, wallHeight, horizontal.magnitude);
             if (instance.GetComponentInChildren<Collider>() == null)
                 instance.AddComponent<BoxCollider>();
+            if (terrainSurface != null && wallPrefab == null)
+            {
+                var profile = TerrainProfile(edge, out var ground);
+                instance.AddComponent<WallSlopeGeometry>().Configure(instance.GetComponentInChildren<MeshFilter>(),
+                    instance.GetComponentInChildren<MeshFilter>().sharedMesh,
+                    Vector3.Dot(direction, world.transform.up) / wallHeight, true, profile, record.Floor == 0 ? ground : null);
+            }
             var metadata = instance.GetComponent<WallSegment>() ?? instance.AddComponent<WallSegment>();
             metadata.Configure(record);
 
@@ -846,6 +1131,126 @@ namespace IdleTown.Construction
             {
                 body.isKinematic = true;
                 DestroyObject(body);
+            }
+        }
+
+        float JointHalfWidth => wallThickness * .65f;
+
+        float PanelInset(WallEdge edge, float length)
+        {
+            // A diagonal panel clears the corner of the one shared square post.
+            float inset = edge.IsDiagonal ? JointHalfWidth * Mathf.Sqrt(2f) + wallThickness * .5f : JointHalfWidth;
+            return Mathf.Min(.42f, inset / Mathf.Max(.01f, length));
+        }
+
+        static bool ShareNode(WallEdge a, WallEdge b) => a.A == b.A || a.A == b.B || a.B == b.A || a.B == b.B;
+
+        void HideGhosts()
+        {
+            foreach (var ghost in previewGhosts) if (ghost != null) ghost.SetActive(false);
+        }
+
+        void DrawGhosts()
+        {
+            int used = 0;
+            previewNodes.Clear();
+            previewNodeFill.Clear();
+            for (int i = 0; i < previewPath.Count; i++)
+            {
+                var ghost = GetGhost(used++);
+                var edge = previewPath[i];
+                previewNodes.Add(edge.A); previewNodes.Add(edge.B);
+                var a = NodePosition(edge.A, FloorBaseHeight(selectedFloor) + wallHeight * .5f);
+                var b = NodePosition(edge.B, FloorBaseHeight(selectedFloor) + wallHeight * .5f);
+                var horizontal = Vector3.ProjectOnPlane(b - a, world.transform.up);
+                ghost.SetActive(true);
+                ghost.GetComponent<WallPreviewMotion>().SetTarget((a + b) * .5f,
+                    Quaternion.LookRotation(horizontal.normalized, world.transform.up),
+                    new Vector3(wallThickness * 1.035f, wallHeight * 1.015f, horizontal.magnitude));
+                var filter = ghost.GetComponent<MeshFilter>();
+                var panel = art.Panel(selectedTier, PanelInset(edge, horizontal.magnitude));
+                if (terrainSurface != null)
+                {
+                    var slope = ghost.GetComponent<WallSlopeGeometry>();
+                    if (slope == null) slope = ghost.AddComponent<WallSlopeGeometry>();
+                    var profile = TerrainProfile(edge, out var ground);
+                    float fillA = EndpointFill(edge, profile, false), fillB = EndpointFill(edge, profile, true);
+                    previewNodeFill.TryGetValue(edge.A, out var oldA); previewNodeFill.TryGetValue(edge.B, out var oldB);
+                    previewNodeFill[edge.A] = Mathf.Max(oldA, fillA); previewNodeFill[edge.B] = Mathf.Max(oldB, fillB);
+                    slope.Configure(filter, panel, Vector3.Dot(b - a, world.transform.up) / wallHeight, false,
+                        profile, selectedFloor == 0 ? ground : null);
+                }
+                else filter.sharedMesh = panel;
+            }
+            foreach (var node in previewNodes)
+            {
+                var ghost = GetGhost(used++);
+                ghost.SetActive(true);
+                ghost.GetComponent<MeshFilter>().sharedMesh = art.Post;
+                previewNodeFill.TryGetValue(node, out var fill);
+                float postHeight = wallHeight + (selectedFloor == 0 ? fill : 0);
+                float postOffset = selectedFloor == 0 ? fill * .5f : fill;
+                ghost.GetComponent<WallPreviewMotion>().SetTarget(NodePosition(node, FloorBaseHeight(selectedFloor) + wallHeight * .5f) + world.transform.up * postOffset,
+                    world.transform.rotation, new Vector3(JointHalfWidth * 2.035f, postHeight * 1.015f, JointHalfWidth * 2.035f));
+            }
+            for (int i = used; i < previewGhosts.Count; i++) previewGhosts[i].SetActive(false);
+        }
+
+        GameObject GetGhost(int index)
+        {
+            if (index < previewGhosts.Count) return previewGhosts[index];
+            var created = new GameObject("Wall Ghost", typeof(MeshFilter), typeof(MeshRenderer), typeof(WallPreviewMotion));
+            created.transform.SetParent(previewLine.transform, false);
+            var renderer = created.GetComponent<MeshRenderer>();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.sharedMaterials = new[] { ghostMaterial, ghostMaterial, ghostMaterial };
+            previewGhosts.Add(created);
+            return created;
+        }
+
+        void RebuildJointPosts()
+        {
+            // Exactly one post per node and floor, even where several walls or separate builds meet.
+            var wanted = new Dictionary<(Vector2Int node, int floor), WallTier>();
+            var fills = new Dictionary<(Vector2Int node, int floor), float>();
+            foreach (var record in model.Walls)
+            {
+                var profile = TerrainProfile(record.Edge, out _);
+                Include(record.Edge.A, record.Floor, record.Tier, EndpointFill(record.Edge, profile, false));
+                Include(record.Edge.B, record.Floor, record.Tier, EndpointFill(record.Edge, profile, true));
+            }
+            void Include(Vector2Int node, int floor, WallTier tier, float fill)
+            {
+                var key = (node, floor);
+                if (!wanted.TryGetValue(key, out var old) || tier > old) wanted[key] = tier;
+                fills.TryGetValue(key, out float previous); fills[key] = Mathf.Max(previous, fill);
+            }
+            var removed = new List<(Vector2Int, int)>();
+            foreach (var pair in jointPosts)
+                if (!wanted.ContainsKey(pair.Key))
+                {
+                    if (pair.Value != null) { pair.Value.SetActive(false); DestroyObject(pair.Value); }
+                    removed.Add(pair.Key);
+                }
+            foreach (var key in removed) jointPosts.Remove(key);
+            if (wallPrefab != null) return;
+            foreach (var pair in wanted)
+            {
+                if (!jointPosts.TryGetValue(pair.Key, out var post) || post == null)
+                {
+                    post = new GameObject("Wall Joint", typeof(MeshFilter), typeof(MeshRenderer));
+                    post.transform.SetParent(transform, false);
+                    post.GetComponent<MeshFilter>().sharedMesh = art.Post;
+                    jointPosts[pair.Key] = post;
+                }
+                float fill = fills[pair.Key];
+                float postHeight = wallHeight + (pair.Key.floor == 0 ? fill : 0);
+                float postOffset = pair.Key.floor == 0 ? fill * .5f : fill;
+                post.transform.SetPositionAndRotation(NodePosition(pair.Key.node,
+                        FloorBaseHeight(pair.Key.floor) + wallHeight * .5f) + world.transform.up * postOffset, world.transform.rotation);
+                post.transform.localScale = new Vector3(JointHalfWidth * 2, postHeight, JointHalfWidth * 2);
+                post.GetComponent<MeshRenderer>().sharedMaterials = art.Palette(pair.Value);
             }
         }
 
@@ -885,8 +1290,8 @@ namespace IdleTown.Construction
         {
             var oldColor = GUI.backgroundColor;
             if (selectedTier == tier)
-                GUI.backgroundColor = new Color(0.45f, 0.9f, 0.5f);
-            if (GUILayout.Button(label))
+                GUI.backgroundColor = new Color(.88f, .72f, .43f);
+            if (GUILayout.Button(label, buttonStyle))
                 SetSelectedTier(tier);
             GUI.backgroundColor = oldColor;
         }
@@ -958,8 +1363,38 @@ namespace IdleTown.Construction
 
         Vector3 NodePosition(Vector2Int node, float y)
         {
-            return world.transform.TransformPoint(
-                new Vector3(node.x * world.CellSize, y, node.y * world.CellSize));
+            var ground = world.transform.TransformPoint(new Vector3(node.x * world.CellSize, 0, node.y * world.CellSize));
+            if (terrainSurface != null && terrainSurface.Sample(ground, out var sampled)) ground = sampled;
+            return ground + world.transform.TransformVector(new Vector3(0, y, 0));
+        }
+
+        float[] TerrainProfile(WallEdge edge, out float[] groundProfile)
+        {
+            groundProfile = null;
+            if (terrainSurface == null) return null;
+            var a = NodePosition(edge.A, 0);
+            var b = NodePosition(edge.B, 0);
+            var center = (a + b) * .5f;
+            const int sections = 8;
+            var profile = new float[sections + 1];
+            bool curved = false;
+            for (int i = 0; i <= sections; i++)
+            {
+                var line = Vector3.Lerp(a, b, i / (float)sections);
+                if (!terrainSurface.Sample(line, out var sample)) sample = line;
+                profile[i] = Vector3.Dot(sample - center, world.transform.up) / wallHeight;
+                curved |= Mathf.Abs(Vector3.Dot(sample - line, world.transform.up)) > .002f;
+            }
+            var filled = WallSlopeGeometry.FillCliffProfile(profile);
+            if (!ReferenceEquals(filled, profile)) { groundProfile = profile; return filled; }
+            return curved ? profile : null;
+        }
+
+        float EndpointFill(WallEdge edge, float[] profile, bool end)
+        {
+            if (profile == null) return 0;
+            float difference = Vector3.Dot(NodePosition(edge.B, 0) - NodePosition(edge.A, 0), world.transform.up);
+            return Mathf.Max(0, profile[end ? profile.Length - 1 : 0] * wallHeight + (end ? -.5f : .5f) * difference);
         }
 
         static Material CreateColorMaterial(Color color)
@@ -991,6 +1426,9 @@ namespace IdleTown.Construction
 
         void OnDestroy()
         {
+            if (demolitionOutlineMaterial != null) DestroyObject(demolitionOutlineMaterial);
+            art.Dispose();
+            if (ghostMaterial != null) DestroyObject(ghostMaterial);
             if (previewMaterial != null)
                 DestroyObject(previewMaterial);
             if (timberWallMaterial != null)
