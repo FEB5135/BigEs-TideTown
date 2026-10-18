@@ -56,6 +56,7 @@ public class TutorialHints : MonoBehaviour
     const int DimTextureWidth = 160;
     const float DimFadeSpeed = 6f;
     const int MaxSpots = 3;
+    const float RefreezeDelay = 1f;
 
     class Step
     {
@@ -67,6 +68,7 @@ public class TutorialHints : MonoBehaviour
         public bool releasesTsunami;
         public Func<bool> resume; // zaman dururken hangi tıklama durmayı kaldırır (boş: herhangi bir sol tık)
         public Action<List<Spot>> spots; // zaman dururken aydınlatılacak yerler
+        public Func<bool> freezeAgain; // zaman açıldıktan sonra adım bitmeden yeniden durdurulsun mu (örn. kalan kaynak türü)
     }
 
     // Ekran pikseli cinsinden aydınlık daire.
@@ -87,6 +89,7 @@ public class TutorialHints : MonoBehaviour
     Well well;
     int lastWood, lastStone;
     bool gotWood, gotStone;
+    bool clickedWood, clickedStone;
     WallConstructionController construction;
     bool wallBuilt;
 
@@ -99,6 +102,7 @@ public class TutorialHints : MonoBehaviour
     Step current;
     bool frozen;
     int frozenFrame;
+    float unfrozenAt;
     float dimLevel;
     readonly List<Spot> spots = new();
     RawImage dim;
@@ -190,10 +194,12 @@ public class TutorialHints : MonoBehaviour
             body = "Ağaçlara ve taş ocaklarına sol tıkla. Odun ve taş ortadaki kuyuya uçar.",
             done = () => well == null || (gotWood && gotStone),
             resume = ClickedResource,
+            // Ocağa tıklayınca zaman açılır, taş kuyuya uçar; sonra yine durup ağacı gösterir (ya da tersi).
+            freezeAgain = () => NeedWood || NeedStone,
             spots = list =>
             {
-                AddNodeSpot(list, ResourceType.Wood);
-                AddNodeSpot(list, ResourceType.Stone);
+                if (NeedWood) AddNodeSpot(list, ResourceType.Wood);
+                if (NeedStone) AddNodeSpot(list, ResourceType.Stone);
             },
         },
         new Step
@@ -313,6 +319,7 @@ public class TutorialHints : MonoBehaviour
         if (!frozen)
             return;
         frozen = false;
+        unfrozenAt = Time.unscaledTime;
         Time.timeScale = 1f;
     }
 
@@ -322,8 +329,11 @@ public class TutorialHints : MonoBehaviour
         return mouse != null && mouse.leftButton.wasPressedThisFrame;
     }
 
-    // ClickHarvester'ın aynı tıklamada toplayacağı bir kaynağa mı basıldı.
-    static bool ClickedResource()
+    bool NeedWood => !gotWood && !clickedWood;
+    bool NeedStone => !gotStone && !clickedStone;
+
+    // ClickHarvester'ın aynı tıklamada toplayacağı bir kaynağa mı basıldı; türü hatırlanır.
+    bool ClickedResource()
     {
         var mouse = Mouse.current;
         if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
@@ -335,7 +345,13 @@ public class TutorialHints : MonoBehaviour
         if (!Physics.Raycast(cam.ScreenPointToRay(position), out var hit, 200f, ~0, QueryTriggerInteraction.Ignore))
             return false;
         var node = hit.collider.GetComponentInParent<ResourceNode>();
-        return node != null && node.Remaining > 0;
+        if (node == null || node.Remaining <= 0)
+            return false;
+        if (node.Type == ResourceType.Wood)
+            clickedWood = true;
+        else if (node.Type == ResourceType.Stone)
+            clickedStone = true;
+        return true;
     }
 
     // Bu türden, ekranın ortasına en yakın görünen kaynak; panellerin altında kalanlar ancak başka yoksa seçilir.
@@ -565,6 +581,8 @@ public class TutorialHints : MonoBehaviour
             float shown = 0f;
             while (!step.done() && (step.autoAdvance <= 0f || shown < step.autoAdvance))
             {
+                if (!frozen && step.freezeAgain != null && Time.unscaledTime - unfrozenAt > RefreezeDelay && step.freezeAgain())
+                    Freeze(step);
                 shown += Time.deltaTime;
                 yield return null;
             }
