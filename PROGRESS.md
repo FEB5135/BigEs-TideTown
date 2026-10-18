@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`Wallfix` `feature/upgrades`'e birleştirildi (`2848eea`), ardından `feature/upgrades` main'e fast-forward ile alındı; ikisi de push edildi)
+Son güncelleme: 2026-10-18 (yükseltme ikonları log.png ve stone.png)
 
 ## Bağlam
 

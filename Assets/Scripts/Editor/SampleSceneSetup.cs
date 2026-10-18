@@ -348,8 +348,8 @@ public static class SampleSceneSetup
             upgrades = hud.gameObject.AddComponent<UpgradeHUD>();
         var ui = new SerializedObject(upgrades);
         ui.FindProperty("template").objectReferenceValue = stoneButton;
-        ui.FindProperty("woodIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/Wood.png");
-        ui.FindProperty("stoneIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/Stone.png");
+        ui.FindProperty("woodIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/log.png");
+        ui.FindProperty("stoneIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/stone.png");
         ui.FindProperty("workerPrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Gatherer>("Assets/Prefabs/Economy/Woodcutter.prefab");
         ui.ApplyModifiedPropertiesWithoutUndo();
         EnsureWorkerTemplate(scene);
