@@ -32,7 +32,7 @@ public class PressableButton : MonoBehaviour, IPointerEnterHandler, IPointerExit
         button.onClick.AddListener(() =>
         {
             if (clickSound != null && audioSource != null)
-                audioSource.PlayOneShot(clickSound);
+                audioSource.PlayOneShot(clickSound, GameSettings.EffectsVolume);
         });
     }
 

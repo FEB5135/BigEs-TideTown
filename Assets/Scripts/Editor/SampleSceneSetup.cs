@@ -29,6 +29,7 @@ public static class SampleSceneSetup
             EnsureNavigation(scene);
             EnsureTutorial(scene);
             EnsureHouseRuins(scene);
+            EnsureMusic(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -87,6 +88,7 @@ public static class SampleSceneSetup
         EnsureNavigation(scene);
         EnsureTutorial(scene);
         EnsureHouseRuins(scene);
+        EnsureMusic(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -492,6 +494,47 @@ public static class SampleSceneSetup
         }
         settings.ApplyModifiedPropertiesWithoutUndo();
         return pairs.Count > 0;
+    }
+
+    // Müzik: dalgalar arasında sakin inşa parçası (Townie Loop), dalga gelirken tehlike parçası (Glorious Morning).
+    // Kayıt yükseklikleri farklı: ikisi ölçülen ortalama gürlüklerine (RMS) göre eşitlenir, sakin olan biraz kısık çalar.
+    public static string EnsureMusic(Scene scene)
+    {
+        var manager = Find<AudioManager>(scene);
+        if (manager == null)
+        {
+            var host = new GameObject("Music");
+            SceneManager.MoveGameObjectToScene(host, scene);
+            manager = host.AddComponent<AudioManager>();
+        }
+        var calm = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Townie_Loop.mp3");
+        var danger = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Glorious_Morning.mp3");
+        float calmRms = Rms(calm), dangerRms = Rms(danger);
+        float quieter = Mathf.Min(calmRms, dangerRms);
+        float dangerGain = dangerRms > 0f ? quieter / dangerRms : 1f;
+        float calmGain = (calmRms > 0f ? quieter / calmRms : 1f) * 0.85f;
+        var settings = new SerializedObject(manager);
+        settings.FindProperty("idlePhaseMusic").objectReferenceValue = calm;
+        settings.FindProperty("tsunamiPhaseMusic").objectReferenceValue = danger;
+        settings.FindProperty("idleMusicGain").floatValue = calmGain;
+        settings.FindProperty("tsunamiMusicGain").floatValue = dangerGain;
+        settings.FindProperty("startingPhase").enumValueIndex = (int)AudioManager.GamePhase.IdleBuilding;
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return $"music: calm rms {calmRms:0.000} gain {calmGain:0.00}, danger rms {dangerRms:0.000} gain {dangerGain:0.00}";
+    }
+
+    static float Rms(AudioClip clip)
+    {
+        if (clip == null)
+            return 0f;
+        clip.LoadAudioData();
+        var data = new float[clip.samples * clip.channels];
+        if (!clip.GetData(data, 0))
+            return 0f;
+        double sum = 0;
+        foreach (var sample in data)
+            sum += sample * sample;
+        return (float)System.Math.Sqrt(sum / data.Length);
     }
 
     [MenuItem("Tools/BigEs/Tutorial'ı Sıfırla")]

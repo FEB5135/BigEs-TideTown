@@ -213,32 +213,102 @@ public static class MainMenuSetup
         var divider = NewImage(face, "Divider", null, Alpha(Color.white, 0.18f));
         Place(divider, new Vector2(0.5f, 1f), new Vector2(560f, 3f), new Vector2(0f, -104f));
 
-        RowLabel(face, "Volume", "Ses", 92f);
-        var slider = MakeSlider(face, new Vector2(95f, 92f));
-        var volumeValue = NewText(face, "Volume Value", "%80", 30, Water, TextAnchor.MiddleRight);
-        Place(volumeValue.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(90f, 40f), new Vector2(285f, 92f));
+        RowLabel(face, "Music", "Müzik", 92f);
+        var musicSlider = MakeSlider(face, "Music Slider", new Vector2(95f, 92f));
+        var musicValue = NewText(face, "Music Value", "%60", 30, Water, TextAnchor.MiddleRight);
+        Place(musicValue.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(90f, 40f), new Vector2(285f, 92f));
 
-        RowLabel(face, "Fullscreen", "Tam Ekran", 8f);
-        var fullscreen = OptionPicker(face, "Fullscreen", 8f, out var fsPrev, out var fsNext);
+        RowLabel(face, "Effects", "Efektler", 8f);
+        var effectsSlider = MakeSlider(face, "Effects Slider", new Vector2(95f, 8f));
+        var effectsValue = NewText(face, "Effects Value", "%80", 30, Water, TextAnchor.MiddleRight);
+        Place(effectsValue.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(90f, 40f), new Vector2(285f, 8f));
 
-        RowLabel(face, "Quality", "Grafik", -76f);
-        var quality = OptionPicker(face, "Quality", -76f, out var qPrev, out var qNext);
+        RowLabel(face, "Fullscreen", "Tam Ekran", -76f);
+        var fullscreen = OptionPicker(face, "Fullscreen", -76f, out var fsPrev, out var fsNext);
 
         var back = MakeButton(face, "Back Button", "GERİ", null, new Vector2(260f, 80f), Vector2.zero, "Ocean", 36, true);
         Place((RectTransform)back.transform, new Vector2(0.5f, 0f), new Vector2(260f, 80f), new Vector2(0f, 64f));
 
         var panel = page.AddComponent<SettingsPanel>();
         var so = new SerializedObject(panel);
-        so.FindProperty("volumeSlider").objectReferenceValue = slider;
-        so.FindProperty("volumeValue").objectReferenceValue = volumeValue;
+        so.FindProperty("musicSlider").objectReferenceValue = musicSlider;
+        so.FindProperty("musicValue").objectReferenceValue = musicValue;
+        so.FindProperty("effectsSlider").objectReferenceValue = effectsSlider;
+        so.FindProperty("effectsValue").objectReferenceValue = effectsValue;
         so.FindProperty("fullscreenPrev").objectReferenceValue = fsPrev;
         so.FindProperty("fullscreenNext").objectReferenceValue = fsNext;
         so.FindProperty("fullscreenValue").objectReferenceValue = fullscreen;
-        so.FindProperty("qualityPrev").objectReferenceValue = qPrev;
-        so.FindProperty("qualityNext").objectReferenceValue = qNext;
-        so.FindProperty("qualityValue").objectReferenceValue = quality;
         so.ApplyModifiedPropertiesWithoutUndo();
         return back;
+    }
+
+    // Sahnedeki eski Ayarlar sayfasını (Ses + Tam Ekran + Grafik) yeni düzene çevirir: Müzik + Efektler + Tam Ekran.
+    // Menünün geri kalanına dokunmaz.
+    public static string UpgradeSettingsPage(UnityEngine.SceneManagement.Scene scene)
+    {
+        SettingsPanel panel = null;
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            panel = root.GetComponentInChildren<SettingsPanel>(true);
+            if (panel != null)
+                break;
+        }
+        if (panel == null)
+            return "settings page not found";
+        var content = panel.transform.Find("Card/Content");
+        if (content == null)
+            return "settings content not found";
+        if (content.Find("Effects Slider") != null)
+            return "settings page already upgraded";
+
+        var musicLabel = Renamed(content, "Volume Label", "Music Label");
+        var musicSlider = Renamed(content, "Volume Slider", "Music Slider");
+        var musicValue = Renamed(content, "Volume Value", "Music Value");
+        if (musicLabel == null || musicSlider == null || musicValue == null)
+            return "volume row not found";
+        musicLabel.GetComponent<Text>().text = "Müzik";
+
+        var effectsLabel = Copy(musicLabel, "Effects Label", 8f);
+        effectsLabel.GetComponent<Text>().text = "Efektler";
+        var effectsSlider = Copy(musicSlider, "Effects Slider", 8f);
+        var effectsValue = Copy(musicValue, "Effects Value", 8f);
+
+        foreach (var name in new[] { "Fullscreen Label", "Fullscreen Prev", "Fullscreen Next", "Fullscreen Value" })
+            if (content.Find(name) is RectTransform row)
+                row.anchoredPosition = new Vector2(row.anchoredPosition.x, -76f);
+        int removed = 0;
+        foreach (var name in new[] { "Quality Label", "Quality Prev", "Quality Next", "Quality Value" })
+            if (content.Find(name) is Transform row)
+            {
+                Object.DestroyImmediate(row.gameObject);
+                removed++;
+            }
+
+        var so = new SerializedObject(panel);
+        so.FindProperty("musicSlider").objectReferenceValue = musicSlider.GetComponent<Slider>();
+        so.FindProperty("musicValue").objectReferenceValue = musicValue.GetComponent<Text>();
+        so.FindProperty("effectsSlider").objectReferenceValue = effectsSlider.GetComponent<Slider>();
+        so.FindProperty("effectsValue").objectReferenceValue = effectsValue.GetComponent<Text>();
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return $"settings page: music + effects sliders, fullscreen moved, {removed} graphics objects removed";
+    }
+
+    static RectTransform Renamed(Transform parent, string from, string to)
+    {
+        var child = parent.Find(from) as RectTransform;
+        if (child != null)
+            child.name = to;
+        return child;
+    }
+
+    // Bir satır parçasının kopyası, aynı sırada ama başka yükseklikte.
+    static RectTransform Copy(RectTransform original, string name, float y)
+    {
+        var copy = (RectTransform)Object.Instantiate(original.gameObject, original.parent).transform;
+        copy.name = name;
+        copy.SetSiblingIndex(original.GetSiblingIndex() + 1);
+        copy.anchoredPosition = new Vector2(original.anchoredPosition.x, y);
+        return copy;
     }
 
     // ---------------------------------------------------------------- Parçalar
@@ -353,9 +423,9 @@ public static class MainMenuSetup
         return value;
     }
 
-    static Slider MakeSlider(RectTransform card, Vector2 position)
+    static Slider MakeSlider(RectTransform card, string name, Vector2 position)
     {
-        var root = NewRect(card, "Volume Slider", new Vector2(270f, 52f), position);
+        var root = NewRect(card, name, new Vector2(270f, 52f), position);
         var track = Sliced(NewImage(root, "Track", SpriteDir + "Bar.png", Alpha(Color.white, 0.18f)), 1f);
         track.anchorMin = new Vector2(0f, 0.5f);
         track.anchorMax = new Vector2(1f, 0.5f);
@@ -374,6 +444,9 @@ public static class MainMenuSetup
         handle.anchorMax = new Vector2(0f, 1f);
         handle.sizeDelta = new Vector2(36f, 0f);
         handle.GetComponent<Image>().preserveAspect = true;
+        // NewImage resimleri tıklamaya kapatır; kaydırıcının izi ve tutamağı fareyi yakalamalı, yoksa sürüklenemez.
+        track.GetComponent<Image>().raycastTarget = true;
+        handle.GetComponent<Image>().raycastTarget = true;
 
         var slider = root.gameObject.AddComponent<Slider>();
         slider.fillRect = fill;

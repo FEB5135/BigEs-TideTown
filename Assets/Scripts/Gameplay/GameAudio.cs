@@ -20,6 +20,8 @@ public class GameAudio : MonoBehaviour
 
     [Header("Ses düzeyi")]
     [Range(0f, 1f)] public float volume = 0.8f;
+    // Bu düzey çarpı oyuncunun Ayarlar'daki efekt sesi.
+    public float Level => volume * GameSettings.EffectsVolume;
     [Tooltip("Kamera olaya bu uzaklıktaysa (m) tam ses, uzaklaştıkça azalır.")]
     [SerializeField] float fullVolumeDistance = 30f;
     [Tooltip("Kamera olaya bu uzaklıktan uzaksa ses duyulmaz.")]
@@ -57,7 +59,7 @@ public class GameAudio : MonoBehaviour
 
     void PlayAt(AudioClip clip, Vector3 position, float gain, float pitchJitter)
     {
-        float level = volume * gain * Attenuation(position);
+        float level = Level * gain * Attenuation(position);
         if (clip == null || level <= 0.01f)
             return;
         var source = pool[next];

@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`feature/waves`: 3 dalga, rastgele köşe, suların çekilmesi; güncel main ve Wallfix (kazanma/kaybetme kartı, takılma düzeltmeleri) birleştirildi)
+Son güncelleme: 2026-10-18 (`feature/settings-audio`: Ayarlar'da Müzik + Efektler, Grafik kalktı; tehlike/sakin müzik dalgalarla değişiyor)
 
 ## Bağlam
 
@@ -26,7 +26,8 @@ Son güncelleme: 2026-10-18 (`feature/waves`: 3 dalga, rastgele köşe, suların
 
 ## Aktif çalışma
 
-- **Şu anki dal: `feature/waves`** (2026-10-18'de main'den açıldı; içine güncel main ve Wallfix (kazanma/kaybetme kartı, takılma düzeltmeleri) ve arkadaşın "Hill variation" commit'i birleştirildi). 2026-10-18'de kullanıcı isteğiyle main bu dala fast-forward ile getirildi (`c075a45`); main ve `feature/waves` aynı.
+- **Şu anki dal: `feature/settings-audio`** (2026-10-18'de main'den, `4aa5fdb`). Main'e birleştirmek kullanıcıya sorulacak.
+- **Önceki dal: `feature/waves`** (2026-10-18'de main'den açıldı; içine güncel main ve Wallfix (kazanma/kaybetme kartı, takılma düzeltmeleri) ve arkadaşın "Hill variation" commit'i birleştirildi). 2026-10-18'de kullanıcı isteğiyle main bu dala fast-forward ile getirildi (`c075a45`); main ve `feature/waves` aynı.
 - **Önceki dal: `Wallfix`** (2026-10-18): kullanıcı isteğiyle `wallfix-beta` buraya birleştirildi. Önce yerel `Wallfix` güncel `origin/Wallfix`'e (`c95c97c`, içinde main ve takımın ev yıkılması + `7d96268` "Stop the stutter when houses fall") ileri sarıldı. Çakışmalar: `MapView` için `wallfix-beta` sürümü alındı (değişiklikler karede bir kez, collider'lar iş parçacığında, zemin yalnız gerekince) ve takımın parçaları açılışta hazırlayan `HouseCollapse.Init(material, houseMeshes)` çağrısı eklendi; `HouseCollapse` için takımın sürümü alındı (karo başına 4 parça, en fazla 600, açılışta 300 parça hazır, gölgesiz; `wallfix-beta`'daki karede-120-parça bütçesi alınmadı). PROGRESS/THIRD_PARTY elle birleştirildi. Birleşim `010aa26` GitHub'a push edildi; Play'de kaybetme kartı ve Tekrar Oyna hatasız.
 - **Önceki dal: `wallfix-beta`** (2026-10-18, kullanıcı isteğiyle `Wallfix`'ten açıldı; GitHub'a push edildi). İçine takımın `origin/feature/house-damage` dalı birleştirildi (`641a4a4`): güncel main (işçi evleri, alarm, batık ev modelleri, imleçler) + su değen binanın bütün olarak yıkılması ve parçalanma animasyonu. Çakışma yalnız PROGRESS/THIRD_PARTY'deydi (THIRD_PARTY'de takımın yeni tablosu alındı). Üstüne kazanma/kaybetme eklendi (aşağıda).
 - **Önceki dal: `feature/house-damage`** (kullanıcı isteğiyle `Wallfix`'ten açıldı, içine güncel main birleştirildi: `5a3dc0c`; çakışmalar yalnız PROGRESS/THIRD_PARTY ve `SampleSceneSetup`'taki `EnsureNavigation` + `EnsureTutorial` satırlarıydı, ikisi de tutuldu). Main'e birleştirmek kullanıcıya sorulacak. Önceki dal `feature/upgrades` main ile aynı. Unity'de değişiklik uygulamak/derlemek/Play denemek gerektiğinde Claude Unity'yi bilgisayar kontrolüyle kendisi kullanır (kullanıcıya "öne getir" denmez); sahne değişiklikleri tek seferlik `Assets/Scripts/Editor/Apply...Once.cs` betikleriyle yapılır. Play'de köylüyü fareyle taşımak zor: Gatherer'ın Inspector menüsünde "Test: Ormanda Çalış" / "Test: Vagon İt" var; kaynak için Tools > BigEs > Test: Kuyuya 100 Odun 100 Tas.
@@ -39,6 +40,14 @@ Son güncelleme: 2026-10-18 (`feature/waves`: 3 dalga, rastgele köşe, suların
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Ayarlar ve müzik (18 Ekim 2026, `feature/settings-audio`):** Kullanıcı: "ayarlarda ses kısmını aktif hale getir, müzik dalından tehlike ve chill müziği aktar, ses ayarlarını yap, grafik (ve tam ekran) kaldır"; sonra "tam ekranı kaldırma, vazgeçtim".
+  - Müzik dalının içeriği (`AudioManager`, `Assets/Audio/Music/` 3 parça) zaten main'deydi ama sahnede değildi ve hiçbir şey `SetPhase` çağırmıyordu. Sahneye "Music" (`AudioManager`, `DontDestroyOnLoad`) eklendi: sakin = Townie Loop, tehlike = Glorious Morning (THIRD_PARTY'deki kullanım tanımına göre; Volatile Reaction kullanılmıyor). `TsunamiVillageAlarm` `DangerChanged`'da köylülerle birlikte müziği de değiştiriyor: dalga bırakılınca (uyarıdan itibaren 60 sn) tehlike, sular çekilince sakin; geçiş 1.5 sn çapraz.
+  - Parça düzeyleri ölçüldü (`SampleSceneSetup.EnsureMusic`, RMS): Townie Loop 0.113, Glorious Morning 0.259 (≈2.3 kat yüksek). Kazançlar: sakin 0.85 (eşitlenmiş × 0.85, biraz kısık), tehlike 0.43 (`AudioManager.idleMusicGain / tsunamiMusicGain`).
+  - `GameSettings`: tek "Ses" (dinleyici düzeyi) yerine `MusicVolume` (varsayılan %60) ve `EffectsVolume` (%80), `VolumeChanged` olayı; dinleyici düzeyi hep 1. Efekt sesi `GameAudio` (`Level`), vagon yuvarlanması (`CartSound`) ve menü buton tıklamasına (`PressableButton`) uygulanıyor. Grafik/kalite ayarı tamamen kalktı; Tam Ekran duruyor.
+  - Ayarlar sayfası (tek seferlik betikle sahnede, `MainMenuSetup.UpgradeSettingsPage`; `BuildSettingsPage` de aynı düzene çevrildi): Müzik + Efektler kaydırıcıları + Tam Ekran; Grafik satırı silindi. Bulunan hata: menü kurucusu bütün resimleri tıklamaya kapattığı için (`NewImage` → `raycastTarget = false`) eski "Ses" kaydırıcısı hiç sürüklenemiyordu; iz ve tutamak artık tıklanabilir.
+  - Play'de denendi (Claude Unity'yi sürdü): sayfa Müzik %60 / Efektler %80 / Tam Ekran; kaydırıcılar tıklamayla %22 / %95 oldu; sakin parça Townie_Loop 0.51 düzeyde (0.6 × 0.85) çalıyordu; dalga bırakılınca Glorious_Morning 0.096 (0.22 × 0.43) çaldı, Townie_Loop 0'a indi; konsolda hata yok. Test sonrası ayarlar %60 / %80 / Kapalı'ya geri alındı. Dalga bitince sakin parçaya dönüş ve efekt kaydırıcısının oyun seslerine etkisi kulakla dinlenmedi.
+  - Sahne değişikliğinde Unity'nin kendi yazdığı iki şey de var: yeni alanların varsayılanları (`dimAlpha`, `rebuildsPerFrame`) ve duvar denetleyicisinde `stoneCost` / `stoneTierWoodCost` 0 (Wallfix kodu bunları her yüklemede zaten 0 yapıyor, oynanış değişmiyor).
 
 - **Dalga sistemi (18 Ekim 2026, `feature/waves`):** Kullanıcı: "3 dalga olacak: 15, 20, 25 m; ilki 3 dakika, diğer ikisi 2 dakika sonra gelsin. Kazanma/kaybetme ekranını arkadaş yapacak, oraya dokunma." Ekran yapılmadı, yalnız olaylar eklendi.
   - `TsunamiController.waves` (Inspector'da düzenlenebilir: yükseklik + gecikme): 1. dalga oyun başlayınca 180 sn, sonrakiler bir öncekinin **bırakılmasından** 120 sn sonra (sayaç dalga sürerken de işler, Duraklat'ta durur). Rastgele 120–180 sn yerine bu kullanılır (`autoRelease` açık ve liste doluysa). Tutorial ilk sayacı eskisi gibi bekletir.
