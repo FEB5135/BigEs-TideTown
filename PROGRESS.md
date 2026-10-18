@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`feature/house-damage`: su değen bina bütün olarak yıkılıyor, parçalanma animasyonu, batık modelle çiziliyor)
+Son güncelleme: 2026-10-18 (batan ev, su değen karodan kurallara göre bütün yapı)
 
 ## Bağlam
 
@@ -36,6 +36,8 @@ Son güncelleme: 2026-10-18 (`feature/house-damage`: su değen bina bütün olar
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Batan evin karo seçimi (18 Ekim 2026):** Su değen karodan başlanıyor. Yanındaki ev karosu, WFC kuralı o dönüşte iki tarafı da kabul ediyorsa aynı eve katılıyor; yalnız değiyor diye katılmıyor. Batık modele bu kümenin tamamı geçiyor, bu yüzden yapının bir parçası sağlam kalmıyor. Haritada henüz ev yokken liste kurulursa sonra yeniden kurulur.
 
 - **Tsunamide ev yıkılması (18 Ekim 2026, `feature/house-damage`):** Kullanıcı önce "su gelince hasar alma mekaniği" istedi, sonra "hasarlı olmasın, sadece yıkılma olsun; arkadaşın assetlerini çek, ev yıkılmayı entegre et" dedi. Arkadaşın (Eren) main'e attığı `0082523 Submerged Houses` (batık ev modelleri `Assets/Meshes/WorldMeshes/house_*f.obj`, aynı taban/köken, yalnız gömük; `palette.png`; ProBuilder ayarı) bu dala birleştirildi (`394dfd5`), eskiye dönülmedi.
   - `Houses.House`: ya ayakta ya yıkık (`IsDestroyed`, `Destroy()`, `Repair()`); evin karoları `Cells` / `CellCenters` (binanın hücreleri, ortası en yakın eve dağıtılır). Olaylar: `Houses.Destroyed`, `Houses.Repaired`; `RepairAll()`, `DestroyedCount`, `Built` (listeyi kurmadan). `RandomFree` yıkık evi vermez.

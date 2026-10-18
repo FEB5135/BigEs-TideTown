@@ -766,6 +766,46 @@ public class WfcSolver : MonoBehaviour
         }
     }
 
+    // True when the solved tiles in these two adjacent cells accept each other, rotation included.
+    public bool Connects(int ax, int ay, int bx, int by)
+    {
+        if (compatible == null || world == null || tileCount == 0)
+            return false;
+
+        var dx = bx - ax;
+        var dy = by - ay;
+        int dir;
+        if (dx == -1 && dy == 0)
+            dir = 0;
+        else if (dx == 1 && dy == 0)
+            dir = 1;
+        else if (dx == 0 && dy == 1)
+            dir = 2;
+        else if (dx == 0 && dy == -1)
+            dir = 3;
+        else
+            return false;
+
+        world.Get(ax, ay, out var idA, out var rotA);
+        world.Get(bx, by, out var idB, out var rotB);
+        var a = FindTile(idA, rotA);
+        var b = FindTile(idB, rotB);
+        if (a < 0 || b < 0)
+            return false;
+
+        return compatible[(a * tileCount + b) * 4 + dir];
+    }
+
+    int FindTile(int id, int rotation)
+    {
+        rotation = Normalize(rotation);
+        for (var i = 0; i < tiles.Count; i++)
+            if (tiles[i].Id == id && tiles[i].Rotation == rotation)
+                return i;
+
+        return -1;
+    }
+
     bool Search(List<int> origins)
     {
         if (!OpenInitialWindows(origins))
