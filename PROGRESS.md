@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`feature/upgrades`: ev başına işçi, boştaki köylü belirteci, tsunamide eve kaçış, NavMesh düzeltmeleri; hepsi push edildi, `206eec1`)
+Son güncelleme: 2026-10-18 (`Wallfix` `feature/upgrades`'e birleştirildi (`2848eea`), ardından `feature/upgrades` main'e fast-forward ile alındı; ikisi de push edildi)
 
 ## Bağlam
 
@@ -16,6 +16,7 @@ Son güncelleme: 2026-10-18 (`feature/upgrades`: ev başına işçi, boştaki k�
 
 - `main`: Ekibin ortak dalı; oynanan sahne **SampleScene**. `feature/villager-jobs` (içinde `fix/tree-cell-ground` da var) 2026-10-17'de main'e fast-forward ile birleştirildi (`084ca73`); ekibin son main'i (`5077d4f`, "Slope half-fix") zaten içindeydi. Ardından `collision-main-merge` (tsunami, duvar çarpışması, katlı inşa) da fast-forward ile main'e alındı.
 - `feature/storm-warning` (GitHub'da, **aktif dal**, main'den): tsunami öncesi fırtına bulutları/şimşek, 2-3 dk sonra kendiliğinden gelen tsunami, uzaktan gelen dalga kabarması, "Anında Etkinleştir" butonu. 2026-10-17'de `origin`e push edildi. 2026-10-18'de güncel main (`3d00740`: eski Forest silindi, müzik/AudioManager, ev ve kum modelleri, WFC fırça editörü) bu dala birleştirildi; SampleScene'deki tek çakışma (main'in sildiği Tree 16 ile bizim Incoming Swell yan yanaydı) elle çözüldü. Unity'de açılıp Play'de denenince main'e birleştirilecek.
+- `Wallfix` (GitHub'da, duvar ekibinin dalı): eğimli/araziyi izleyen duvarlar, 2 m kat ve 20 m tavan (10 kat), silme modu (N), duvar sanatı (`Assets/Art/Walls`), su geçirmez duvar engelleri. 2026-10-18'de `feature/upgrades`'e çakışmasız birleştirildi (`2848eea`); her iki dalın da değiştirdiği tek dosya SampleScene'di (Wallfix yalnız `maxFloors` 3→10 ve `wallHeight` 1.25→2 yaptı). Unity'de 0 hata ile derlendi, Play'de duvar paneli "KAT 1 / 10" ve işçi/hız butonları birlikte çalıştı. Aynı gün main'e alındı.
 - `fix/tree-cell-ground` (GitHub'da): ağaç/maden düzeltmeleri; main'e birleştirildi (`feature/villager-jobs` üzerinden), silinebilir.
 - `feature/villager-jobs` (GitHub'da): köylüleri elle işe koyma, vagon itme, dağ/tepe (ekibin WFC kuralları), köylü animasyonları, menü renk düzeltmesi ve oyun sesleri. Main'e birleştirildi (`084ca73`).
 - `feature/menu-redesign`: Main'e birleştirildi (`fbd8b40`), silinebilir.
@@ -25,7 +26,7 @@ Son güncelleme: 2026-10-18 (`feature/upgrades`: ev başına işçi, boştaki k�
 
 ## Aktif çalışma
 
-- **Şu anki dal: `feature/upgrades`** (main'den, güncel main de içinde; origin ile aynı). Main'e birleştirmek kullanıcıya sorulacak. Unity'de değişiklik uygulamak/derlemek/Play denemek gerektiğinde Claude Unity'yi bilgisayar kontrolüyle kendisi kullanır (kullanıcıya "öne getir" denmez); sahne değişiklikleri tek seferlik `Assets/Scripts/Editor/Apply...Once.cs` betikleriyle yapılır. Play'de köylüyü fareyle taşımak zor: Gatherer'ın Inspector menüsünde "Test: Ormanda Çalış" / "Test: Vagon İt" var; kaynak için Tools > BigEs > Test: Kuyuya 100 Odun 100 Tas.
+- **Şu anki dal: `feature/upgrades`** (Wallfix de içinde). 2026-10-18'de main bu dala fast-forward ile getirildi; main ve `feature/upgrades` aynı commit'te. Unity'de değişiklik uygulamak/derlemek/Play denemek gerektiğinde Claude Unity'yi bilgisayar kontrolüyle kendisi kullanır (kullanıcıya "öne getir" denmez); sahne değişiklikleri tek seferlik `Assets/Scripts/Editor/Apply...Once.cs` betikleriyle yapılır. Play'de köylüyü fareyle taşımak zor: Gatherer'ın Inspector menüsünde "Test: Ormanda Çalış" / "Test: Vagon İt" var; kaynak için Tools > BigEs > Test: Kuyuya 100 Odun 100 Tas.
 - 2026-10-18: main'in imleç güncellemesi (`0567b41`, yeni `cursor_*` dokuları) ve THIRD_PARTY.md düzenlemesi (`67cce63`) `feature/upgrades`'e birleştirildi (`041a14d`). THIRD_PARTY.md'de main'in tablosu alındı, bu daldaki WFC harita üretimi için "Kod (Harita Üretimi)" satırı eklendi. Unity'de sahne diskten yeniden yüklendi; Play'de yeni imleç, ağaçsız kuyu çevresi ve İşçi Hızı butonu görüldü.
 - Dal: `feature/upgrades` (main'den; 2026-10-18'de kullanıcı isteğiyle `feature/storm-warning` içine birleştirildi, merge `fa0e041`, içinde güncel main de var). Ardından main'in `04170d0` "New Icons" commit'i (odun/taş ikonları, SampleScene) çakışmasız bu dala alındı (`651a132`; merge mesajı yanlışlıkla "into feature/storm-warning" diyor). Yükseltmeler, işçi üretme, işçi hızı + fırtına, Anında Etkinleştir, gelen dalga birlikte bu dalda. Sahne: `Assets/Scenes/SampleScene.unity`. Kurulum kodu: `Assets/Scripts/Editor/SampleSceneSetup.cs` (`EnsureGridForest` + `EnsureTerrain`, `EnsureVillagerJobs`, `EnsureAudio`).
 - `SampleScene2.unity` tasarımcının (arkadaşın) sahnesi; **dokunulmaz**, yalnız WFC kuralları okunur.
@@ -214,7 +215,8 @@ Son güncelleme: 2026-10-18 (`feature/upgrades`: ev başına işçi, boştaki k�
 - [ ] Ana menü: skorun tanımı belirlenince oyun sonunda `HighScore.Submit` çağrılacak.
 - [ ] Toplama hızı ile duvar maliyetini dengelemek.
 - [ ] İşçi hızı (`Gatherer.workSpeedMultiplier` 1.5 / `workTimeMultiplier` 0.6) toplama ile duvar maliyeti dengesine göre ayarlanacak; tsunami paneli sağ üstteki ocağın yükseltme butonunu örtebiliyor, yeri düşünülmeli.
-- [ ] Yükseltmeler (`feature/upgrades`): Play'de vagon/oduncu hızlanmasını gözle kontrol etmek, yeni işçiyi ormana/ocağa bırakıp denemek; bedeller ve çarpanlar dengelenecek. Seviye görselleri ve kalıcı işçi butonu yeri sonra (şimdilik geçici). Main'e birleştirmek kullanıcıya sorulacak.
+- [ ] Yükseltmeler (`feature/upgrades`): Play'de vagon/oduncu hızlanmasını gözle kontrol etmek, yeni işçiyi ormana/ocağa bırakıp denemek; bedeller ve çarpanlar dengelenecek. Seviye görselleri ve kalıcı işçi butonu yeri sonra (şimdilik geçici). Main'e birleştirildi (2026-10-18, Wallfix ile birlikte).
+- [ ] Wallfix sonrası: duvar yüksekliği artık 2 m/kat, en fazla 10 kat (20 m); 10 m'lik dalgaya karşı denge ve kaynak maliyeti Play'de denenmeli. Unity'de Play'den önce sahne değiştiyse (git merge vb.) sahne diskten yeniden açılmalı, yoksa eski hali bellekte kalıyor.
 - [ ] Sol alttaki odun/taş butonlarına işlev vermek (henüz kararlaştırılmadı).
 - [ ] Teslimden önce: repo public olmadan eski commit'lerdeki Asset Store dosyaları için GitHub Support'a başvurmak ya da temiz bir geçmişle yeniden oluşturmak. Pixabay sesi (`RockBreak.mp3`) lisansı tek başına dağıtımı yasaklıyor, public repoda durumu değerlendirilmeli.
 - [ ] URP gölge mesafesi (`m_ShadowDistance: 50`) uzaktan bakınca gölgeleri kesiyor; ekip isterse artırılabilir (ortak ayar, dokunulmadı).
