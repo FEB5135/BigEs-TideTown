@@ -1,20 +1,33 @@
+using System;
 using UnityEngine;
 
-// Oyuncu ayarları (ses, tam ekran, grafik). PlayerPrefs'te saklanır, oyun açılınca uygulanır.
+// Oyuncu ayarları (müzik ve efekt sesi, tam ekran). PlayerPrefs'te saklanır, oyun açılınca uygulanır.
 public static class GameSettings
 {
-    const string VolumeKey = "BigEs.Volume";
+    const string MusicKey = "BigEs.MusicVolume";
+    const string EffectsKey = "BigEs.EffectsVolume";
     const string FullscreenKey = "BigEs.Fullscreen";
-    const string QualityKey = "BigEs.Quality";
 
-    public static float Volume
+    // Ses ayarlarından biri değişti: müzik ve efekt çalanlar düzeylerini yeniler.
+    public static event Action VolumeChanged;
+
+    public static float MusicVolume
     {
-        get => PlayerPrefs.GetFloat(VolumeKey, 0.8f);
+        get => PlayerPrefs.GetFloat(MusicKey, 0.6f);
         set
         {
-            value = Mathf.Clamp01(value);
-            PlayerPrefs.SetFloat(VolumeKey, value);
-            AudioListener.volume = value;
+            PlayerPrefs.SetFloat(MusicKey, Mathf.Clamp01(value));
+            VolumeChanged?.Invoke();
+        }
+    }
+
+    public static float EffectsVolume
+    {
+        get => PlayerPrefs.GetFloat(EffectsKey, 0.8f);
+        set
+        {
+            PlayerPrefs.SetFloat(EffectsKey, Mathf.Clamp01(value));
+            VolumeChanged?.Invoke();
         }
     }
 
@@ -28,25 +41,13 @@ public static class GameSettings
         }
     }
 
-    public static int Quality
-    {
-        get => Mathf.Clamp(PlayerPrefs.GetInt(QualityKey, QualitySettings.GetQualityLevel()), 0, QualitySettings.names.Length - 1);
-        set
-        {
-            value = Mathf.Clamp(value, 0, QualitySettings.names.Length - 1);
-            PlayerPrefs.SetInt(QualityKey, value);
-            QualitySettings.SetQualityLevel(value, true);
-        }
-    }
-
     public static void Save() => PlayerPrefs.Save();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void ApplySaved()
     {
-        AudioListener.volume = Volume;
-        if (PlayerPrefs.HasKey(QualityKey))
-            QualitySettings.SetQualityLevel(Quality, true);
+        // Müzik ve efektler kendi düzeylerini ayrı ayrı uygular; eski tek ses ayarı (dinleyici düzeyi) kullanılmıyor.
+        AudioListener.volume = 1f;
         if (PlayerPrefs.HasKey(FullscreenKey) && !Application.isEditor)
             Screen.fullScreen = Fullscreen;
     }

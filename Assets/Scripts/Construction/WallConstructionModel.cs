@@ -218,6 +218,95 @@ namespace IdleTown.Construction
             return walls.TryGetValue(new WallKey(edge, floor), out record);
         }
 
+        /// <summary>
+        /// A route along existing floor-one walls that is as short as the straight path, so picking the two
+        /// ends of a built wall follows that wall. A detour (e.g. the open ends of a U) keeps the straight path.
+        /// </summary>
+        public bool TryFindRoute(Vector2Int start, Vector2Int end, IReadOnlyList<WallEdge> straight, out List<WallEdge> route)
+        {
+            route = null;
+            if (start == end || straight == null || straight.Count == 0) return false;
+            var onWalls = true;
+            for (var i = 0; i < straight.Count && onWalls; i++) onWalls = floorZeroEdges.Contains(straight[i]);
+            if (onWalls) return false;
+
+            var neighbours = new Dictionary<Vector2Int, List<Vector2Int>>();
+            foreach (var edge in floorZeroEdges)
+            {
+                Link(edge.A, edge.B);
+                Link(edge.B, edge.A);
+            }
+            if (!neighbours.ContainsKey(start) || !neighbours.ContainsKey(end)) return false;
+
+            var previous = new Dictionary<Vector2Int, Vector2Int> { [start] = start };
+            var depth = new Dictionary<Vector2Int, int> { [start] = 0 };
+            var queue = new Queue<Vector2Int>();
+            queue.Enqueue(start);
+            while (queue.Count > 0 && !previous.ContainsKey(end))
+            {
+                var node = queue.Dequeue();
+                if (depth[node] >= straight.Count) continue;
+                foreach (var next in neighbours[node])
+                {
+                    if (previous.ContainsKey(next)) continue;
+                    previous[next] = node;
+                    depth[next] = depth[node] + 1;
+                    queue.Enqueue(next);
+                }
+            }
+            if (!previous.ContainsKey(end)) return false;
+
+            route = new List<WallEdge>(depth[end]);
+            for (var node = end; node != start; node = previous[node])
+                route.Add(new WallEdge(previous[node], node));
+            route.Reverse();
+            return true;
+
+            void Link(Vector2Int from, Vector2Int to)
+            {
+                if (!neighbours.TryGetValue(from, out var list)) neighbours[from] = list = new List<Vector2Int>();
+                list.Add(to);
+            }
+        }
+
+        /// <summary>
+        /// Picks the floor a path builds on and the edges built there. A weaker material under the path is
+        /// upgraded first, lowest floor first; otherwise the lowest part of the path rises by one storey.
+        /// </summary>
+        public int ResolveAutoFloor(IReadOnlyList<WallEdge> path, WallTier tier, int maxFloors, List<WallEdge> edges)
+        {
+            edges.Clear();
+            var upgradeFloor = int.MaxValue;
+            var lowest = int.MaxValue;
+            foreach (var edge in path)
+            {
+                var height = 0;
+                while (height < maxFloors && TryGet(edge, height, out var record))
+                {
+                    if (record.Tier < tier)
+                    {
+                        upgradeFloor = Math.Min(upgradeFloor, height);
+                        break;
+                    }
+                    height++;
+                }
+                lowest = Math.Min(lowest, height);
+            }
+
+            if (upgradeFloor != int.MaxValue)
+            {
+                foreach (var edge in path)
+                    if (TryGet(edge, upgradeFloor, out var record) && record.Tier < tier)
+                        edges.Add(edge);
+                return upgradeFloor;
+            }
+
+            foreach (var edge in path)
+                if (!TryGet(edge, lowest, out _))
+                    edges.Add(edge);
+            return lowest;
+        }
+
         /// <summary>Removes exactly one undirected edge. Used when a physical segment is destroyed.</summary>
         public bool Remove(WallEdge edge) => Remove(edge, 0);
 

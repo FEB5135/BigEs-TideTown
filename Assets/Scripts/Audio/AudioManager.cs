@@ -24,7 +24,7 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Köy inşa ve kaynak toplama fazında çalacak parça (Örn: Townie_Loop)")]
     [SerializeField] private AudioClip idlePhaseMusic;
 
-    [Tooltip("Tsunami dalgası yaklaşırken çalacak parça (Örn: Glorious_Morning veya Volatile_Reaction)")]
+    [Tooltip("Tsunami dalgası yaklaşırken çalacak parça (Volatile_Reaction)")]
     [SerializeField] private AudioClip tsunamiPhaseMusic;
 
     [Tooltip("Ana menüde çalacak parça (Opsiyonel)")]
@@ -40,6 +40,11 @@ public class AudioManager : MonoBehaviour
     [Range(0f, 1f)] [SerializeField] private float masterVolume = 1f;
     [Range(0f, 1f)] [SerializeField] private float musicVolume = 0.8f;
     [Range(0f, 1f)] [SerializeField] private float sfxVolume = 1f;
+
+    [Header("Parça Düzeyleri")]
+    [Tooltip("Parçaların kayıt yükseklikleri farklı; birbirine denk duyulsun diye her biri bu oranla çalınır.")]
+    [Range(0f, 1f)] [SerializeField] private float idleMusicGain = 1f;
+    [Range(0f, 1f)] [SerializeField] private float tsunamiMusicGain = 1f;
 
     [Header("Başlangıç Ayarları")]
     [Tooltip("Sahneler arası geçişte ses yöneticisinin korunmasını sağlar")]
@@ -88,6 +93,8 @@ public class AudioManager : MonoBehaviour
         }
 
         SetupAudioSources();
+        ApplySettings();
+        GameSettings.VolumeChanged += ApplySettings;
     }
 
     private void Start()
@@ -193,7 +200,7 @@ public class AudioManager : MonoBehaviour
         fadingInSource.Play();
 
         float startOutVolume = fadingOutSource != null ? fadingOutSource.volume : 0f;
-        float targetInVolume = masterVolume * musicVolume;
+        float targetInVolume = TargetVolume(newClip);
         float timer = 0f;
 
         if (duration <= 0.01f)
@@ -307,8 +314,29 @@ public class AudioManager : MonoBehaviour
     {
         if (activeMusicSource != null && activeMusicSource.isPlaying && crossfadeCoroutine == null)
         {
-            activeMusicSource.volume = masterVolume * musicVolume;
+            activeMusicSource.volume = TargetVolume(activeMusicSource.clip);
         }
+    }
+
+    // Oyuncunun Ayarlar'daki müzik ve efekt sesi.
+    private void ApplySettings()
+    {
+        musicVolume = GameSettings.MusicVolume;
+        sfxVolume = GameSettings.EffectsVolume;
+        UpdateActiveVolumes();
+    }
+
+    private void OnDestroy()
+    {
+        GameSettings.VolumeChanged -= ApplySettings;
+        if (Instance == this)
+            Instance = null;
+    }
+
+    private float TargetVolume(AudioClip clip)
+    {
+        float gain = clip == tsunamiPhaseMusic ? tsunamiMusicGain : clip == idlePhaseMusic ? idleMusicGain : 1f;
+        return masterVolume * musicVolume * gain;
     }
 
     private void Update()
@@ -369,7 +397,7 @@ public class AudioManager : MonoBehaviour
     {
         if (tsunamiPhaseMusic == null)
         {
-            tsunamiPhaseMusic = FindAudioClipAsset("Glorious_Morning") ?? FindAudioClipAsset("Volatile_Reaction");
+            tsunamiPhaseMusic = FindAudioClipAsset("Volatile_Reaction");
         }
 
         if (idlePhaseMusic == null)

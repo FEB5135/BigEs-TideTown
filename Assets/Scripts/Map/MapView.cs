@@ -229,6 +229,8 @@ public class MapView : MonoBehaviour
             count++;
         }
         origin = count > 0 ? origin / count : house.Center;
+        if (GameAudio.Instance != null)
+            GameAudio.Play(GameAudio.Instance.houseBreak, origin);
 
         foreach (var cell in structure)
         {
