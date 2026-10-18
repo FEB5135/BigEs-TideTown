@@ -1004,6 +1004,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::IdleTown.Construction.WallDemoGrid
   world: {fileID: 1602157105}
+  terrainSurface: {fileID: 0}
   color: {r: 0.16, g: 0.24, b: 0.2, a: 1}
 --- !u!23 &123608663
 MeshRenderer:
@@ -1122,6 +1123,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleTown.Runtime::IdleTown.Construction.WallDemoGrid
   world: {fileID: 10385819}
+  terrainSurface: {fileID: 0}
   color: {r: 0.16, g: 0.24, b: 0.2, a: 1}
 --- !u!23 &132178528
 MeshRenderer:
@@ -5478,6 +5480,55 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &595395689
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 595395691}
+  - component: {fileID: 595395690}
+  m_Layer: 0
+  m_Name: Tutorial
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &595395690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595395689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 246223ed0db01f94a9c4210c9813525b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleTown.Runtime::TutorialHints
+  font: {fileID: 12800000, guid: 45f0fe53976ab1d4c8aec9a9c0215b70, type: 3}
+  panelSprite: {fileID: 21300000, guid: 0de1c9bb912f47c44b6a7660670392f5, type: 3}
+  infoDuration: 9
+  stepGap: 0.6
+  alwaysShow: 0
+--- !u!4 &595395691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595395689}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &614770273 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1969125119422315795, guid: d63ed926607a3da4c911637089faa9da, type: 3}
@@ -14407,6 +14458,7 @@ MonoBehaviour:
   resourceStoreSource: {fileID: 2141296705}
   inputCamera: {fileID: 784009414}
   wallPrefab: {fileID: 0}
+  terrainSurface: {fileID: 0}
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -26543,3 +26595,4 @@ SceneRoots:
   - {fileID: 970497801}
   - {fileID: 501909854}
   - {fileID: 1575717507}
+  - {fileID: 595395691}

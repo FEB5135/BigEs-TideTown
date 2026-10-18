@@ -47,7 +47,7 @@ Metin ve diğer kategorilerde hazır kaynak kullanılmadı.
 
 | Kategori | Kullanım | Araç | Amaç ve kullanım yeri |
 | --- | --- | --- | --- |
-| Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, yapı yükseltme ve işçi üretme, kamera, tıklama, arayüz, ana menü, kamera giriş geçişi ve ayar scriptleri; sahne kurulum (editör) scriptleri; Unity paket derleme hatasının çözümü. |
+| Kod | Kullanıldı | Claude (Anthropic) | `Assets/Scripts/` altındaki kaynak toplama, kuyu, yapı yükseltme ve işçi üretme, kamera, tıklama, arayüz, ana menü, kamera giriş geçişi, oyun başı ipucu kartları (tutorial) ve ayar scriptleri; sahne kurulum (editör) scriptleri; Unity paket derleme hatasının çözümü. |
 | Kod | Kullanıldı | Claude (Anthropic) | `Assets/Tsunami/` altındaki tsunami simülasyonu: sonlu hacim sığ su çözücüsü (`TsunamiPhysicsSolver`), batimetri, su/deniz tabanı/sprey shader'ları, su yüzeyi ve okyanus çizimi, köpük ve çarpma sıçraması efektleri, oyun içi tsunami paneli ve sahne kurulum (editör) scriptleri. Çözücü Unity dışında sayısal testlerle (durgun göl, dalga hızı √(g·h), kütle korunumu, baraj yıkılması) doğrulandı. |
 | Kod ve görsel | Kullanıldı | Claude (Anthropic) | Tsunami öncesi fırtına (`Assets/Tsunami/Scripts/Rendering/TsunamiStorm.cs`): kodla üretilen low-poly bulutlar, şimşekler ve ışığın kararması; açık denizden gelen dalga kabarması (`TsunamiSwell.cs`); tsunaminin oyun başladıktan 2-3 dakika sonra kendiliğinden gelmesi ve paneldeki "Anında Etkinleştir" butonu. Hazır model, doku veya ses kullanılmadı.
 | Kod | Kullanıldı | Codex (OpenAI) | Köylülerin yürüme/odun kesme animasyonu, mevcut ekip modelinin kemik ağırlıkları, animasyonlu oduncu prefab kurulumu, SampleScene aktarımı ve Unity entegrasyon testleri. |
@@ -57,5 +57,5 @@ Metin ve diğer kategorilerde hazır kaynak kullanılmadı.
 | Görsel | Kullanıldı | Claude (Anthropic) + Blender 4.2 | Maden ocağı ve maden vagonu 3B modelleri (`Assets/Meshes/Quarry.fbx`, `Assets/Meshes/MineCart.fbx`): Claude, modelleri Blender Python scriptleriyle (`Art/Blender/`) kurdu; ekibin `palette.png` paleti ve kuyu stili kullanıldı. Ana menünün ikonları, gölgesi, kenar karartması, dalga amblemi, butonları (kesik köşeli, alt kalınlıklı), paneli ve kaydırıcı parçaları (`Assets/UI/Menu/`) ile köylü tutma imleçleri (açık/kapalı el, `Assets/UI/Cursor/`) Claude'un yazdığı Python scriptiyle (`Art/UI/make_menu_sprites.py`) çizildi; Kenney parçalarını yeniden renklendiren script (`Art/UI/adapt_kenney.py`) de Claude'a aittir. |
 | Ses | Kullanılmadı | — | — |
 | Ses | Kullanıldı | Claude (Anthropic) | Maden vagonunun ray üstünde yuvarlanma sesi (`Assets/Audio/SFX/CartRoll.wav`): Claude'un yazdığı Python scriptiyle (`Art/Audio/make_cart_roll.py`) gürültü ve sinüs dalgalarından sentezlendi; hazır kayıt kullanılmadı. |
-| Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası, menü metinleri ve kod içi açıklamalar. |
+| Metin | Kullanıldı | Claude (Anthropic) | Bu beyan dosyası, menü ve tutorial ipucu metinleri ve kod içi açıklamalar. |
 | Diğer | Kullanılmadı | — | — |

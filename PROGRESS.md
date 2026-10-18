@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`feature/storm-warning`, `feature/upgrades`'e birleştirildi)
+Son güncelleme: 2026-10-18 (ipucu kartları tutorial'ı, `Wallfix`)
 
 ## Bağlam
 
@@ -33,6 +33,8 @@ Son güncelleme: 2026-10-18 (`feature/storm-warning`, `feature/upgrades`'e birle
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **İpucu kartları tutorial'ı (18 Ekim 2026, `Wallfix` dalında, commit edilmedi):** Kullanıcı: "oyunun başına kontrolleri ve oynanışı anlatan tutorial". Konuşulan seçeneklerden (menüde sayfa / tam yönlendirmeli / bağlama göre ipucu) ipucu kartları seçildi. `Assets/Scripts/UI/TutorialHints.cs` (sahnede "Tutorial" nesnesi): `MainMenu.GameStarted` ile ekranın üst ortasında oyunu durdurmayan bir kart çıkar (lacivert panel, Rubik, "1 / 7", ATLA). Kart oyun sırasında kodla kurulur. Adımlar: kamera (sağ tık/tekerlek) → ağaç ve ocağa tıklayıp odun+taş topla → İşçi butonuyla köylü al → köylüyü ağaca/ocağa bırak (`HasJob`) → yükseltme bilgisi (9 sn ya da ilk yükseltme) → B ile duvar ör (`WallTierBuilt`) → "Köyü koru" bilgisi (9 sn). Oyuncu bir adımı zaten yaptıysa o adım gösterilmez. Bitince ya da ATLA'ya basılınca `PlayerPrefs` "TutorialDone" yazılır, sonraki oyunlarda çıkmaz; sıfırlamak için `Tools/BigEs/Tutorial'ı Sıfırla` (test için Inspector'da `alwaysShow`). Tsunami sayacı: tutorial sürerken `TutorialHints.HoldsTsunami` sayacı bekletir; duvar adımı gelince ya da ATLA'da `TsunamiAllowed` ile `TsunamiController.ScheduleRelease` çalışır. `AudioManager`'ın 1/2 müzik test tuşları `debugPhaseKeys` (varsayılan kapalı) arkasına alındı, duvar malzemesi tuşlarıyla çakışıyordu. Kurulum: `SampleSceneSetup.EnsureTutorial` (Integrate de çağırır), SampleScene'e tek seferlik betikle eklendi. Play'de doğrulandı: 7 adımın hepsi sırayla geçti (köylüyü işe koyma geçici bir editör komutuyla yapıldı, fareyle sürükleme denenmedi), duvar adımında panel "tsunamiye 2:00" saymaya başladı, kart 7. adımdan sonra kapandı; ikinci oyunda kart çıkmadı ve sayaç hemen başladı; sıfırlamadan sonra ATLA kartı kapatıp sayacı başlattı; konsolda hata yok. Yalnız QHD Game görünümünde bakıldı: kart üst ortada, solda duvar atölyesi ve sağda tsunami paneli arasında; küçük çözünürlükte (ör. 1280×720) soldaki IMGUI duvar paneliyle çakışabilir.
 
 - **Kuyu çevresinde ağaç yok, İşçi Hızı menüde (18 Ekim 2026, `feature/upgrades`):** Kullanıcı: "kuyunun belli bir uzaklığına kadar ağaç oluşmasın, işçiler gidip gelsin; işçi hızlandırma yükseltmesi menüden olsun".
   - `WfcSolver`: `clearIds` (5), `clearCenter` (kuyu), `clearRadius` 24 m: bu çemberde ağaç çıkmaz (boyanmış hücreler ve yalnız ağaç olabilen hücreler hariç). Bağlantı `SampleSceneSetup.EnsureWellClearing` (kurulum da çağırır), tek seferlik betikle uygulandı.
@@ -184,6 +186,7 @@ Son güncelleme: 2026-10-18 (`feature/storm-warning`, `feature/upgrades`'e birle
 
 ## Sıradaki işler / açık konular
 
+- [ ] Tutorial: küçük çözünürlükte kartın soldaki duvar paneliyle çakışıp çakışmadığına bakılmalı; ipucu metinleri ekiple okunup gerekirse kısaltılmalı. Teslim sürümünde "Anında Etkinleştir" test butonunun kalıp kalmayacağı kararlaştırılmalı.
 - [ ] WFC kıyı/köy bölgeleri ve köylüsüz başlangıç Unity'de Play'de denenmeli: işçi al → ormana/ocağa bırak → evlerin, dağların içinden geçmediğini, çatıya çıkmadığını izle. `VillagerAnimationIntegrationTests` köylüsüz sahneye göre güncellenmeli.
 - [ ] WFC: elle boyanmış harita sabitlemesiz de bazı tohumlarda çözülemiyor (7 oyunda 2); boyanmış hücreler/kurallar ekip tasarımcısıyla kontrol edilmeli ya da başarısızlıkta yeni tohumla yeniden denenmeli.
 - [ ] Sel takipçisi WFC ev karolarını (id 10–13) izlemiyor; köy hasarı/durum yazısı için gerekirse eklenecek.

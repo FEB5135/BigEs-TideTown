@@ -54,6 +54,9 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Parçalar arası yumuşak geçiş süresi (saniye)")]
     [SerializeField] private float defaultCrossfadeDuration = 1.5f;
 
+    [Tooltip("Test: 1 / 2 tuşları müzik fazını değiştirir. Oyunda kapalı olmalı (aynı tuşlar duvar malzemesini seçer).")]
+    [SerializeField] private bool debugPhaseKeys;
+
     [Header("Ses Kanalları (Boş bırakılırsa otomatik oluşturulur)")]
     [SerializeField] private AudioSource musicSourceA;
     [SerializeField] private AudioSource musicSourceB;
@@ -312,7 +315,7 @@ public class AudioManager : MonoBehaviour
     {
 #if ENABLE_INPUT_SYSTEM
         var kb = UnityEngine.InputSystem.Keyboard.current;
-        if (kb != null)
+        if (debugPhaseKeys && kb != null)
         {
             if (kb.digit1Key.wasPressedThisFrame)
             {
