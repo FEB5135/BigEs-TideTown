@@ -35,6 +35,8 @@ public class ResourceNode : MonoBehaviour
     // Tıklanınca ya da toplayıcı vurunca (örn. grid'de çizilen ağacı sallamak için).
     public event Action Hit;
 
+    // Sahnedeki açık kaynaklar (örn. tutorial'da tıklanacak ağacı göstermek için).
+    public static IReadOnlyList<ResourceNode> Active => active;
     public ResourceType Type => type;
     public int Remaining => remaining;
     public bool IsAvailable => remaining > 0 && claimants.Count < maxGatherers;

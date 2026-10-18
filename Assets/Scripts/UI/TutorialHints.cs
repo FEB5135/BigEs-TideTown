@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using IdleTown.Construction;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 // Oyun başında ekranın üst ortasında çıkan ipucu kartları. Oyunu durdurmaz: oyuncu söyleneni yapınca sıradaki
@@ -11,6 +13,9 @@ using UnityEngine.UI;
 // (Tools > BigEs > Tutorial'ı Sıfırla).
 // Tutorial sürerken tsunami sayacı başlamaz (HoldsTsunami): duvar adımı gelince ya da atlanınca TsunamiAllowed
 // çağrılır ve TsunamiController sayacı başlatır.
+// Oyuncu ilk dalgada vakit kaybetmesin diye her eylem adımı açılınca oyun zamanı durur (Time.timeScale = 0),
+// ekran hafifçe kararır ve tıklanacak yerler (ağaç ve ocak, İşçi butonu, köylü) aydınlık bir halkayla gösterilir.
+// Oyuncu tıklayınca (ya da adımı yapınca) zaman akmaya devam eder, sıradaki adıma kadar. Bilgi adımları zamanı durdurmaz.
 // Kart oyun sırasında kod ile kurulur; sahnede yalnız bu bileşen ve yazı tipi/sprite bağlantıları durur.
 public class TutorialHints : MonoBehaviour
 {
@@ -30,6 +35,8 @@ public class TutorialHints : MonoBehaviour
     [SerializeField] bool alwaysShow;
     [Tooltip("Sağ üstteki tsunami panelinin kapladığı genişlik (1920 referans pikseli). Kart onun soluna sığdırılır.")]
     [SerializeField] float rightReserve = 510f;
+    [Tooltip("Zaman durunca ekranın göze görünen kararma miktarı (0-1).")]
+    [SerializeField, Range(0f, 1f)] float dimAlpha = 0.55f;
 
     static readonly Color Navy = new(0.043f, 0.165f, 0.239f, 0.94f);
     static readonly Color Gold = new(1f, 0.824f, 0.247f);
@@ -46,6 +53,9 @@ public class TutorialHints : MonoBehaviour
     const float CardTop = -24f;
     const float SlideDistance = 24f;
     const float FadeTime = 0.3f;
+    const int DimTextureWidth = 160;
+    const float DimFadeSpeed = 6f;
+    const int MaxSpots = 3;
 
     class Step
     {
@@ -55,6 +65,15 @@ public class TutorialHints : MonoBehaviour
         public Action begin;
         public float autoAdvance; // > 0: bilgi adımı, bu kadar saniye sonra geçer
         public bool releasesTsunami;
+        public Func<bool> resume; // zaman dururken hangi tıklama durmayı kaldırır (boş: herhangi bir sol tık)
+        public Action<List<Spot>> spots; // zaman dururken aydınlatılacak yerler
+    }
+
+    // Ekran pikseli cinsinden aydınlık daire.
+    struct Spot
+    {
+        public Vector2 center;
+        public float radius;
     }
 
     Step[] steps;
@@ -76,6 +95,17 @@ public class TutorialHints : MonoBehaviour
     float cardX;
     CanvasGroup group;
     Text badge, title, body;
+
+    Step current;
+    bool frozen;
+    int frozenFrame;
+    float dimLevel;
+    readonly List<Spot> spots = new();
+    RawImage dim;
+    Texture2D dimTexture;
+    Color32[] dimPixels;
+    readonly RawImage[] rings = new RawImage[MaxSpots];
+    UpgradeHUD upgradeHud;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
@@ -111,6 +141,9 @@ public class TutorialHints : MonoBehaviour
             construction.WallTierBuilt -= OnWallBuilt;
         // Sahne kapanırken sayaç başlatılmaz, yalnız bekletme kalkar.
         HoldsTsunami = false;
+        Unfreeze();
+        if (dimTexture != null)
+            Destroy(dimTexture);
     }
 
     void OnGameStarted()
@@ -130,6 +163,7 @@ public class TutorialHints : MonoBehaviour
         construction = FindAnyObjectByType<WallConstructionController>();
         if (construction != null)
             construction.WallTierBuilt += OnWallBuilt;
+        upgradeHud = FindAnyObjectByType<UpgradeHUD>();
 
         routine = StartCoroutine(Run());
     }
@@ -155,18 +189,32 @@ public class TutorialHints : MonoBehaviour
             title = "KAYNAK TOPLA",
             body = "Ağaçlara ve taş ocaklarına sol tıkla. Odun ve taş ortadaki kuyuya uçar.",
             done = () => well == null || (gotWood && gotStone),
+            resume = ClickedResource,
+            spots = list =>
+            {
+                AddNodeSpot(list, ResourceType.Wood);
+                AddNodeSpot(list, ResourceType.Stone);
+            },
         },
         new Step
         {
             title = "KÖYLÜ AL",
             body = "Topladıklarınla sol alttaki işçi butonundan bir köylü al.",
             done = () => Gatherer.Villagers.Count > 0,
+            spots = list => AddUiSpot(list, upgradeHud != null ? upgradeHud.WorkerButton : null),
         },
         new Step
         {
             title = "KÖYLÜYE İŞ VER",
             body = "Köylüyü sol tıkla tutup bir ağacın yanına bırak: odun keser. Taş ocağına bırakırsan vagon iter.",
             done = AnyVillagerWorking,
+            spots = list =>
+            {
+                var villager = IdleVillager();
+                if (villager == null) return;
+                AddWorldSpot(list, villager);
+                AddWorldSpot(list, ResourceNode.FindNearestFree(ResourceType.Wood, villager.transform.position));
+            },
         },
         new Step
         {
@@ -182,6 +230,8 @@ public class TutorialHints : MonoBehaviour
                 + "1 / 2 / 3: ahşap, taş, güçlü. Sağ tık: iptal.",
             releasesTsunami = true,
             done = () => construction == null || wallBuilt,
+            // Soldaki duvar paneli IMGUI ile karartmanın üstüne çizilir, ayrıca göstermeye gerek yok.
+            resume = () => construction.ConstructionModeActive || LeftPressed(),
         },
         new Step
         {
@@ -198,6 +248,14 @@ public class TutorialHints : MonoBehaviour
             if (villager != null && (villager.HasJob || villager.PushedCart != null))
                 return true;
         return false;
+    }
+
+    static Gatherer IdleVillager()
+    {
+        foreach (var villager in Gatherer.Villagers)
+            if (villager != null && !villager.HasJob && villager.PushedCart == null)
+                return villager;
+        return null;
     }
 
     static bool AnyUpgraded()
@@ -224,10 +282,240 @@ public class TutorialHints : MonoBehaviour
 
     void OnWallBuilt(WallRecord record, GameObject instance) => wallBuilt = true;
 
+    void Update()
+    {
+        // Durmayı başlatan karedeki tıklama (örn. Oyna butonu) sayılmaz.
+        if (frozen && current != null && Time.frameCount > frozenFrame && (current.done() || (current.resume != null ? current.resume() : LeftPressed())))
+            Unfreeze();
+    }
+
     void LateUpdate()
     {
         if (card != null && card.gameObject.activeSelf)
             Layout();
+        UpdateDim();
+    }
+
+    // ------------------------------------------------------------------ zaman durdurma
+
+    void Freeze(Step step)
+    {
+        current = step;
+        if (step.autoAdvance > 0f || frozen)
+            return;
+        frozen = true;
+        frozenFrame = Time.frameCount;
+        Time.timeScale = 0f;
+    }
+
+    void Unfreeze()
+    {
+        if (!frozen)
+            return;
+        frozen = false;
+        Time.timeScale = 1f;
+    }
+
+    static bool LeftPressed()
+    {
+        var mouse = Mouse.current;
+        return mouse != null && mouse.leftButton.wasPressedThisFrame;
+    }
+
+    // ClickHarvester'ın aynı tıklamada toplayacağı bir kaynağa mı basıldı.
+    static bool ClickedResource()
+    {
+        var mouse = Mouse.current;
+        if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
+            return false;
+        var position = mouse.position.ReadValue();
+        var cam = Camera.main;
+        if (cam == null || WallConstructionController.IsPointerOverConstructionUi(position))
+            return false;
+        if (!Physics.Raycast(cam.ScreenPointToRay(position), out var hit, 200f, ~0, QueryTriggerInteraction.Ignore))
+            return false;
+        var node = hit.collider.GetComponentInParent<ResourceNode>();
+        return node != null && node.Remaining > 0;
+    }
+
+    // Bu türden, ekranın ortasına en yakın görünen kaynak; panellerin altında kalanlar ancak başka yoksa seçilir.
+    void AddNodeSpot(List<Spot> list, ResourceType type)
+    {
+        var cam = Camera.main;
+        if (cam == null)
+            return;
+        var middle = new Vector2(Screen.width, Screen.height) * 0.5f;
+        ResourceNode best = null;
+        float bestScore = float.MaxValue;
+        foreach (var node in ResourceNode.Active)
+        {
+            if (node.Type != type || node.Remaining <= 0)
+                continue;
+            var screen = cam.WorldToScreenPoint(node.transform.position);
+            if (screen.z <= 0f || screen.x < 0f || screen.y < 0f || screen.x > Screen.width || screen.y > Screen.height)
+                continue;
+            float score = ((Vector2)screen - middle).sqrMagnitude;
+            if (UnderPanel(screen))
+                score += Screen.width * Screen.width * 4f;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = node;
+            }
+        }
+        AddWorldSpot(list, best);
+    }
+
+    // Ekran noktası kartın, sağ üstteki tsunami panelinin, soldaki duvar panelinin ya da alttaki HUD şeridinin altında mı.
+    bool UnderPanel(Vector2 screen)
+    {
+        float scale = canvas.scaleFactor;
+        var corners = new Vector3[4];
+        card.GetWorldCorners(corners);
+        if (screen.y > corners[0].y - 20f * scale)
+            return true;
+        if (screen.x > Screen.width - rightReserve * scale && screen.y > Screen.height - 440f * scale)
+            return true;
+        if (screen.y < 140f * scale)
+            return true;
+        if (construction != null && construction.isActiveAndEnabled
+            && WallConstructionController.PanelRect.Contains(new Vector2(screen.x, Screen.height - screen.y)))
+            return true;
+        return false;
+    }
+
+    // Nesnenin görselinin ekrandaki kaplamına göre bir daire.
+    static void AddWorldSpot(List<Spot> list, Component target)
+    {
+        var cam = Camera.main;
+        if (target == null || cam == null)
+            return;
+        Bounds bounds = default;
+        bool any = false;
+        foreach (var r in target.GetComponentsInChildren<Renderer>())
+        {
+            if (!r.enabled || r is ParticleSystemRenderer)
+                continue;
+            if (any) bounds.Encapsulate(r.bounds);
+            else { bounds = r.bounds; any = true; }
+        }
+        if (!any)
+        {
+            var collider = target.GetComponentInChildren<Collider>();
+            bounds = collider != null ? collider.bounds : new Bounds(target.transform.position, Vector3.one * 2f);
+        }
+
+        Vector2 min = new(float.MaxValue, float.MaxValue), max = new(float.MinValue, float.MinValue);
+        var center = bounds.center;
+        var extents = bounds.extents;
+        for (int i = 0; i < 8; i++)
+        {
+            var corner = center + Vector3.Scale(extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+            var screen = cam.WorldToScreenPoint(corner);
+            if (screen.z <= 0f)
+                return;
+            min = Vector2.Min(min, screen);
+            max = Vector2.Max(max, screen);
+        }
+        AddSpot(list, (min + max) * 0.5f, (max - min).magnitude * 0.5f);
+    }
+
+    static void AddUiSpot(List<Spot> list, RectTransform target)
+    {
+        if (target == null || !target.gameObject.activeInHierarchy)
+            return;
+        var canvas = target.GetComponentInParent<Canvas>();
+        canvas = canvas != null ? canvas.rootCanvas : null;
+        var cam = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        var corners = new Vector3[4];
+        target.GetWorldCorners(corners);
+        Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
+        Vector2 b = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
+        AddSpot(list, (a + b) * 0.5f, (b - a).magnitude * 0.5f);
+    }
+
+    static void AddSpot(List<Spot> list, Vector2 center, float radius)
+    {
+        float unit = Screen.height / 1080f;
+        list.Add(new Spot { center = center, radius = Mathf.Clamp(radius + 18f * unit, 50f * unit, 190f * unit) });
+    }
+
+    // Zaman dururken ekran kararır, tıklanacak yerler aydınlık kalır; gösterilecek yer yoksa yalnız kenarlar kararır.
+    void UpdateDim()
+    {
+        if (dim == null)
+            return;
+        dimLevel = Mathf.MoveTowards(dimLevel, frozen ? 1f : 0f, DimFadeSpeed * Time.unscaledDeltaTime);
+        float alpha = dimLevel;
+        dim.color = new Color(1f, 1f, 1f, alpha);
+        bool visible = alpha > 0.001f;
+        dim.enabled = visible;
+
+        spots.Clear();
+        if (visible && current?.spots != null)
+            current.spots(spots);
+
+        float scale = canvas.scaleFactor;
+        float pulse = 1f + 0.06f * Mathf.Sin(Time.unscaledTime * 5f);
+        for (int i = 0; i < rings.Length; i++)
+        {
+            bool on = visible && i < spots.Count && scale > 0f;
+            rings[i].enabled = on;
+            if (!on)
+                continue;
+            var rect = rings[i].rectTransform;
+            rect.anchoredPosition = spots[i].center / scale;
+            float size = spots[i].radius * 2f * pulse / scale;
+            rect.sizeDelta = new Vector2(size, size);
+            rings[i].color = new Color(Gold.r, Gold.g, Gold.b, alpha);
+        }
+
+        if (visible)
+            PaintDim();
+    }
+
+    void PaintDim()
+    {
+        int width = DimTextureWidth;
+        int height = Mathf.Max(1, Mathf.RoundToInt(width * (float)Screen.height / Mathf.Max(1, Screen.width)));
+        if (dimTexture == null || dimTexture.height != height)
+        {
+            if (dimTexture != null)
+                Destroy(dimTexture);
+            dimTexture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                name = "Tutorial Dim",
+            };
+            dimPixels = new Color32[width * height];
+            dim.texture = dimTexture;
+        }
+
+        float pixel = (float)Screen.width / width;
+        var middle = new Vector2(Screen.width, Screen.height) * 0.5f;
+        float corner = middle.magnitude;
+        for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+        {
+            var p = new Vector2((x + 0.5f) * pixel, (y + 0.5f) * pixel);
+            float a;
+            if (spots.Count == 0)
+            {
+                a = Mathf.Lerp(0.25f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.15f, 0.8f, (p - middle).magnitude / corner)));
+            }
+            else
+            {
+                a = 1f;
+                foreach (var spot in spots)
+                    a = Mathf.Min(a, Mathf.SmoothStep(0f, 1f, ((p - spot.center).magnitude - spot.radius) / (spot.radius * 0.5f)));
+            }
+            // UI lineer renk uzayında karışır: göze görünen kararma için alfa büyütülür.
+            float alpha = 1f - Mathf.Pow(1f - a * dimAlpha, 2.2f);
+            dimPixels[y * width + x] = new Color32(0, 0, 0, (byte)(alpha * 255f));
+        }
+        dimTexture.SetPixels32(dimPixels);
+        dimTexture.Apply(false);
     }
 
     // Kart soldaki duvar panelinin (IMGUI, ekranla ölçeklenmez) ve sağ üstteki tsunami panelinin arasına sığdırılır:
@@ -272,6 +560,7 @@ public class TutorialHints : MonoBehaviour
             SetStep(i, step);
             card.gameObject.SetActive(true);
             Layout();
+            Freeze(step);
             yield return Fade(true);
             float shown = 0f;
             while (!step.done() && (step.autoAdvance <= 0f || shown < step.autoAdvance))
@@ -279,8 +568,10 @@ public class TutorialHints : MonoBehaviour
                 shown += Time.deltaTime;
                 yield return null;
             }
+            Unfreeze();
+            current = null;
             yield return Fade(false);
-            yield return new WaitForSeconds(stepGap);
+            yield return new WaitForSecondsRealtime(stepGap);
         }
         Finish();
     }
@@ -297,6 +588,8 @@ public class TutorialHints : MonoBehaviour
     IEnumerator SkipRoutine()
     {
         AllowTsunami();
+        Unfreeze();
+        current = null;
         yield return Fade(false);
         Finish();
     }
@@ -308,6 +601,8 @@ public class TutorialHints : MonoBehaviour
         PlayerPrefs.Save();
         running = false;
         routine = null;
+        Unfreeze();
+        current = null;
         card.gameObject.SetActive(false);
     }
 
@@ -364,6 +659,8 @@ public class TutorialHints : MonoBehaviour
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
         canvasObject.AddComponent<GraphicRaycaster>();
+
+        BuildDim(canvasObject.transform);
 
         card = NewRect("Card", canvasObject.transform);
         card.anchorMin = card.anchorMax = card.pivot = new Vector2(0.5f, 1f);
@@ -423,6 +720,49 @@ public class TutorialHints : MonoBehaviour
 
         card.gameObject.SetActive(false);
         EnsureEventSystem();
+    }
+
+    // Karartma ve halkalar kartın arkasında; tıklamaları kapmazlar (köylü ve kaynak tıklamaları UI'ya bakıyor).
+    void BuildDim(Transform parent)
+    {
+        dim = NewRect("Dim", parent).gameObject.AddComponent<RawImage>();
+        var dimRect = dim.rectTransform;
+        dimRect.anchorMin = Vector2.zero;
+        dimRect.anchorMax = Vector2.one;
+        dimRect.sizeDelta = Vector2.zero;
+        dim.raycastTarget = false;
+        dim.color = new Color(1f, 1f, 1f, 0f);
+        dim.enabled = false;
+
+        var ringTexture = RingTexture();
+        for (int i = 0; i < rings.Length; i++)
+        {
+            var ring = NewRect("Ring", parent).gameObject.AddComponent<RawImage>();
+            ring.texture = ringTexture;
+            ring.color = Gold;
+            ring.raycastTarget = false;
+            ring.rectTransform.anchorMin = ring.rectTransform.anchorMax = Vector2.zero;
+            ring.enabled = false;
+            rings[i] = ring;
+        }
+    }
+
+    static Texture2D RingTexture()
+    {
+        const int size = 128;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "Tutorial Ring" };
+        var pixels = new Color32[size * size];
+        float half = size * 0.5f;
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float d = new Vector2(x + 0.5f - half, y + 0.5f - half).magnitude;
+            float a = Mathf.Clamp01(1f - Mathf.Abs(d - (half - 5f)) / 2.5f);
+            pixels[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+        }
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+        return texture;
     }
 
     static RectTransform NewRect(string name, Transform parent)
