@@ -1390,9 +1390,7 @@ MonoBehaviour:
   checkInterval: 0.25
   floodDepth: 0.25
   destroyDepth: 1.2
-  houseDestroyDepth: 1
-  houseFlowMinDepth: 0.3
-  houseDestroyFlow: 1.5
+  houseWetDepth: 0.05
   floodedMaterial: {fileID: 2100000, guid: 299b5e79509d14a4680a8b75f258d662, type: 2}
   destroyedMaterial: {fileID: 2100000, guid: 2c51b033a80863246b6e93ebc2ab438e, type: 2}
   statusText: {fileID: 155505860}
@@ -24604,6 +24602,7 @@ MonoBehaviour:
   waveHeightText: {fileID: 2025824919}
   statusText: {fileID: 722723330}
   countdownText: {fileID: 695503404}
+  prepareNoticeTime: 8
 --- !u!114 &1950063955
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25092,6 +25091,16 @@ MonoBehaviour:
   autoRelease: 1
   releaseDelayMin: 120
   releaseDelayMax: 180
+  waves:
+  - height: 15
+    delay: 180
+  - height: 20
+    delay: 120
+  - height: 25
+    delay: 120
+  waveDuration: 60
+  drainStart: 45
+  drainDuration: 15
   fallbackSourcePosition: {x: 0, y: 0, z: -90}
   fallbackDirection: 0
 --- !u!4 &1964409334

@@ -25,11 +25,15 @@ namespace Tsunami
         [SerializeField] Text statusText;
         [Tooltip("Large countdown / alert label. Optional.")]
         [SerializeField] Text countdownText;
+        [Tooltip("Seconds the 'get ready for the next wave' notice stays on the large label.")]
+        [SerializeField, Min(0f)] float prepareNoticeTime = 8f;
 
         int shownKey = int.MinValue;
         int shownReleaseSecond = int.MinValue;
         int shownWaves = int.MinValue;
         bool shownDanger;
+        bool calmCountdown;  // the next wave is counting down and the village is out of danger
+        float prepareUntil = -1f;
         bool shownPending;
         Text startLabel, stopLabel;
         CanvasGroup visibility;
@@ -136,14 +140,26 @@ namespace Tsunami
                 RefreshStatus();
                 RefreshWaveHeight();
             }
+            // A calm countdown to the next wave begins at the game start and when the water of the last one has
+            // drained: tell the player to get ready.
+            bool calm = controller.WaveCount > 0 && controller.NextReleaseScheduled && !controller.InDanger;
+            if (calm && !calmCountdown) prepareUntil = Time.time + prepareNoticeTime;
+            calmCountdown = calm;
             if (countdownText == null) return;
             int key = -1;
             if (controller.State == TsunamiState.Warning) key = Mathf.CeilToInt(controller.WarningRemaining);
             else if (controller.State == TsunamiState.Running && controller.Simulation != null && controller.Simulation.SimTime < 6.0) key = 1000;
+            else if (calm && Time.time < prepareUntil) key = 2000 + Mathf.CeilToInt(controller.NextReleaseRemaining);
             if (key == shownKey) return;
             shownKey = key;
             string wave = controller.WaveCount > 0 ? $"{controller.WavesReleased}. DALGA" : "TSUNAMİ";
-            if (key == 1000) countdownText.text = $"{wave} GELİYOR";
+            if (key >= 2000)
+            {
+                int left = key - 2000;
+                countdownText.text = $"{controller.WavesReleased + 1}. DALGAYA HAZIRLAN!\n" +
+                                     $"{controller.NextWaveHeight:0} m dalga {left / 60}:{left % 60:00} sonra";
+            }
+            else if (key == 1000) countdownText.text = $"{wave} GELİYOR";
             else if (key >= 0) countdownText.text = controller.WaveCount > 0 ? $"{wave} ({controller.WaveHeight:0} m)\n{key}" : $"TSUNAMİ UYARISI\n{key}";
             else countdownText.text = string.Empty;
         }
