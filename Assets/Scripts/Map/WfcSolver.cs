@@ -26,6 +26,42 @@ public class WfcSolver : MonoBehaviour
     int maxDistance = 16;
     [SerializeField] Rule[] rules;
     [SerializeField] FixedCell[] initialCells;
+    [SerializeField, Tooltip("Ids that make up the coast: sand and its slopes. Between the painted coast and the map edge only these ids are allowed. Inland they reach at most Coast Width cells past the painted coast. Empty turns this off.")]
+    int[] coastIds = { 14, 15, 16, 17 };
+    [SerializeField, Tooltip("How many cells the beach may reach inland from the painted coast.")]
+    float coastWidth = 3f;
+    [SerializeField, Tooltip("Sand pits that do not reach the map edge are turned into this id (flat ground).")]
+    int pitFillId;
+    [SerializeField, Tooltip("Cells this much nearer to the painted coast than to other painted cells must be coast. Past Coast Width the same many cells stay free, so the shore has room for its slopes.")]
+    float coastBand = 2f;
+    [SerializeField, Tooltip("Ids that only appear near painted cells of the same ids (the houses). Empty turns this off.")]
+    int[] villageIds = { 10, 11, 12, 13 };
+    [SerializeField, Tooltip("Within this many cells of a painted village cell these ids get the full village weight.")]
+    float villageRadius = 12f;
+    [SerializeField, Tooltip("These ids thin out past Village Radius and never appear farther than this from a painted village cell.")]
+    float villageReach = 20f;
+    [SerializeField, Tooltip("Inside the village these ids are chosen this many times more often.")]
+    float villageWeight = 4f;
+    [SerializeField, Tooltip("Rough size of the random clumps and gaps between houses, in cells.")]
+    float villagePatch = 5f;
+    [SerializeField, Tooltip("Hill ids (low slopes and the middle level). They are left out of random flat patches, so hills come in clumps with open ground between. Empty turns this off.")]
+    int[] hillIds = { 1, 2, 3, 4 };
+    [SerializeField, Range(0f, 1f), Tooltip("About how much of the open land becomes flat patches.")]
+    float flatShare = 0.4f;
+    [SerializeField, Tooltip("Rough size of a flat patch, in cells.")]
+    float flatPatch = 14f;
+    [SerializeField, Tooltip("Painted cells of these ids keep their surroundings free, since they stand on hills (the mountains).")]
+    int[] mountainIds = { 6, 7, 8, 9 };
+    [SerializeField, Tooltip("How many cells around painted mountains are never made flat.")]
+    float mountainClearance = 6f;
+    [SerializeField, Tooltip("Ids kept out of the circle around Clear Center (trees around the well, so workers have a walk).")]
+    int[] clearIds = { 5 };
+    [SerializeField] Transform clearCenter;
+    [SerializeField, Tooltip("Radius of that circle, in metres.")]
+    float clearRadius = 24f;
+
+    float[] villageBias;
+    bool[] villageTile;
 
     readonly List<FixedCell> pins = new();
     readonly List<Tile> tiles = new();
@@ -123,6 +159,11 @@ public class WfcSolver : MonoBehaviour
 
         usedSeed = seed != 0 ? seed : Environment.TickCount;
         random = new System.Random(usedSeed);
+        ApplyCoast();
+        ApplyVillage();
+        ApplyFlats();
+        ApplyClearing();
+
         attempts = 0;
         attemptLimit = Math.Max(MaxAttempts, cellCount * 32);
         dirty.Clear();
@@ -138,11 +179,16 @@ public class WfcSolver : MonoBehaviour
         if (!PropagateInitial(origins) || !Search(origins))
             return false;
 
+        var chosen = new int[cellCount];
+        for (var i = 0; i < cellCount; i++)
+            chosen[i] = ChosenTile(i);
+        FillPits(chosen);
+
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
             {
-                var tile = ChosenTile(y * width + x);
+                var tile = chosen[y * width + x];
                 world.Set(x, y, tiles[tile].Id, tiles[tile].Rotation);
             }
         }
@@ -367,6 +413,342 @@ public class WfcSolver : MonoBehaviour
         return true;
     }
 
+    // Local rules alone let sand pits open inland and grass, trees and houses spread over the beach.
+    // The painted coast outlines the island: outside it (toward the map edge) is all coast, and the beach
+    // reaches only a few cells inland from it.
+    void ApplyCoast()
+    {
+        if (coastIds == null || coastIds.Length == 0 || initialCells == null)
+            return;
+
+        var coast = new List<int>();
+        var land = new List<int>();
+        foreach (var cell in initialCells)
+        {
+            if (world.InBounds(cell.X, cell.Y))
+                (Array.IndexOf(coastIds, cell.Id) >= 0 ? coast : land).Add(cell.Y * width + cell.X);
+        }
+
+        if (coast.Count == 0)
+            return;
+
+        // 1 coast only, -1 no coast, 0 free.
+        var zone = new sbyte[counts.Length];
+        for (var i = 0; i < counts.Length; i++)
+        {
+            if (counts[i] < tileCount)
+                continue;
+
+            var sand = Nearest(i, coast, out var toCoastSquared);
+            var toCoast = Math.Sqrt(toCoastSquared);
+            var toLand = double.MaxValue;
+            var outside = false;
+            if (land.Count > 0)
+            {
+                var ground = Nearest(i, land, out var toLandSquared);
+                toLand = Math.Sqrt(toLandSquared);
+                // The painted coast lies between this cell and the land: the cell is past the shore line.
+                // Just inside the painted land both lie the same way too, but the land is nearer there.
+                outside = toCoast < toLand
+                    && (sand % width - i % width) * (ground % width - i % width)
+                    + (sand / width - i / width) * (ground / width - i / width) > 0;
+            }
+
+            if (toCoast + coastBand < toLand && (outside || toCoast <= coastWidth))
+                zone[i] = 1;
+            else if (!outside && toCoast > coastWidth + coastBand)
+                zone[i] = -1;
+        }
+
+        // Coast and land never touch directly; the shore needs free cells for its slopes.
+        var gap = (int)Math.Ceiling(coastBand);
+        for (var i = 0; i < zone.Length; i++)
+        {
+            if (zone[i] == -1 && HasZoneNear(zone, i, gap, 1))
+                zone[i] = 0;
+        }
+
+        var isCoast = IdMask(coastIds);
+        for (var i = 0; i < zone.Length; i++)
+        {
+            if (zone[i] != 0)
+                Restrict(i, isCoast, zone[i] > 0);
+        }
+    }
+
+    bool HasZoneNear(sbyte[] zone, int cell, int radius, sbyte value)
+    {
+        var x = cell % width;
+        var y = cell / width;
+        for (var ny = Math.Max(0, y - radius); ny <= Math.Min(height - 1, y + radius); ny++)
+        {
+            for (var nx = Math.Max(0, x - radius); nx <= Math.Min(width - 1, x + radius); nx++)
+            {
+                if (zone[ny * width + nx] == value)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    // The free band between beach and land still leaves room for small sand pits. A patch of coast tiles that does
+    // not reach the map edge is a pit: it and its slopes become flat ground. Every slope faces ground on its outer
+    // side, so the cells around the pit already fit ground.
+    void FillPits(int[] chosen)
+    {
+        if (coastIds == null || coastIds.Length == 0)
+            return;
+
+        var fill = -1;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (tiles[tile].Id == pitFillId && tiles[tile].Rotation == 0)
+                fill = tile;
+        }
+
+        if (fill < 0)
+            return;
+
+        var isCoast = IdMask(coastIds);
+        var seen = new bool[chosen.Length];
+        var patch = new List<int>();
+        for (var start = 0; start < chosen.Length; start++)
+        {
+            if (seen[start] || !isCoast[chosen[start]])
+                continue;
+
+            patch.Clear();
+            patch.Add(start);
+            seen[start] = true;
+            var reachesEdge = false;
+            for (var k = 0; k < patch.Count; k++)
+            {
+                var cell = patch[k];
+                var x = cell % width;
+                var y = cell / width;
+                if (x == 0 || y == 0 || x == width - 1 || y == height - 1)
+                    reachesEdge = true;
+                for (var dir = 0; dir < 4; dir++)
+                {
+                    var nx = x + DX[dir];
+                    var ny = y + DY[dir];
+                    if ((uint)nx >= (uint)width || (uint)ny >= (uint)height)
+                        continue;
+                    var next = ny * width + nx;
+                    if (seen[next] || !isCoast[chosen[next]])
+                        continue;
+                    seen[next] = true;
+                    patch.Add(next);
+                }
+            }
+
+            if (reachesEdge)
+                continue;
+            foreach (var cell in patch)
+                chosen[cell] = fill;
+        }
+    }
+
+    // Houses stay around the painted village instead of dotting the whole island. They thin out toward the edge
+    // and random clumps and gaps keep the village from filling a round blob.
+    void ApplyVillage()
+    {
+        villageBias = null;
+        if (villageIds == null || villageIds.Length == 0 || initialCells == null)
+            return;
+
+        var village = new List<int>();
+        foreach (var cell in initialCells)
+        {
+            if (world.InBounds(cell.X, cell.Y) && Array.IndexOf(villageIds, cell.Id) >= 0)
+                village.Add(cell.Y * width + cell.X);
+        }
+
+        if (village.Count == 0)
+            return;
+
+        villageTile = IdMask(villageIds);
+        villageBias = new float[counts.Length];
+        var reach = Math.Max(villageReach, villageRadius);
+        var noise = Noise(villagePatch);
+        for (var i = 0; i < counts.Length; i++)
+        {
+            var distance = Math.Sqrt(NearestSquared(i, village));
+            if (distance > reach)
+            {
+                if (counts[i] > 1)
+                    Restrict(i, villageTile, false);
+                continue;
+            }
+
+            var falloff = distance <= villageRadius ? 1.0 : 1.0 - (distance - villageRadius) / (reach - villageRadius + 1e-6);
+            villageBias[i] = (float)(villageWeight * Math.Max(falloff, 0.05) * 2.0 * noise[i]);
+        }
+    }
+
+    // Smooth value noise in 0..1 with features about this many cells across.
+    double[] Noise(float patch)
+    {
+        var field = new double[counts.Length];
+        if (patch <= 0f)
+        {
+            for (var i = 0; i < field.Length; i++)
+                field[i] = 0.5;
+            return field;
+        }
+
+        var gridW = (int)Math.Ceiling(width / patch) + 2;
+        var gridH = (int)Math.Ceiling(height / patch) + 2;
+        var grid = new double[gridW * gridH];
+        for (var i = 0; i < grid.Length; i++)
+            grid[i] = random.NextDouble();
+
+        for (var i = 0; i < field.Length; i++)
+        {
+            var gx = i % width / patch;
+            var gy = i / width / patch;
+            var x0 = (int)gx;
+            var y0 = (int)gy;
+            var tx = Smooth(gx - x0);
+            var ty = Smooth(gy - y0);
+            var top = Lerp(grid[y0 * gridW + x0], grid[y0 * gridW + x0 + 1], tx);
+            var bottom = Lerp(grid[(y0 + 1) * gridW + x0], grid[(y0 + 1) * gridW + x0 + 1], tx);
+            field[i] = Lerp(top, bottom, ty);
+        }
+
+        return field;
+    }
+
+    // Without this, hills spread evenly over the whole island. Smooth noise picks open patches that stay flat.
+    void ApplyFlats()
+    {
+        if (hillIds == null || hillIds.Length == 0 || flatShare <= 0f || flatPatch <= 0f)
+            return;
+
+        var mountains = new List<int>();
+        if (initialCells != null && mountainIds != null)
+        {
+            foreach (var cell in initialCells)
+            {
+                if (world.InBounds(cell.X, cell.Y) && Array.IndexOf(mountainIds, cell.Id) >= 0)
+                    mountains.Add(cell.Y * width + cell.X);
+            }
+        }
+
+        var noise = Noise(flatPatch);
+        var isHill = IdMask(hillIds);
+        var clearance = mountainClearance * mountainClearance;
+        for (var i = 0; i < counts.Length; i++)
+        {
+            if (counts[i] <= 1 || !HasAny(i, isHill) || noise[i] >= flatShare)
+                continue;
+            if (mountains.Count > 0 && NearestSquared(i, mountains) <= clearance)
+                continue;
+
+            Restrict(i, isHill, false);
+        }
+    }
+
+    void ApplyClearing()
+    {
+        if (clearCenter == null || clearIds == null || clearIds.Length == 0 || clearRadius <= 0f)
+            return;
+
+        var local = world.transform.InverseTransformPoint(clearCenter.position);
+        var cx = local.x / world.CellSize - 0.5f;
+        var cy = local.z / world.CellSize - 0.5f;
+        var radius = clearRadius / world.CellSize;
+        var isClear = IdMask(clearIds);
+        for (var i = 0; i < counts.Length; i++)
+        {
+            var dx = i % width - cx;
+            var dy = i / width - cy;
+            if (counts[i] <= 1 || dx * dx + dy * dy > radius * radius || !HasOther(i, isClear))
+                continue;
+            Restrict(i, isClear, false);
+        }
+    }
+
+    bool HasOther(int cell, bool[] mask)
+    {
+        var cellBase = cell * tileCount;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile] && !mask[tile])
+                return true;
+        }
+
+        return false;
+    }
+
+    bool HasAny(int cell, bool[] mask)
+    {
+        var cellBase = cell * tileCount;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile] && mask[tile])
+                return true;
+        }
+
+        return false;
+    }
+
+    static double Smooth(double t) => t * t * (3 - 2 * t);
+
+    static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
+    bool[] IdMask(int[] ids)
+    {
+        var mask = new bool[tileCount];
+        for (var tile = 0; tile < tileCount; tile++)
+            mask[tile] = Array.IndexOf(ids, tiles[tile].Id) >= 0;
+        return mask;
+    }
+
+    // Keeps only the tiles whose mask matches. The cell becomes an origin of the first propagation.
+    void Restrict(int cell, bool[] mask, bool keep)
+    {
+        var cellBase = cell * tileCount;
+        var kept = 0;
+        for (var tile = 0; tile < tileCount; tile++)
+        {
+            if (possible[cellBase + tile] && mask[tile] != keep)
+                possible[cellBase + tile] = false;
+            if (possible[cellBase + tile])
+                kept++;
+        }
+
+        counts[cell] = kept;
+    }
+
+    int NearestSquared(int cell, List<int> cells)
+    {
+        Nearest(cell, cells, out var best);
+        return best;
+    }
+
+    int Nearest(int cell, List<int> cells, out int bestSquared)
+    {
+        var x = cell % width;
+        var y = cell / width;
+        bestSquared = int.MaxValue;
+        var nearest = -1;
+        for (var i = 0; i < cells.Count; i++)
+        {
+            var dx = cells[i] % width - x;
+            var dy = cells[i] / width - y;
+            var d = dx * dx + dy * dy;
+            if (d < bestSquared)
+            {
+                bestSquared = d;
+                nearest = cells[i];
+            }
+        }
+
+        return nearest;
+    }
+
     void BuildCompatibility()
     {
         for (var a = 0; a < tileCount; a++)
@@ -523,6 +905,8 @@ public class WfcSolver : MonoBehaviour
             var tile = available[i];
             choices[i] = tile;
             weights[i] = tiles[tile].Weight / open[tiles[tile].Id];
+            if (villageBias != null && villageTile[tile])
+                weights[i] *= villageBias[cell];
         }
 
         count = available.Count;

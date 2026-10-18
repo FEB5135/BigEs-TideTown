@@ -7,7 +7,9 @@ using UnityEngine.UI;
 // Geçici yükseltme arayüzü (HUD'da):
 // - her yükseltilebilir yapının (her taş ocağı ayrı, orman) üstünde ekranda onu takip eden küçük buton; yalnız
 //   kuyudaki odun ve taş bir sonraki seviyeye yetince belirir, tıklayınca o bedelle yükseltir;
-// - taş butonunun yanında odun ve taşla yeni işçi (köylü) üreten buton; işçi kuyunun yanında doğar ve dolaşır.
+// - taş butonunun yanında odun ve taşla yeni işçi (köylü) üreten buton; işçi kuyunun yanında doğar ve dolaşır;
+// - onun yanında işçileri hızlandıran yükseltme (ormanın UpgradeLevel'ı; harita elle boyandığı için ormanın tek bir
+//   yeri yok, butonu menüde durur).
 // Butonlar sahnedeki taş butonundan kopyalanır, böylece görünüm aynı kalır.
 [RequireComponent(typeof(Canvas))]
 public class UpgradeHUD : MonoBehaviour
@@ -24,9 +26,12 @@ public class UpgradeHUD : MonoBehaviour
 
     [Header("İşçi")]
     [SerializeField] Gatherer workerPrefab;
+    [Tooltip("Sahnede köylü yokken yeni işçinin boyunu, hızını ve mesafelerini aldığı kapalı köylü.")]
+    [SerializeField] Gatherer workerTemplate;
     [SerializeField] float workerButtonWidth = 290f;
     [SerializeField] int workerWood = 15;
     [SerializeField] int workerStone = 10;
+    [SerializeField] float speedButtonWidth = 300f;
 
     class Entry
     {
@@ -47,6 +52,10 @@ public class UpgradeHUD : MonoBehaviour
     Text workerText;
     CanvasGroup workerGroup;
     int hired;
+    UpgradeLevel speedUpgrade;
+    Button speedButton;
+    Text speedText;
+    CanvasGroup speedGroup;
 
     void Start()
     {
@@ -60,7 +69,12 @@ public class UpgradeHUD : MonoBehaviour
         BuildWorkerButton();
         buttonLayer = BuildButtonLayer();
         foreach (var upgrade in UpgradeLevel.All)
-            AddEntry(upgrade);
+        {
+            if (upgrade.IsForest && speedUpgrade == null)
+                BuildSpeedButton(upgrade);
+            else
+                AddEntry(upgrade);
+        }
         well.Changed += OnWellChanged;
         Refresh();
     }
@@ -72,6 +86,8 @@ public class UpgradeHUD : MonoBehaviour
         foreach (var entry in entries)
             if (entry.upgrade != null)
                 entry.upgrade.Changed -= OnUpgraded;
+        if (speedUpgrade != null)
+            speedUpgrade.Changed -= OnUpgraded;
     }
 
     void OnWellChanged(ResourceType type, int amount) => Refresh();
@@ -82,40 +98,60 @@ public class UpgradeHUD : MonoBehaviour
 
     void BuildWorkerButton()
     {
-        var panel = template.parent as RectTransform;
-        var copy = Copy(template.parent, "Worker Button", null, out workerText, out workerGroup);
-        copy.SetSiblingIndex(template.GetSiblingIndex() + 1);
-        copy.sizeDelta = new Vector2(workerButtonWidth, copy.sizeDelta.y);
-        if (panel != null && panel.TryGetComponent<HorizontalLayoutGroup>(out var layout))
-            panel.sizeDelta += new Vector2(workerButtonWidth + layout.spacing, 0f);
+        var copy = MenuButton("Worker Button", template.GetSiblingIndex() + 1, workerButtonWidth, "+", out workerText, out workerGroup);
+        workerButton = copy.GetComponent<Button>();
+        workerButton.onClick.AddListener(HireWorker);
+    }
 
-        // İşçi ikonu olmadığı için ikon yuvasında büyük bir "+".
-        var slot = copy.Find("Icon Slot");
-        if (slot != null && workerText != null)
+    void BuildSpeedButton(UpgradeLevel upgrade)
+    {
+        speedUpgrade = upgrade;
+        var index = workerButton != null ? workerButton.transform.GetSiblingIndex() + 1 : template.GetSiblingIndex() + 1;
+        var copy = MenuButton("Worker Speed Button", index, speedButtonWidth, "»", out speedText, out speedGroup);
+        speedButton = copy.GetComponent<Button>();
+        speedButton.onClick.AddListener(() =>
         {
-            var plus = new GameObject("Plus", typeof(RectTransform), typeof(Text), typeof(Outline)).GetComponent<RectTransform>();
-            plus.SetParent(slot, false);
-            plus.anchorMin = Vector2.zero;
-            plus.anchorMax = Vector2.one;
-            plus.offsetMin = plus.offsetMax = Vector2.zero;
-            var text = plus.GetComponent<Text>();
-            text.font = workerText.font;
+            speedUpgrade.TryUpgrade(well);
+            Refresh();
+        });
+        upgrade.Changed += OnUpgraded;
+    }
+
+    // Alttaki kaynak panelinde, taş butonunun kopyası; ikon yerine büyük bir işaret.
+    RectTransform MenuButton(string name, int siblingIndex, float width, string glyph, out Text label, out CanvasGroup group)
+    {
+        var panel = template.parent as RectTransform;
+        var copy = Copy(template.parent, name, null, out label, out group);
+        copy.SetSiblingIndex(siblingIndex);
+        copy.sizeDelta = new Vector2(width, copy.sizeDelta.y);
+        if (panel != null && panel.TryGetComponent<HorizontalLayoutGroup>(out var layout))
+            panel.sizeDelta += new Vector2(width + layout.spacing, 0f);
+
+        var slot = copy.Find("Icon Slot");
+        if (slot != null && label != null)
+        {
+            var mark = new GameObject("Glyph", typeof(RectTransform), typeof(Text), typeof(Outline)).GetComponent<RectTransform>();
+            mark.SetParent(slot, false);
+            mark.anchorMin = Vector2.zero;
+            mark.anchorMax = Vector2.one;
+            mark.offsetMin = mark.offsetMax = Vector2.zero;
+            var text = mark.GetComponent<Text>();
+            text.font = label.font;
             text.fontSize = 52;
             text.fontStyle = FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;
-            text.color = workerText.color;
-            text.text = "+";
+            text.color = label.color;
+            text.text = glyph;
             text.raycastTarget = false;
-            var outline = plus.GetComponent<Outline>();
-            var source = workerText.GetComponent<Outline>();
+            var outline = mark.GetComponent<Outline>();
+            var source = label.GetComponent<Outline>();
             if (source != null)
             {
                 outline.effectColor = source.effectColor;
                 outline.effectDistance = source.effectDistance;
             }
         }
-        workerButton = copy.GetComponent<Button>();
-        workerButton.onClick.AddListener(HireWorker);
+        return copy;
     }
 
     // Yapı butonları ayrı bir canvas katmanında, diğer panellerin (Tsunami paneli, kaynak paneli) altında çizilir ve
@@ -194,6 +230,18 @@ public class UpgradeHUD : MonoBehaviour
             workerGroup.alpha = canHire ? 1f : 0.7f;
         if (workerText != null)
             workerText.text = $"İşçi\n<size=22>{workerWood} odun {workerStone} taş</size>";
+
+        if (speedUpgrade != null)
+        {
+            bool canUpgrade = speedUpgrade.CanUpgrade(well);
+            speedButton.interactable = canUpgrade;
+            if (speedGroup != null)
+                speedGroup.alpha = canUpgrade ? 1f : 0.7f;
+            if (speedText != null)
+                speedText.text = speedUpgrade.TryGetNextCost(out int wood, out int stone)
+                    ? $"İşçi Hızı Sv {speedUpgrade.Level + 1}\n<size=22>{wood} odun {stone} taş</size>"
+                    : $"İşçi Hızı\n<size=22>En yüksek</size>";
+        }
     }
 
     // Yapı butonları yapının ekrandaki yerini takip eder; para yetmezken, son seviyede, menüde, inşa modunda ve yapı
@@ -235,7 +283,7 @@ public class UpgradeHUD : MonoBehaviour
             Refresh();
             return;
         }
-        var template = Gatherer.Villagers.Count > 0 ? Gatherer.Villagers[0] : null;
+        var template = Gatherer.Villagers.Count > 0 ? Gatherer.Villagers[0] : workerTemplate;
         var direction = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward;
         var spot = well.transform.position + direction * (well.ApproachRadius + 2.5f);
         if (NavMesh.SamplePosition(spot, out var hit, 6f, NavMesh.AllAreas))

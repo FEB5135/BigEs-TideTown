@@ -25,6 +25,7 @@ public static class SampleSceneSetup
             EnsureVillagerJobs(scene);
             EnsureAudio(scene);
             EnsureUpgrades(scene);
+            EnsureWellClearing(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -79,6 +80,7 @@ public static class SampleSceneSetup
         EnsureVillagerJobs(scene);
         EnsureAudio(scene);
         EnsureUpgrades(scene);
+        EnsureWellClearing(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -347,6 +349,60 @@ public static class SampleSceneSetup
         ui.FindProperty("stoneIcon").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Icons/Stone.png");
         ui.FindProperty("workerPrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Gatherer>("Assets/Prefabs/Economy/Woodcutter.prefab");
         ui.ApplyModifiedPropertiesWithoutUndo();
+        EnsureWorkerTemplate(scene);
+        return true;
+    }
+
+    // Oyun köylüsüz başlar: oyuncu elle topladığıyla işçi alır. Sahnedeki köylülerden biri kapalı "Worker Template"
+    // olarak kalır ve yeni işçiler onun ayarlarını (boy, hız, mesafeler) alır; diğerleri silinir.
+    public static bool EnsureWorkerTemplate(Scene scene)
+    {
+        var hud = Find<UpgradeHUD>(scene);
+        if (hud == null)
+            return false;
+
+        Gatherer template = null;
+        var extra = new List<Gatherer>();
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (var worker in root.GetComponentsInChildren<Gatherer>(true))
+            {
+                if (worker.Type != ResourceType.Wood || worker.GetComponent<VillagerAnimation>() == null)
+                    continue;
+                if (template == null || (worker.name == WorkerTemplateName && template.name != WorkerTemplateName))
+                {
+                    if (template != null)
+                        extra.Add(template);
+                    template = worker;
+                }
+                else
+                    extra.Add(worker);
+            }
+        if (template == null)
+            return false;
+
+        foreach (var worker in extra)
+            Object.DestroyImmediate(worker.gameObject);
+        template.name = WorkerTemplateName;
+        template.gameObject.SetActive(false);
+
+        var ui = new SerializedObject(hud);
+        ui.FindProperty("workerTemplate").objectReferenceValue = template;
+        ui.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
+
+    const string WorkerTemplateName = "Worker Template";
+
+    // Kuyunun çevresinde ağaç çıkmaz (WfcSolver.clearCenter): işçiler odunu uzaktan taşısın.
+    public static bool EnsureWellClearing(Scene scene)
+    {
+        var solver = Find<WfcSolver>(scene);
+        var well = Find<Well>(scene);
+        if (solver == null || well == null)
+            return false;
+        var settings = new SerializedObject(solver);
+        settings.FindProperty("clearCenter").objectReferenceValue = well.transform;
+        settings.ApplyModifiedPropertiesWithoutUndo();
         return true;
     }
 
