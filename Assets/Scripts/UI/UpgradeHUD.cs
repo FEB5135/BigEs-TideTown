@@ -226,13 +226,21 @@ public class UpgradeHUD : MonoBehaviour
                 entry.text.text = $"Yükselt\n<size=26>Sv {upgrade.Level + 1}</size>";
         }
 
-        bool canHire = workerPrefab != null && well.CanAfford(workerWood, workerStone);
+        // Her ev bir işçi barındırır: işçi sınırı haritadaki ev sayısıdır (her oyunda farklı).
+        int houses = Houses.Count;
+        bool roomLeft = houses == 0 || Houses.Occupied < houses;
+        bool canHire = workerPrefab != null && roomLeft && well.CanAfford(workerWood, workerStone);
         if (workerButton != null)
             workerButton.interactable = canHire;
         if (workerGroup != null)
             workerGroup.alpha = canHire ? 1f : 0.7f;
         if (workerText != null)
-            workerText.text = $"İşçi\n<size=22>{workerWood} odun {workerStone} taş</size>";
+        {
+            var title = houses > 0 ? $"İşçi {Houses.Occupied}/{houses}" : "İşçi";
+            workerText.text = roomLeft
+                ? $"{title}\n<size=22>{workerWood} odun {workerStone} taş</size>"
+                : $"{title}\n<size=22>Boş ev yok</size>";
+        }
 
         if (speedUpgrade != null)
         {
@@ -278,23 +286,43 @@ public class UpgradeHUD : MonoBehaviour
 
     // ---------------------------------------------------------------- İşçi
 
-    // Bedeli kuyudan öder; kuyunun yanında, sahnedeki köylülerin ayarlarıyla yeni bir köylü doğar ve dolaşır.
+    // Bedeli kuyudan öder; boş bir evin önünde (ev yoksa kuyunun yanında), şablon köylünün ayarlarıyla yeni bir köylü
+    // doğar ve dolaşır. O ev artık onun evidir (tsunamide oraya kaçar).
     void HireWorker()
     {
-        if (workerPrefab == null || !well.TrySpend(workerWood, workerStone))
+        bool hasHouses = Houses.Count > 0;
+        if (workerPrefab == null || (hasHouses && Houses.Occupied >= Houses.Count) || !well.TrySpend(workerWood, workerStone))
         {
             Refresh();
             return;
         }
         var template = Gatherer.Villagers.Count > 0 ? Gatherer.Villagers[0] : workerTemplate;
-        var direction = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward;
-        var spot = well.transform.position + direction * (well.ApproachRadius + 2.5f);
+        var house = hasHouses ? Houses.RandomFree() : null;
+        Vector3 spot, facing;
+        if (house != null)
+        {
+            spot = house.RandomDoor();
+            facing = spot - house.Center;
+        }
+        else
+        {
+            facing = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward;
+            spot = well.transform.position + facing * (well.ApproachRadius + 2.5f);
+        }
+        facing.y = 0f;
+        if (facing.sqrMagnitude < 0.001f)
+            facing = Vector3.forward;
         if (NavMesh.SamplePosition(spot, out var hit, 6f, NavMesh.AllAreas))
             spot = hit.position;
-        spot.y += workerPrefab.transform.position.y; // Köylü varsa BecomeVillagerLike zemine göre düzeltir.
-        var worker = Instantiate(workerPrefab, spot, Quaternion.LookRotation(direction), template != null ? template.transform.parent : null);
+        spot.y += workerPrefab.transform.position.y; // BecomeVillagerLike zemine göre düzeltir.
+        var worker = Instantiate(workerPrefab, spot, Quaternion.LookRotation(facing), template != null ? template.transform.parent : null);
         worker.name = $"Worker {++hired}";
         worker.BecomeVillagerLike(template);
+        if (house != null)
+        {
+            house.Resident = worker;
+            worker.Shelter = house;
+        }
         Refresh();
     }
 }

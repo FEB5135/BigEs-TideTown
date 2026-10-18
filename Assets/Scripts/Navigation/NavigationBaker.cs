@@ -143,6 +143,22 @@ public class NavigationBaker : MonoBehaviour
         return corners.Count > 0;
     }
 
+    // from'dan to'ya NavMesh üzerinden tam bir yol var mı (yarıda kalmadan to'nun tolerance kadar yakınına varılır mı).
+    public static bool IsReachable(Vector3 from, Vector3 to, float tolerance = 1.5f)
+    {
+        if (!Ready)
+            return true;
+        var filter = new NavMeshQueryFilter { agentTypeID = instance.settings.agentTypeID, areaMask = NavMesh.AllAreas };
+        if (!NavMesh.SamplePosition(from, out var start, 6f, filter) || !NavMesh.SamplePosition(to, out var end, tolerance + 2f, filter))
+            return false;
+        var path = new NavMeshPath();
+        if (!NavMesh.CalculatePath(start.position, end.position, filter, path) || path.status != NavMeshPathStatus.PathComplete)
+            return false;
+        var last = path.corners.Length > 0 ? path.corners[path.corners.Length - 1] : start.position;
+        last.y = to.y;
+        return (last - to).sqrMagnitude <= (tolerance + 2f) * (tolerance + 2f);
+    }
+
     // NavMesh üstündeki from'dan to'ya düz gidilirse NavMesh'te kalınan son nokta (to bir engelin içindeyse kenarı).
     public static Vector3 ClampToNavMesh(Vector3 from, Vector3 to)
     {

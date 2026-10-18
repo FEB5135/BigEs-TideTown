@@ -8,7 +8,9 @@ using UnityEngine.AI;
 // Sahnede NavigationBaker varsa engellerin etrafından dolaşır, yoksa düz çizgide yürür.
 // Köylü (villager) işaretliyse işi verilene kadar köyde dolaşır; oyuncu onu tutup ormana bırakınca oduncu olur,
 // ocağa bırakınca o ocağın vagonunu iter (VillagerPicker). Vagon (needsPusher) iten biri yokken bekler.
-public enum GathererActivity { Idle, Walking, Harvesting, Pushing }
+// Boştaki köylünün başında küçük bir belirteç durur. Tsunami alarmında (SetAlarm) köylüler işi bırakıp kolları
+// havada evlerine koşar ve içeri girer; alarm bitince kapıdan çıkıp dolaşır.
+public enum GathererActivity { Idle, Walking, Harvesting, Pushing, Fleeing }
 
 public class Gatherer : MonoBehaviour
 {
@@ -42,6 +44,12 @@ public class Gatherer : MonoBehaviour
     [SerializeField] Vector2 wanderPause = new(1.5f, 4f);
     [Tooltip("Vagonu iterken vagonun arka ucuyla arasında kalan boşluk (eller kasaya değsin).")]
     [SerializeField] float pushGap = 0.35f;
+    [Tooltip("Boştaki köylünün başında duran belirtecin malzemesi. Boşsa belirteç çizilmez.")]
+    [SerializeField] Material idleMarkerMaterial;
+    [Tooltip("Belirtecin ekrandaki boyu: kameradan uzaklığın bu katı kadar büyütülür (en az kendi boyu).")]
+    [SerializeField] float markerScreenSize = 0.035f;
+    [Tooltip("Tsunami alarmında evine koşarken yürüme hızı çarpanı.")]
+    [SerializeField] float fleeSpeedMultiplier = 1.8f;
 
     [Header("Vagon")]
     [Tooltip("Yalnız bir köylü iterken ilerler.")]
@@ -52,6 +60,23 @@ public class Gatherer : MonoBehaviour
     static readonly List<Gatherer> villagers = new();
     // Sahnedeki (etkin) köylüler.
     public static IReadOnlyList<Gatherer> Villagers => villagers;
+
+    // Tsunami alarmı (köprü: Tsunami/Scripts/Gameplay/TsunamiVillageAlarm). Açıkken köylüler evlerine kaçar.
+    public static bool Alarm { get; private set; }
+
+    public static void SetAlarm(bool on)
+    {
+        if (Alarm == on)
+            return;
+        Alarm = on;
+        foreach (var villager in villagers.ToArray())
+        {
+            if (on)
+                villager.Flee();
+            else
+                villager.LeaveShelter();
+        }
+    }
 
     readonly RaycastHit[] groundHits = new RaycastHit[8];
     readonly List<Vector3> corners = new();
@@ -75,6 +100,15 @@ public class Gatherer : MonoBehaviour
     // Ağaca son vuruşun zamanı ve vuruş aralığı (balta animasyonu vuruşa denk gelsin diye).
     public float LastHitTime { get; private set; } = -100f;
     public float HitInterval => hitInterval * WorkTimeFactor;
+    // Köylünün evi (doğduğu, tsunamide kaçtığı yer).
+    public Houses.House Shelter { get; set; }
+    // Evine girmiş (görünmez) ya da evine koşuyor: tutulamaz.
+    public bool InShelter { get; private set; }
+    public bool CanBePicked => villager && !Alarm && !InShelter;
+
+    GameObject idleMarker;
+    float markerHeight;
+    float markerPhase;
 
     public void SetHome(ResourceNode node) => home = node;
 
@@ -94,7 +128,8 @@ public class Gatherer : MonoBehaviour
     // İşte: vagon, işe konmuş köylü (oduncu ya da vagon iten) ve köylü olmayan toplayıcı.
     bool Working => home != null || HasJob || !villager;
 
-    float SpeedFactor => Working ? workSpeedMultiplier * (Upgrade != null ? Upgrade.SpeedMultiplier : 1f) : 1f;
+    float SpeedFactor => Activity == GathererActivity.Fleeing ? fleeSpeedMultiplier
+        : Working ? workSpeedMultiplier * (Upgrade != null ? Upgrade.SpeedMultiplier : 1f) : 1f;
     float WorkTimeFactor => Working ? workTimeMultiplier * (Upgrade != null ? Upgrade.WorkTimeMultiplier : 1f) : 1f;
 
     // Prefab'tan yeni üretilen işçiyi sahnedeki bir köylünün ayarlarıyla köylü yapar (Start'tan önce çağrılır).
@@ -113,6 +148,9 @@ public class Gatherer : MonoBehaviour
             wanderRadius = template.wanderRadius;
             wanderPause = template.wanderPause;
             pushGap = template.pushGap;
+            idleMarkerMaterial = template.idleMarkerMaterial;
+            markerScreenSize = template.markerScreenSize;
+            fleeSpeedMultiplier = template.fleeSpeedMultiplier;
             // Aynı boy ve zeminden aynı yükseklik (Start yüksekliği bulunduğu yerden ölçer).
             transform.localScale = template.transform.localScale;
             var position = transform.position;
@@ -184,12 +222,192 @@ public class Gatherer : MonoBehaviour
         while (NavigationBaker.Exists && !NavigationBaker.Ready)
             yield return null;
         ready = true;
+        if (villager)
+            CreateIdleMarker();
         if (routine != null)
             yield break; // Beklerken iş verildi.
-        if (villager)
+        if (villager && Alarm)
+            Flee();
+        else if (villager)
             Wander();
         else
             routine = StartCoroutine(WorkLoop());
+    }
+
+    // ---------------------------------------------------------------- Boştaki köylünün belirteci
+
+    // Başın üstünde küçük, soluk bir elmas: yavaşça döner ve hafifçe iner kalkar; köylü işe konunca kaybolur.
+    void CreateIdleMarker()
+    {
+        if (idleMarker != null || idleMarkerMaterial == null)
+            return;
+        float top = transform.position.y + 2f;
+        foreach (var renderer in GetComponentsInChildren<Renderer>())
+            top = Mathf.Max(top, renderer.bounds.max.y);
+        markerHeight = top - transform.position.y + 0.55f;
+        idleMarker = new GameObject("Idle Marker", typeof(MeshFilter), typeof(MeshRenderer));
+        idleMarker.transform.SetParent(transform, false);
+        idleMarker.GetComponent<MeshFilter>().sharedMesh = MarkerMesh;
+        var markerRenderer = idleMarker.GetComponent<MeshRenderer>();
+        markerRenderer.sharedMaterial = idleMarkerMaterial;
+        markerRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        markerRenderer.receiveShadows = false;
+        markerPhase = Random.Range(0f, Mathf.PI * 2f);
+    }
+
+    void LateUpdate()
+    {
+        if (idleMarker == null)
+            return;
+        bool show = villager && !HasJob && !InShelter && Activity != GathererActivity.Fleeing;
+        if (idleMarker.activeSelf != show)
+            idleMarker.SetActive(show);
+        if (!show)
+            return;
+        // Ekranda hep aynı boyda: kamera uzaklaştıkça büyür (oyun başındaki 80 m'de de görünsün), yakında küçük kalır.
+        // Köylünün boyundan bağımsız.
+        var cam = Camera.main;
+        float size = cam != null ? Mathf.Max(1f, Vector3.Distance(cam.transform.position, transform.position) * markerScreenSize) : 1f;
+        var scale = transform.lossyScale;
+        idleMarker.transform.localScale = new Vector3(size / Mathf.Max(scale.x, 0.01f), size / Mathf.Max(scale.y, 0.01f), size / Mathf.Max(scale.z, 0.01f));
+        float bob = Mathf.Sin(Time.time * 2f + markerPhase) * 0.08f * size;
+        idleMarker.transform.position = transform.position + Vector3.up * (markerHeight + 0.24f * (size - 1f) + bob);
+        idleMarker.transform.rotation = Quaternion.Euler(0f, Time.time * 60f, 0f);
+    }
+
+    static Mesh markerMesh;
+
+    // Yassı bir elmas (sekizyüzlü), yüzleri ayrı köşeli.
+    static Mesh MarkerMesh
+    {
+        get
+        {
+            if (markerMesh != null)
+                return markerMesh;
+            const float w = 0.16f, h = 0.24f;
+            Vector3 top = new(0f, h, 0f), bottom = new(0f, -h, 0f);
+            Vector3[] ring = { new(w, 0f, 0f), new(0f, 0f, w), new(-w, 0f, 0f), new(0f, 0f, -w) };
+            var vertices = new List<Vector3>();
+            for (int i = 0; i < 4; i++)
+            {
+                var a = ring[i];
+                var b = ring[(i + 1) % 4];
+                vertices.AddRange(new[] { top, b, a, bottom, a, b });
+            }
+            var triangles = new int[vertices.Count];
+            for (int i = 0; i < triangles.Length; i++)
+                triangles[i] = i;
+            markerMesh = new Mesh { name = "Idle Marker" };
+            markerMesh.SetVertices(vertices);
+            markerMesh.SetTriangles(triangles, 0);
+            markerMesh.RecalculateNormals();
+            markerMesh.RecalculateBounds();
+            return markerMesh;
+        }
+    }
+
+    // ---------------------------------------------------------------- Tsunami alarmı
+
+    // İşi bırakıp kolları havada evinin kapısına koşar, içeri girer (görünmez olur).
+    public void Flee()
+    {
+        if (!villager)
+            return;
+        Stop();
+        HasJob = false;
+        if (!ready)
+            return; // Start alarmı görüp kendisi çağırır.
+        routine = StartCoroutine(FleeLoop());
+    }
+
+    IEnumerator FleeLoop()
+    {
+        var house = Shelter ?? NearestHouse();
+        if (house != null)
+        {
+            var door = ReachableDoor(house);
+            // Yol bulunamazsa (tutulup bırakıldığı yer) biraz bekleyip yeniden dener; ilerleyemiyorsa kapıya düz
+            // yürür. Yolun ortasında kaybolmaz.
+            for (int attempt = 0; attempt < 6 && FlatDistance(door) > 1.5f; attempt++)
+            {
+                var before = transform.position;
+                Activity = GathererActivity.Fleeing;
+                yield return TravelTo(door, 0.6f);
+                if (attempt > 0 && (transform.position - before).sqrMagnitude < 0.04f)
+                    break;
+            }
+            Activity = GathererActivity.Fleeing;
+            yield return MoveTo(door, 0.6f);
+        }
+        Activity = GathererActivity.Idle;
+        SetHidden(true);
+    }
+
+    // Alarm bitti: kapıdan çıkıp evinin çevresinde dolaşır.
+    public void LeaveShelter()
+    {
+        if (!villager)
+            return;
+        Stop();
+        SetHidden(false);
+        if (ready)
+            Wander();
+    }
+
+    float FlatDistance(Vector3 point)
+    {
+        var offset = point - transform.position;
+        offset.y = 0f;
+        return offset.magnitude;
+    }
+
+    // Kapı hücresinin ortası evin ve ağaçların dibinde NavMesh dışında kalabilir: ona en yakın yürünebilir nokta.
+    static Vector3 WalkableDoor(Houses.House house, Vector3 from)
+    {
+        var door = house.DoorNearest(from);
+        return NavMesh.SamplePosition(door, out var hit, 4f, NavMesh.AllAreas) ? hit.position : door;
+    }
+
+    // Kendi evine yolu yoksa (köyün kopuk bir köşesinde kalmış), yolu olan en yakın evin kapısı.
+    Vector3 ReachableDoor(Houses.House own)
+    {
+        var door = WalkableDoor(own, transform.position);
+        if (NavigationBaker.IsReachable(transform.position, door))
+            return door;
+        var houses = new List<Houses.House>(Houses.All);
+        houses.Sort((a, b) => (a.Center - transform.position).sqrMagnitude.CompareTo((b.Center - transform.position).sqrMagnitude));
+        for (int i = 0; i < houses.Count && i < 15; i++)
+        {
+            var other = WalkableDoor(houses[i], transform.position);
+            if (NavigationBaker.IsReachable(transform.position, other))
+                return other;
+        }
+        return door;
+    }
+
+    Houses.House NearestHouse()
+    {
+        Houses.House best = null;
+        float bestDistance = float.MaxValue;
+        foreach (var house in Houses.All)
+        {
+            float distance = (house.Center - transform.position).sqrMagnitude;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = house;
+            }
+        }
+        return best;
+    }
+
+    void SetHidden(bool hidden)
+    {
+        InShelter = hidden;
+        foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+            renderer.enabled = !hidden;
+        foreach (var collider in GetComponents<Collider>())
+            collider.enabled = !hidden;
     }
 
     // ---------------------------------------------------------------- Köylünün işleri
@@ -200,6 +418,36 @@ public class Gatherer : MonoBehaviour
         Stop();
         HasJob = false;
         routine = StartCoroutine(WanderLoop(transform.position));
+    }
+
+    // Geliştirirken Play'de köylüyü tutup taşımadan işe koymak için (Inspector'da bileşenin menüsü).
+    [ContextMenu("Test: Ormanda Çalış")]
+    void TestWorkInForest()
+    {
+        if (Application.isPlaying)
+            WorkInForest();
+    }
+
+    [ContextMenu("Test: Vagon İt")]
+    void TestPushCart()
+    {
+        if (!Application.isPlaying)
+            return;
+        Gatherer best = null;
+        float bestDistance = float.MaxValue;
+        foreach (var cart in FindObjectsByType<Gatherer>())
+        {
+            if (!cart.needsPusher || cart.IsReserved)
+                continue;
+            float distance = (cart.transform.position - transform.position).sqrMagnitude;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = cart;
+            }
+        }
+        if (best != null)
+            PushCart(best);
     }
 
     // Oduncu olur: en yakın boş ağacı bulur, toplar, kuyuya götürür; sürekli.
@@ -249,6 +497,8 @@ public class Gatherer : MonoBehaviour
     // Tutulup bırakıldıktan sonra yeni yerindeki zemine göre yükseklik farkı korunur.
     public void SnapToGround()
     {
+        offMeshReturn = null; // Tutulup başka yere bırakıldı.
+
         var position = transform.position;
         if (TryGetGroundHeight(position, out float groundY))
             transform.position = new Vector3(position.x, groundY + heightOffset, position.z);
@@ -336,7 +586,7 @@ public class Gatherer : MonoBehaviour
         {
             yield return WaitForPusher();
             var well = Well.Instance;
-            var node = home != null ? home : ResourceNode.FindNearestFree(resourceType, transform.position);
+            var node = home != null ? home : ResourceNode.FindNearestFree(resourceType, transform.position, IsUnreachable);
             CurrentTarget = node;
             Activity = GathererActivity.Idle;
             if (well == null || node == null)
@@ -367,6 +617,16 @@ public class Gatherer : MonoBehaviour
                 yield return TravelTo(node.transform.position, stopDistance);
             if (node == null)
                 continue;
+            // Yolu bulunamayan ağaç (sık ormanın ortası, tepenin üstü): bir süre atlanır, başkasına gidilir.
+            if (home == null && FlatDistance(node.transform.position) > stopDistance + MaxFinalStep)
+            {
+                unreachable[node] = Time.time + UnreachableSeconds;
+                node.Release(this);
+                claimed = null;
+                CurrentTarget = null;
+                yield return null;
+                continue;
+            }
             if (resourceType == ResourceType.Wood)
                 yield return FaceTarget(node.transform.position);
             if (node == null)
@@ -400,16 +660,44 @@ public class Gatherer : MonoBehaviour
             if (carried <= 0)
                 continue;
 
-            // Kuyunun bu taraftaki kenarına gidilir; ortasına yol aranırsa kuyunun etrafında dolanır.
-            float approach = Mathf.Max(wellStopDistance, well.ApproachRadius);
-            var fromWell = transform.position - well.transform.position;
-            fromWell.y = 0f;
-            var rim = well.transform.position + (fromWell.sqrMagnitude > 0.01f ? fromWell.normalized : Vector3.forward) * (approach + 0.5f);
-            yield return TravelTo(rim, 0.5f);
+            // Kuyunun bu taraftaki kenarına gidilir; ortasına yol aranırsa kuyunun etrafında dolanır. O kenar evlerin
+            // arasında kalıp yolu yoksa kuyunun çevresinde yolu olan en yakın kenar seçilir.
+            yield return TravelTo(WellRim(well), 0.5f);
+            // Kuyunun kenarına yol bulunamadıysa (başladığı yer kopuktu), yaklaştığı yerden bir kez daha dener.
+            if (well != null && FlatDistance(well.transform.position) > Mathf.Max(wellStopDistance, well.ApproachRadius) + MaxFinalStep)
+                yield return TravelTo(WellRim(well), 0.5f);
             SetCarrying(false);
             if (well != null)
                 well.Throw(resourceType, carried, transform.position + Vector3.up);
         }
+    }
+
+    const float UnreachableSeconds = 30f;
+    readonly Dictionary<ResourceNode, float> unreachable = new();
+
+    bool IsUnreachable(ResourceNode node) => unreachable.TryGetValue(node, out var until) && Time.time < until;
+
+    Vector3 WellRim(Well well)
+    {
+        float approach = Mathf.Max(wellStopDistance, well.ApproachRadius) + 0.5f;
+        var fromWell = transform.position - well.transform.position;
+        fromWell.y = 0f;
+        if (fromWell.sqrMagnitude < 0.01f)
+            fromWell = Vector3.forward;
+        var first = well.transform.position + fromWell.normalized * approach;
+        // Kenardan dışarı doğru halkalar; her halkada bu taraftan başlayıp iki yana sırayla 22.5°'lik adımlarla.
+        for (int ring = 0; ring < 5; ring++)
+        {
+            float radius = approach + ring * 1.5f;
+            for (int step = 0; step < 16; step++)
+            {
+                float angle = (step + 1) / 2 * 22.5f * (step % 2 == 0 ? 1f : -1f);
+                var rim = well.transform.position + Quaternion.Euler(0f, angle, 0f) * fromWell.normalized * radius;
+                if (NavigationBaker.IsReachable(transform.position, rim))
+                    return rim;
+            }
+        }
+        return first;
     }
 
     // Vagon: iten köylü yoksa olduğu yerde bekler.
@@ -439,18 +727,39 @@ public class Gatherer : MonoBehaviour
             yield return MoveTo(target, distance);
             yield break;
         }
+        // Son adımda NavMesh dışına (ağaçların arasına) girdiyse önce girdiği yoldan geri çıkar; o cepten NavMesh ile
+        // yol bulunmaz.
+        if (offMeshReturn is Vector3 back)
+        {
+            offMeshReturn = null;
+            yield return MoveTo(back, PathStopDistance);
+        }
         if (!NavigationBaker.TryFindPath(transform.position, target, corners))
         {
-            Activity = GathererActivity.Idle;
+            if (Activity != GathererActivity.Fleeing)
+                Activity = GathererActivity.Idle;
             yield return new WaitForSeconds(0.5f);
             yield break;
         }
         var points = corners.ToArray();
         for (int i = 1; i < points.Length; i++)
             yield return MoveTo(points[i], PathStopDistance);
-        // Hedef bir engelin içindeyse (ağaç, kuyu) NavMesh'in bittiği yerde durulur.
-        yield return MoveTo(NavigationBaker.ClampToNavMesh(points[points.Length - 1], target), distance);
+        // Hedef bir engelin içindeyse (ağaç, kuyu) NavMesh'in kenarından son birkaç metre düz yürünür, yoksa uzaktan
+        // vurur/atardı. Hedef daha uzaksa (yol yarıda kaldı) NavMesh'in bittiği yerde durulur; düz gitse evlerin
+        // içinden geçerdi.
+        var edge = NavigationBaker.ClampToNavMesh(points[points.Length - 1], target);
+        var rest = target - edge;
+        rest.y = 0f;
+        bool offMesh = rest.magnitude <= MaxFinalStep + distance && rest.magnitude > distance;
+        if (offMesh)
+            yield return MoveTo(edge, PathStopDistance);
+        yield return MoveTo(offMesh ? target : edge, distance);
+        if (offMesh)
+            offMeshReturn = edge;
     }
+
+    const float MaxFinalStep = 3f;
+    Vector3? offMeshReturn;
 
     IEnumerator MoveTo(Vector3 target, float distance)
     {
@@ -461,11 +770,13 @@ public class Gatherer : MonoBehaviour
             toTarget.y = 0f;
             if (toTarget.magnitude <= distance)
             {
-                Activity = GathererActivity.Idle;
+                if (Activity != GathererActivity.Fleeing)
+                    Activity = GathererActivity.Idle;
                 yield break;
             }
 
-            Activity = GathererActivity.Walking;
+            if (Activity != GathererActivity.Fleeing)
+                Activity = GathererActivity.Walking;
             var step = Vector3.ClampMagnitude(toTarget, moveSpeed * SpeedFactor * Time.deltaTime);
             var next = transform.position + step;
             if (TryGetGroundHeight(next, out float groundY))

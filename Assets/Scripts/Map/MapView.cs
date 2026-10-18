@@ -11,6 +11,8 @@ public class MapView : MonoBehaviour
     [SerializeField] int chunkSize = 16;
     [SerializeField] bool createColliders;
     [SerializeField] Module[] modules;
+    [SerializeField, Tooltip("Sunken models drawn in place of a house's tiles once the tsunami destroys it.")]
+    Ruin[] ruins;
 
     readonly Dictionary<int, List<Variant>> variants = new();
     readonly Dictionary<Vector2Int, Chunk> chunks = new();
@@ -19,6 +21,9 @@ public class MapView : MonoBehaviour
     GameObject defaultPrefab;
     bool filling;
     readonly Dictionary<Mesh, Mesh> treeGroundMeshes = new();
+    readonly Dictionary<GameObject, GameObject> ruinOf = new();
+    readonly HashSet<int> ruinedCells = new();
+    HouseCollapse collapse;
 
     public IEnumerable<Collider> ConstructionSurfaces
     {
@@ -102,8 +107,18 @@ public class MapView : MonoBehaviour
             }
         }
 
+        if (ruins != null)
+            foreach (var ruin in ruins)
+                if (ruin.Intact != null && ruin.Ruined != null)
+                    ruinOf[ruin.Intact] = ruin.Ruined;
+
         cells = new CellDraw[world.Width * world.Height];
         world.CellChanged += Refresh;
+        collapse = new GameObject("House Collapse").AddComponent<HouseCollapse>();
+        collapse.transform.SetParent(transform, false);
+        collapse.Init(material);
+        Houses.Destroyed += OnHouseDestroyed;
+        Houses.Repaired += OnHouseRepaired;
         filling = true;
 
         for (var y = 0; y < world.Height; y++)
@@ -120,6 +135,8 @@ public class MapView : MonoBehaviour
     {
         if (world != null)
             world.CellChanged -= Refresh;
+        Houses.Destroyed -= OnHouseDestroyed;
+        Houses.Repaired -= OnHouseRepaired;
 
         foreach (var chunk in chunks.Values)
         {
@@ -130,11 +147,68 @@ public class MapView : MonoBehaviour
         foreach (var mesh in treeGroundMeshes.Values) if (mesh != null) ReleaseMesh(mesh);
     }
 
+    void OnHouseDestroyed(Houses.House house)
+    {
+        Collapse(house);
+        SetRuined(house, true);
+    }
+    void OnHouseRepaired(Houses.House house) => SetRuined(house, false);
+
+    // Breaks the house's standing tiles apart, each exactly where and how it is drawn (position and rotation).
+    void Collapse(Houses.House house)
+    {
+        if (cells == null || collapse == null)
+            return;
+        var origin = Vector3.zero;
+        var count = 0;
+        foreach (var home in house.Building)
+            foreach (var centre in home.CellCenters)
+            {
+                origin += centre;
+                count++;
+            }
+        origin = count > 0 ? origin / count : house.Center;
+
+        foreach (var cell in house.Cells)
+        {
+            if (!world.InBounds(cell.x, cell.y) || ruinedCells.Contains(cell.y * world.Width + cell.x))
+                continue;
+            var draw = cells[cell.y * world.Width + cell.x];
+            if (draw.Prefab == null)
+                continue;
+            foreach (var filter in draw.Prefab.GetComponentsInChildren<MeshFilter>())
+                if (filter.sharedMesh != null && filter.sharedMesh.isReadable)
+                    collapse.Break(filter.sharedMesh,
+                        transform.localToWorldMatrix * draw.Local * LocalToRoot(filter.transform, draw.Prefab.transform),
+                        origin, house.Impact);
+        }
+    }
+
+    // A house's tiles switch to (or back from) their sunken models; its chunks are rebuilt once.
+    void SetRuined(Houses.House house, bool ruined)
+    {
+        if (cells == null)
+            return;
+        filling = true;
+        foreach (var cell in house.Cells)
+        {
+            if (!world.InBounds(cell.x, cell.y))
+                continue;
+            var index = cell.y * world.Width + cell.x;
+            if (ruined ? ruinedCells.Add(index) : ruinedCells.Remove(index))
+                Refresh(cell.x, cell.y);
+        }
+        filling = false;
+        RebuildDirty();
+    }
+
     void Refresh(int x, int y)
     {
         var index = y * world.Width + x;
         world.Get(x, y, out var id, out var rotation);
         var prefab = Pick(id, x, y);
+        if (prefab != null && ruinedCells.Contains(index) && ruinOf.TryGetValue(prefab, out var ruin))
+            prefab = ruin;
         if (prefab == null)
         {
             cells[index] = default;
@@ -355,6 +429,13 @@ public class MapView : MonoBehaviour
         public MeshCollider Collider;
         public Mesh GroundMesh;
         public MeshCollider GroundCollider;
+    }
+
+    [Serializable]
+    public struct Ruin
+    {
+        public GameObject Intact;
+        public GameObject Ruined;
     }
 
     [Serializable]

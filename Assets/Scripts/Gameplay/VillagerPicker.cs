@@ -12,10 +12,15 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Camera))]
 public class VillagerPicker : MonoBehaviour
 {
+    [SerializeField] Texture2D defaultCursor;
     [SerializeField] Texture2D openHand;
     [SerializeField] Texture2D closedHand;
-    [Tooltip("İmlecin tıklama noktası (dokunun içinde, piksel).")]
-    [SerializeField] Vector2 hotspot = new(22f, 10f);
+    [Tooltip("Varsayılan imlecin tıklama noktası (dokunun içinde, üstten piksel).")]
+    [SerializeField] Vector2 defaultHotspot = new(18f, 4f);
+    [Tooltip("Açık elin tıklama noktası.")]
+    [SerializeField] Vector2 openHotspot = new(25f, 1f);
+    [Tooltip("Yumruk imlecinin tıklama noktası.")]
+    [SerializeField] Vector2 closedHotspot = new(24f, 12f);
     [SerializeField] float maxRayDistance = 400f;
     [Tooltip("İmleç bir köylünün ekranda bu kadar yakınındaysa (1080p'de piksel) o köylü tutulabilir; uzaktan küçük görünen köylüleri yakalamak kolay olsun.")]
     [SerializeField] float pickRadius = 32f;
@@ -61,6 +66,9 @@ public class VillagerPicker : MonoBehaviour
         }
 
         var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
+        // Tsunami alarmında tutulan köylü bırakılır ve evine kaçar.
+        if (held != null && Gatherer.Alarm)
+            Drop();
         if (held != null)
         {
             if (TryGroundPoint(ray, out var ground))
@@ -68,7 +76,7 @@ public class VillagerPicker : MonoBehaviour
             Carry();
             if (!mouse.leftButton.isPressed)
                 Drop();
-            SetCursor(closedHand);
+            SetCursor(closedHand, closedHotspot);
             Busy = true;
             return;
         }
@@ -83,7 +91,7 @@ public class VillagerPicker : MonoBehaviour
 
         var villager = VillagerUnder(ray, mouse.position.ReadValue());
         Busy = villager != null;
-        SetCursor(villager != null ? openHand : null);
+        SetCursor(villager != null ? openHand : defaultCursor, villager != null ? openHotspot : defaultHotspot);
         if (villager != null && mouse.leftButton.wasPressedThisFrame)
             PickUp(villager, ray);
     }
@@ -105,7 +113,7 @@ public class VillagerPicker : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             var gatherer = hits[i].collider.GetComponentInParent<Gatherer>();
-            if (gatherer != null && gatherer.IsVillager && hits[i].distance < bestDistance)
+            if (gatherer != null && gatherer.CanBePicked && hits[i].distance < bestDistance)
             {
                 best = gatherer;
                 bestDistance = hits[i].distance;
@@ -118,6 +126,8 @@ public class VillagerPicker : MonoBehaviour
         bestDistance = radius;
         foreach (var villager in Gatherer.Villagers)
         {
+            if (!villager.CanBePicked)
+                continue;
             var screen = cam.WorldToScreenPoint(villager.transform.position + Vector3.up);
             if (screen.z <= 0f)
                 continue;
@@ -194,6 +204,11 @@ public class VillagerPicker : MonoBehaviour
         t.SetPositionAndRotation(new Vector3(spot.x, t.position.y, spot.z), Quaternion.Euler(0f, t.eulerAngles.y, 0f));
         villager.SnapToGround();
 
+        if (Gatherer.Alarm)
+        {
+            villager.Flee();
+            return;
+        }
         var cart = QuarryCartNear(holdPoint);
         if (cart != null)
             villager.PushCart(cart);
@@ -248,7 +263,7 @@ public class VillagerPicker : MonoBehaviour
 
     static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;
 
-    void SetCursor(Texture2D texture)
+    void SetCursor(Texture2D texture, Vector2 point = default)
     {
         if (shownCursor == texture)
             return;
@@ -256,6 +271,6 @@ public class VillagerPicker : MonoBehaviour
         if (texture == null)
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
         else
-            Cursor.SetCursor(texture, hotspot, CursorMode.ForceSoftware); // donanım imleci 32 px ile sınırlı olabiliyor
+            Cursor.SetCursor(texture, point, CursorMode.ForceSoftware); // donanım imleci 32 px ile sınırlı olabiliyor
     }
 }

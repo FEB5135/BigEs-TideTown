@@ -26,7 +26,9 @@ public static class SampleSceneSetup
             EnsureAudio(scene);
             EnsureUpgrades(scene);
             EnsureWellClearing(scene);
-        EnsureTutorial(scene);
+            EnsureNavigation(scene);
+            EnsureTutorial(scene);
+            EnsureHouseRuins(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return;
@@ -82,7 +84,9 @@ public static class SampleSceneSetup
         EnsureAudio(scene);
         EnsureUpgrades(scene);
         EnsureWellClearing(scene);
+        EnsureNavigation(scene);
         EnsureTutorial(scene);
+        EnsureHouseRuins(scene);
         var iso = new SerializedObject(camera.GetComponent<IsometricCamera>());
         iso.FindProperty("distance").floatValue = 80f;
         iso.FindProperty("panExtents").vector2Value = new Vector2(100f, 100f);
@@ -262,8 +266,9 @@ public static class SampleSceneSetup
         if (picker == null)
             picker = camera.gameObject.AddComponent<VillagerPicker>();
         var settings = new SerializedObject(picker);
-        settings.FindProperty("openHand").objectReferenceValue = CursorTexture("HandOpen.png");
-        settings.FindProperty("closedHand").objectReferenceValue = CursorTexture("HandClosed.png");
+        settings.FindProperty("defaultCursor").objectReferenceValue = CursorTexture("cursor_default.png");
+        settings.FindProperty("openHand").objectReferenceValue = CursorTexture("cursor_open.png");
+        settings.FindProperty("closedHand").objectReferenceValue = CursorTexture("cursor_clenched.png");
         settings.ApplyModifiedPropertiesWithoutUndo();
 
         foreach (var root in scene.GetRootGameObjects())
@@ -386,6 +391,10 @@ public static class SampleSceneSetup
             Object.DestroyImmediate(worker.gameObject);
         template.name = WorkerTemplateName;
         template.gameObject.SetActive(false);
+        var workerSettings = new SerializedObject(template);
+        workerSettings.FindProperty("idleMarkerMaterial").objectReferenceValue = IdleMarkerMaterial();
+        workerSettings.FindProperty("markerScreenSize").floatValue = 0.11f;
+        workerSettings.ApplyModifiedPropertiesWithoutUndo();
 
         var ui = new SerializedObject(hud);
         ui.FindProperty("workerTemplate").objectReferenceValue = template;
@@ -394,6 +403,35 @@ public static class SampleSceneSetup
     }
 
     const string WorkerTemplateName = "Worker Template";
+    const string IdleMarkerPath = "Assets/Materials/IdleMarker.mat";
+
+    // Boştaki köylünün belirteci: ışıktan etkilenmeyen arayüzün su mavisi (#2EC4D6). Sarı, sarımsı yeşil çimende
+    // seçilmiyordu.
+    static Material IdleMarkerMaterial()
+    {
+        var material = AssetDatabase.LoadAssetAtPath<Material>(IdleMarkerPath);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "IdleMarker" };
+            AssetDatabase.CreateAsset(material, IdleMarkerPath);
+        }
+        material.SetColor("_BaseColor", new Color(0.18f, 0.77f, 0.84f));
+        EditorUtility.SetDirty(material);
+        return material;
+    }
+
+    // Yol bulma köylüler için: 0.8 m (vagon genişliği) evlerin ve ağaçların arasındaki 2 m'lik geçitleri kapatıyordu;
+    // köylüler yolu bulamayıp uzaktan vuruyor, kaçarken takılıyordu.
+    public static bool EnsureNavigation(Scene scene)
+    {
+        var baker = Find<NavigationBaker>(scene);
+        if (baker == null)
+            return false;
+        var settings = new SerializedObject(baker);
+        settings.FindProperty("agentRadius").floatValue = 0.45f;
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
 
     // Kuyunun çevresinde ağaç çıkmaz (WfcSolver.clearCenter): işçiler odunu uzaktan taşısın.
     public static bool EnsureWellClearing(Scene scene)
@@ -424,6 +462,36 @@ public static class SampleSceneSetup
         settings.FindProperty("panelSprite").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Menu/Panel.png");
         settings.ApplyModifiedPropertiesWithoutUndo();
         return true;
+    }
+
+    // Tsunaminin yıktığı evler MapView'da batık modelleriyle çizilir: her ev karosu (house_*) kendi "f" sürümüyle eşlenir.
+    public static bool EnsureHouseRuins(Scene scene)
+    {
+        var view = Find<MapView>(scene);
+        if (view == null)
+            return false;
+        var settings = new SerializedObject(view);
+        var modules = settings.FindProperty("modules");
+        var pairs = new List<(GameObject intact, GameObject ruined)>();
+        for (int i = 0; i < modules.arraySize; i++)
+        {
+            var intact = modules.GetArrayElementAtIndex(i).FindPropertyRelative("Prefab").objectReferenceValue as GameObject;
+            if (intact == null || !intact.name.StartsWith("house_") || pairs.Any(pair => pair.intact == intact))
+                continue;
+            var ruined = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Meshes/WorldMeshes/{intact.name}f.obj");
+            if (ruined != null)
+                pairs.Add((intact, ruined));
+        }
+        var ruins = settings.FindProperty("ruins");
+        ruins.arraySize = pairs.Count;
+        for (int i = 0; i < pairs.Count; i++)
+        {
+            var ruin = ruins.GetArrayElementAtIndex(i);
+            ruin.FindPropertyRelative("Intact").objectReferenceValue = pairs[i].intact;
+            ruin.FindPropertyRelative("Ruined").objectReferenceValue = pairs[i].ruined;
+        }
+        settings.ApplyModifiedPropertiesWithoutUndo();
+        return pairs.Count > 0;
     }
 
     [MenuItem("Tools/BigEs/Tutorial'ı Sıfırla")]
