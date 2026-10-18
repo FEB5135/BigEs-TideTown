@@ -46,9 +46,49 @@ namespace Tsunami.EditorTools
                 }
                 CheckDiagonalLoop(); passed++;
                 CheckDamagedSeal(); passed++;
-                Write($"PASS: {passed}/12 water seal checks. Intact walls block above-crest water in X/Z; shared owner, destruction, rebuilding, reset, diagonal enclosure and damaged standing seal verified.");
+                CheckContactDamageDisabled(); passed++;
+                CheckImpactDamagePreserved(); passed++;
+                Write($"PASS: {passed}/14 water checks. Wall seals, destruction/rebuilding, damaged seal, no continuous contact damage (including legacy settings), and preserved impact damage verified.");
             }
             catch (Exception error) { Write($"FAIL after {passed} checks: {error}"); throw; }
+        }
+
+        static void CheckContactDamageDisabled()
+        {
+            var settings = WallDamageSettings.Default;
+            // Reproduce serialized scenes from before the change: even an enormous positive rate
+            // must not silently bring back continuous contact damage.
+            settings.sustainedDamagePerKilonewtonSecond = 100f;
+            Require(settings.Validated().sustainedDamagePerKilonewtonSecond == 0f, "Legacy contact rate remained enabled.");
+            var state = new WallDamageState();
+            var spreading = WallFaceLoad.Calculate(1000f, 9.81f, 2f, 10f, .5f, 0f, 0f);
+            for (int i = 0; i < 30000; i++)
+            {
+                float force = i % 2 == 0 ? 0f : spreading.ImpactForceNewtons;
+                Require(!state.Apply(force, 10000000f, .02f, settings, out var impact, out var contact), "Resting or slowly spreading water destroyed a wall.");
+                Require(impact == 0f && contact == 0f, "Contact generated damage without an impact.");
+            }
+            Require(state.Damage == 0f && !state.Broken, "Ten minutes of contact wore down the wall.");
+            state.Apply(100000f, 0f, .1f, settings, out _, out _);
+            float damage = state.Damage;
+            Require(damage > 0f, "Test impact did not damage the wall.");
+            for (int i = 0; i < 1000; i++) state.Apply(0f, 10000000f, .02f, settings, out _, out _);
+            Require(state.Damage == damage, "A damaged wall kept losing health after the wave passed.");
+        }
+
+        static void CheckImpactDamagePreserved()
+        {
+            var settings = WallDamageSettings.Default;
+            var withContact = new WallDamageState();
+            var impactOnly = new WallDamageState();
+            for (int i = 0; i < 1000 && !impactOnly.Broken; i++)
+            {
+                withContact.Apply(100000f, 10000000f, .02f, settings, out _, out var contact);
+                impactOnly.Apply(100000f, 0f, .02f, settings, out _, out _);
+                Require(contact == 0f && Math.Abs(withContact.Damage - impactOnly.Damage) < .0001f,
+                    "Pressure changed the impact damage or consumed its rate limit.");
+            }
+            Require(impactOnly.Broken && withContact.Broken, "A strong tsunami can no longer break a wall.");
         }
 
         static void CheckDamagedSeal()

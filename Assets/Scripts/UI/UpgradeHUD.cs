@@ -220,7 +220,7 @@ public class UpgradeHUD : MonoBehaviour
             entry.affordable = upgrade.CanUpgrade(well);
             entry.button.interactable = entry.affordable;
             if (entry.text != null)
-                entry.text.text = $"Yükselt\n<size=26>Sv {upgrade.Level + 1}</size>";
+                entry.text.text = $"Yükselt\n<size=26>Sv {upgrade.Level + 1} · {(upgrade.Level + 1 >= 3 ? 5 : 4)} işçi</size>";
         }
 
         // Her ev bir işçi barındırır: işçi sınırı haritadaki ev sayısıdır (her oyunda farklı).

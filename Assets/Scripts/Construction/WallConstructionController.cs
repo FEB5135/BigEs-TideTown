@@ -146,11 +146,11 @@ namespace IdleTown.Construction
 
         void NormalizeConfiguration()
         {
-            woodCost = Mathf.Max(0, woodCost);
-            stoneCost = Mathf.Max(0, stoneCost);
-            stoneTierWoodCost = Mathf.Max(woodCost, stoneTierWoodCost);
-            stoneTierStoneCost = Mathf.Max(stoneCost, stoneTierStoneCost);
-            reinforcedWoodCost = Mathf.Max(stoneTierWoodCost, reinforcedWoodCost);
+            woodCost = Mathf.Max(1, woodCost);
+            stoneCost = 0;
+            stoneTierWoodCost = 0;
+            stoneTierStoneCost = Mathf.Max(1, stoneTierStoneCost);
+            reinforcedWoodCost = Mathf.Max(woodCost, reinforcedWoodCost);
             reinforcedStoneCost = Mathf.Max(stoneTierStoneCost, reinforcedStoneCost);
             wallHeight = StoreyHeight;
             maxFloors = Mathf.Clamp(maxFloors, 1, Mathf.FloorToInt(MaximumWallHeight / StoreyHeight));
@@ -298,14 +298,14 @@ namespace IdleTown.Construction
 
             GUILayout.Label($"{model.Walls.Count} duvar parçası    ·    {TierName(selectedTier)}", labelStyle);
             if (hasStart)
-                GUILayout.Label($"Ön izleme: {previewPath.Count} parça  /  {previewWood} odun · {previewStone} taş", labelStyle);
+                GUILayout.Label($"Ön izleme: {previewPath.Count} parça  /  {CostText(previewWood, previewStone)}", labelStyle);
             else
                 GUILayout.Label("Başlangıç noktasını seçerek bir duvar çiz.", labelStyle);
 
             var wasEnabled = GUI.enabled;
             GUI.enabled = hasStart && hasLastValidPreviewEndpoint && (!hasPreviewEndpoint || previewValid);
             var buildButtonLabel = hasLastValidPreviewEndpoint
-                ? $"İNŞA ET   ·   {lastValidPreviewCount} parça / {lastValidPreviewWood} odun · {lastValidPreviewStone} taş"
+                ? $"İNŞA ET   ·   {lastValidPreviewCount} parça / {CostText(lastValidPreviewWood, lastValidPreviewStone)}"
                 : "İNŞA ET   ·   Geçerli bir yol seç";
             GUI.backgroundColor = new Color(.4f, .77f, .61f);
             if (GUILayout.Button(buildButtonLabel, buttonStyle))
@@ -718,7 +718,7 @@ namespace IdleTown.Construction
             previewPath.Clear();
             previewLine.positionCount = 0;
             HideGhosts();
-            status = $"İnşa tamamlandı: Kat {selectedFloor + 1}, {TierName(selectedTier)}, {builtCount} parça; {spentWood} odun ve {spentStone} taş harcandı.";
+            status = $"İnşa tamamlandı: Kat {selectedFloor + 1}, {TierName(selectedTier)}, {builtCount} parça; {CostText(spentWood, spentStone)} harcandı.";
             confirmationStatus = status;
             return true;
         }
@@ -964,7 +964,7 @@ namespace IdleTown.Construction
 
             if (!canAfford)
             {
-                reason = $"Yetersiz kaynak: {wood} odun ve {stone} taş gerekiyor.";
+                reason = $"Yetersiz kaynak: {CostText(wood, stone)} gerekiyor.";
                 return false;
             }
 
@@ -1298,12 +1298,14 @@ namespace IdleTown.Construction
 
         float FloorBaseHeight(int floor) => floorZeroBaseHeight + floor * wallHeight;
 
+        static string CostText(int wood, int stone) => wood == 0 ? $"{stone} taş" : stone == 0 ? $"{wood} odun" : $"{wood} odun · {stone} taş";
+
         WallCost CostFor(WallTier tier)
         {
             return tier switch
             {
-                WallTier.Timber => new WallCost(woodCost, stoneCost),
-                WallTier.Stone => new WallCost(stoneTierWoodCost, stoneTierStoneCost),
+                WallTier.Timber => new WallCost(woodCost, 0),
+                WallTier.Stone => new WallCost(0, stoneTierStoneCost),
                 WallTier.Reinforced => new WallCost(reinforcedWoodCost, reinforcedStoneCost),
                 _ => default
             };

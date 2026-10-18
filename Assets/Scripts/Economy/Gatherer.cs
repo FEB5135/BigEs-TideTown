@@ -178,7 +178,11 @@ public class Gatherer : MonoBehaviour
             villagers.Add(this);
     }
 
-    void OnDisable() => villagers.Remove(this);
+    void OnDisable()
+    {
+        villagers.Remove(this);
+        Stop();
+    }
 
     // Köylü imleçle tutulabilsin diye görselinin boyunda tetikleyici kapsül (zemin ve tıklama ışınlarını etkilemez).
     void EnsurePickCollider()
@@ -605,7 +609,11 @@ public class Gatherer : MonoBehaviour
                 continue;
             }
 
-            node.Claim(this);
+            if (!node.TryClaim(this))
+            {
+                yield return new WaitForSeconds(.25f);
+                continue;
+            }
             claimed = node;
             if (path.Length > 0)
             {

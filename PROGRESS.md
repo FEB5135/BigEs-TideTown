@@ -2,7 +2,7 @@
 
 Yeni bir oturuma (session) başlarken önce bu dosyayı oku. Her iş bitince "Son durum" ve "Sıradaki işler" bölümlerini güncelle.
 
-Son güncelleme: 2026-10-18 (`Wallfix` `feature/upgrades`'e birleştirildi (`2848eea`), ardından `feature/upgrades` main'e fast-forward ile alındı; ikisi de push edildi)
+Son güncelleme: 2026-10-18 (`Wallfix`: suyun sürekli temas/basınç hasarı kapatıldı; tsunami darbe hasarı korunuyor)
 
 ## Bağlam
 
@@ -36,6 +36,10 @@ Son güncelleme: 2026-10-18 (`Wallfix` `feature/upgrades`'e birleştirildi (`284
 - Dal: `collision` (taban `f35fd06`, `origin/Terrain-1`). Tsunami–duvar çarpışması ve dayanıklılık entegrasyonu tamamlandı; commit/push yapılmadı, Unity Play doğrulaması Codex'e devredildi.
 
 ## Son durum (yapılanlar)
+
+- **Sürekli su hasarı kapatıldı (18 Ekim 2026, Wallfix):** `WallDamageState` yalnız dinamik darbeden can azaltır; hidrostatik/seviye farkı basıncı simülasyonda hesaplanmaya devam eder ancak duvar canını tüketmez. Eski sahnelerdeki pozitif sürekli hasar oranı da `Validated()` ile sıfırlanır; SampleScene oranı 0. Unity su kontrolleri 14/14 geçti: 10 dakika durgun/yavaş yayılma teması, darbeden sonra canın sabit kalması, güçlü darbenin hâlâ yıkabilmesi ve önceki yalıtım/kırılma/yeniden inşa kontrolleri (`Logs/Wallfix-contact-damage.log`).
+
+- **Wallfix kaynak ve maden dengesi (18 Ekim 2026):** Tahta duvar yalnız odun, taş duvar yalnız taş, güçlü duvar iki kaynağı kullanır. Varsayılan parça bedelleri 1 odun / 4 taş / 6 odun + 6 taş; malzeme yükseltmesi kaynak iadesi üretmez. Madenler seviyelerine göre 2/4/5 ayrı vagon açar; her vagon bir köylüyle çalışır, kaynak aynı kapasite sınırını uygular. Üçüncü seviye madenlerde mevcut toplama süresi çarpanı ayrıca 1.5'e bölünür (%50 ek toplama hızı); orman bu ek bonustan etkilenmez. İlgili Unity EditMode duvar ve ekonomi testleri 64/64 geçti (`Logs/Wallfix-balance-tests.xml`). Yeni kapasitenin oyun içinde çoklu köylüyle uzun süreli üretim döngüsü henüz görsel olarak denenmedi.
 
 - **Belirteç büyütüldü, uzaktan vurma/atma ve kaçarken kaybolma düzeltildi (18 Ekim 2026, `feature/upgrades`):** Belirteç su mavisi (#2EC4D6) ve `markerScreenSize` 0.11. Sebep NavMesh'ti: fırtına bulutları NavMesh kurulurken haritanın ortasında duruyor, 40–70 m'lik kutuları kuyunun çevresini kapatıyordu; tsunami kökü artık `NavIgnore` (köprü `TsunamiVillageAlarm` ekler). Ajan yarıçapı 0.8 → 0.45 (`SampleSceneSetup.EnsureNavigation`). Gatherer: hedefin 3 m yakınına kadar son adım düz yürünür, NavMesh dışına girilen noktaya sonraki yolculukta geri dönülür (ağaç cebi), ulaşılamayan ağaç 30 sn atlanır, kuyuya yolu olan kenar 16 yön × 5 halkada aranır, kaçış önce kendi kapısına yol arar yoksa yolu olan en yakın evin kapısına gider ve yolda kaybolmaz. Ölçüm (geçici log): odun 1.1 m'den kesiliyor, kuyuya 11 m'den (kenar 10.3) atılıyor. Inspector'da Gatherer menüsüne "Test: Ormanda Çalış" eklendi. Play'de doğrulandı: ormanda çalışan işçi alarmda (12.6, −14.8)'den ~4 sn'de 25 m koşup kendi kapısına (−7, −28) vardı ve içeri girdi; vagon itme "Test: Vagon İt" ile denendi, 0.45 yarıçapla vagon döngüsü çalışıyor (90 sn'de taş 90 → 146).
 - **Ev başına bir işçi, boştaki köylü belirteci, tsunamide eve kaçış (18 Ekim 2026, `feature/upgrades`):** Kullanıcı: "evler rastgele; ev sayısı kadar işçi sınırı olsun; işçi bir evin yanında doğsun; boştaki köylüler göz yormayan bir belirteçle işaretli olsun; tsunami alarmında işlerini bırakıp ellerini çapraz havaya kaldırıp evlerine kaçsınlar".
@@ -194,6 +198,8 @@ Son güncelleme: 2026-10-18 (`Wallfix` `feature/upgrades`'e birleştirildi (`284
 - **Duvar katları ve seviyeleri (kod tamamlandı, Unity doğrulaması bekliyor):** İnşada panel veya `PageUp/PageDown` ile kat, `1/2/3` ile Ahşap/Taş/Güçlendirilmiş seçilir. Kat 1 tabanı, duvar/kat yüksekliği ve azami kat sayısı ayarlanabilir. Üst kenarlar aynı kenarda eşit ya da daha güçlü doğrudan alt destek ister; doluluk ve çapraz kesişme kat bazındadır. Maliyetler kümülatif ve monotondur; yükseltme yalnız farkı öder, düşürme/aynı seviye reddedilir. Görsel önce hazırlanır, depo bir kez harcanır, sonra model commit edilir ve ancak bundan sonra eski yükseltme görseli kaldırılır. Ön izleme, collider/engel sorgusu ve oluşturulan geometri seçili kat yüksekliğini kullanır. `WallSegment` kenar/kat/seviye metadata'sı ile `WallTierBuilt` olayı eklendi; eski `TryBuild`, `Edges` ve `WallBuilt` korunuyor. Unity'den bağımsız `WallTierRules` için 5 senaryolu .NET çalıştırılabilir testi geçti. Kat/destek/yükseltme/rollback/cache/engel regresyonları EditMode testlerine yazıldı fakat kullanıcının isteğiyle Unity çalıştırılmadı.
 
 ## Sıradaki işler / açık konular
+
+- [ ] Madenlerin 2/4/5 vagon kapasitesini Play'de birden fazla köylü atayarak üretim ve kuyuya dönüş döngüsünde görsel olarak kontrol et; kapasite, kaynak sınırı ve üçüncü seviye hız bonusu otomatik testlerle doğrulandı.
 
 - [ ] Tsunami kaçışı: kol pozu oyun kamerasından yakından gözle kontrol edilmeli; köylüler evlerine girince sel takipçisi onları sayamıyor (köy hasarı ileride evlere bağlanabilir).
 - [ ] `VillagerAnimationIntegrationTests` köylüsüz sahneye göre güncellenmeli (SampleScene artık köylüyle başlamıyor; işçi alınır).

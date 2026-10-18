@@ -255,7 +255,7 @@ namespace IdleTown.Tests
                 Assert.That(secondBuilt, Is.True, secondReason);
                 Assert.That(controller.Edges, Has.Count.EqualTo(5));
                 Assert.That(resources.Wood, Is.EqualTo(initialWood - 5));
-                Assert.That(resources.Stone, Is.EqualTo(initialStone - 5));
+                Assert.That(resources.Stone, Is.EqualTo(initialStone));
                 AssertWallsAreActiveAndPhysical(firstBuild);
                 Assert.That(GetBuiltWalls(root.transform), Has.Count.EqualTo(5));
             }
@@ -286,11 +286,11 @@ namespace IdleTown.Tests
                 Assert.That(eventVisual, Is.SameAs(visual));
                 Assert.That(controller.Edges, Has.Count.EqualTo(1));
                 Assert.That(resources.Wood, Is.EqualTo(8));
-                Assert.That(resources.Stone, Is.EqualTo(8));
+                Assert.That(resources.Stone, Is.EqualTo(10));
 
                 Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, out reason), Is.True, reason);
                 Assert.That(resources.Wood, Is.EqualTo(7));
-                Assert.That(resources.Stone, Is.EqualTo(7));
+                Assert.That(resources.Stone, Is.EqualTo(10));
                 UnityEngine.Object.DestroyImmediate(visual);
             }
             finally
@@ -383,7 +383,7 @@ namespace IdleTown.Tests
                 Assert.That(controller.Edges, Has.Count.EqualTo(2));
                 Assert.That(resources.SpendCalls, Is.EqualTo(2));
                 Assert.That(resources.Wood, Is.EqualTo(8));
-                Assert.That(resources.Stone, Is.EqualTo(8));
+                Assert.That(resources.Stone, Is.EqualTo(10));
             }
             finally
             {
@@ -422,12 +422,12 @@ namespace IdleTown.Tests
 
                 Assert.That(controller.TryBuild(Vector2Int.zero, Vector2Int.right, 0, WallTier.Timber, out var timberReason), Is.True, timberReason);
                 Assert.That(resources.Wood, Is.EqualTo(19));
-                Assert.That(resources.Stone, Is.EqualTo(19));
+                Assert.That(resources.Stone, Is.EqualTo(20));
 
                 Assert.That(controller.TryBuild(Vector2Int.right, Vector2Int.zero, 0, WallTier.Stone, out var stoneReason), Is.True, stoneReason);
 
                 Assert.That(resources.SpendCalls, Is.EqualTo(2));
-                Assert.That(resources.Wood, Is.EqualTo(17));
+                Assert.That(resources.Wood, Is.EqualTo(19));
                 Assert.That(resources.Stone, Is.EqualTo(16));
                 Assert.That(controller.Edges, Has.Count.EqualTo(1));
                 Assert.That(controller.Walls, Has.Count.EqualTo(1));
@@ -657,7 +657,7 @@ namespace IdleTown.Tests
                 Assert.That(built, Is.True, reason);
                 Assert.That(reason, Is.Empty);
                 Assert.That(resources.Wood, Is.EqualTo(initialWood - 1));
-                Assert.That(resources.Stone, Is.EqualTo(initialStone - 1));
+                Assert.That(resources.Stone, Is.EqualTo(initialStone));
                 Assert.That(laterSubscriberCalled, Is.True);
                 Assert.That(controller.Edges, Has.Count.EqualTo(1));
                 AssertWallsAreActiveAndPhysical(GetBuiltWalls(root.transform));
@@ -698,7 +698,7 @@ namespace IdleTown.Tests
                 Assert.That(built, Is.True, reason);
                 Assert.That(reason, Is.Empty);
                 Assert.That(resources.Wood, Is.EqualTo(initialWood - 1));
-                Assert.That(resources.Stone, Is.EqualTo(initialStone - 1));
+                Assert.That(resources.Stone, Is.EqualTo(initialStone));
                 Assert.That(controller.Edges, Has.Count.EqualTo(1));
                 Assert.That(builtWall, Is.Not.Null);
                 Assert.That(builtWall.activeSelf, Is.True);
@@ -767,7 +767,7 @@ namespace IdleTown.Tests
                 Assert.That(reentrantResult, Is.False);
                 Assert.That(resources.SpendCalls, Is.EqualTo(1));
                 Assert.That(resources.Wood, Is.EqualTo(9));
-                Assert.That(resources.Stone, Is.EqualTo(9));
+                Assert.That(resources.Stone, Is.EqualTo(10));
                 Assert.That(controller.Edges, Has.Count.EqualTo(1));
             }
             finally
