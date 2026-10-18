@@ -31,6 +31,9 @@ namespace Tsunami
                  "the storm clouds are the only sign of how close it is.")]
         [SerializeField, Min(0f)] float finalCountdown = 10f;
 
+        const float StormNoticeLeadSeconds = 30f;
+        const float StormNoticeDuration = 5f;
+
         int shownKey = int.MinValue;
         int shownReleaseSecond = int.MinValue;
         int shownWaves = int.MinValue;
@@ -158,12 +161,16 @@ namespace Tsunami
                 float left = controller.WarningRemaining;
                 if (controller.WaveCount == 0 || left <= finalCountdown) key = Mathf.CeilToInt(left);
             }
+            else if (controller.NextReleaseScheduled &&
+                     controller.NextReleaseRemaining <= StormNoticeLeadSeconds &&
+                     controller.NextReleaseRemaining > StormNoticeLeadSeconds - StormNoticeDuration) key = 3000;
             else if (controller.State == TsunamiState.Running && controller.Simulation != null && controller.Simulation.SimTime < 6.0) key = 1000;
             else if (calm && Time.time < prepareUntil) key = 2000;
             if (key == shownKey) return;
             shownKey = key;
             string wave = controller.WaveCount > 0 ? $"{controller.WavesReleased}. DALGA" : "TSUNAMİ";
-            if (key == 2000) countdownText.text = $"{controller.WavesReleased + 1}. DALGAYA HAZIRLAN!";
+            if (key == 3000) countdownText.text = "Kara bulutlar yaklaşıyor";
+            else if (key == 2000) countdownText.text = $"{controller.WavesReleased + 1}. DALGAYA HAZIRLAN!";
             else if (key == 1000) countdownText.text = $"{wave} GELİYOR";
             else if (key >= 0) countdownText.text = controller.WaveCount > 0 ? $"{wave} ({controller.WaveHeight:0} m)\n{key}" : $"TSUNAMİ UYARISI\n{key}";
             else countdownText.text = string.Empty;

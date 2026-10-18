@@ -24550,7 +24550,7 @@ MonoBehaviour:
   - height: 15
     delay: 180
   - height: 20
-    delay: 120
+    delay: 180
   - height: 25
     delay: 120
   waveDuration: 60

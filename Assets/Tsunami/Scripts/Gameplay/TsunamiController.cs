@@ -65,7 +65,7 @@ namespace Tsunami
         [SerializeField] Wave[] waves =
         {
             new Wave { height = 15f, delay = 180f },
-            new Wave { height = 20f, delay = 120f },
+            new Wave { height = 20f, delay = 180f },
             new Wave { height = 25f, delay = 120f }
         };
         [Tooltip("Seconds after its release that a wave counts as in progress: the villagers shelter and the storm " +
