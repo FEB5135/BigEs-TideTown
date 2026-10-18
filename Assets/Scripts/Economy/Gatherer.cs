@@ -428,6 +428,28 @@ public class Gatherer : MonoBehaviour
             WorkInForest();
     }
 
+    [ContextMenu("Test: Vagon İt")]
+    void TestPushCart()
+    {
+        if (!Application.isPlaying)
+            return;
+        Gatherer best = null;
+        float bestDistance = float.MaxValue;
+        foreach (var cart in FindObjectsByType<Gatherer>())
+        {
+            if (!cart.needsPusher || cart.IsReserved)
+                continue;
+            float distance = (cart.transform.position - transform.position).sqrMagnitude;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = cart;
+            }
+        }
+        if (best != null)
+            PushCart(best);
+    }
+
     // Oduncu olur: en yakın boş ağacı bulur, toplar, kuyuya götürür; sürekli.
     public void WorkInForest()
     {
