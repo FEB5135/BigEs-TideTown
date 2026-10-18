@@ -29,6 +29,10 @@ public class Well : MonoBehaviour, IWallResourceStore
     [SerializeField] float pickupTimeout = 6f;
     [Tooltip("ResourceType sırasıyla (Wood, Stone) atış görselleri. Boşsa basit bir kütük/taş oluşturulur.")]
     [SerializeField] GameObject[] throwPrefabs;
+    [Tooltip("Uçuştaki kütük ve taşın malzemesi. İlkel küpün varsayılan shader'ı oyunda paketlenmez ve pembe görünür.")]
+    [SerializeField] Material throwMaterial;
+
+    readonly Dictionary<Color, Material> throwTints = new();
 
     [Tooltip("ResourceType sırasıyla (Wood, Stone) mevcut miktarlar.")]
     [SerializeField] int[] amounts = new int[ResourceTypeCount];
@@ -53,6 +57,9 @@ public class Well : MonoBehaviour, IWallResourceStore
 
     void OnDestroy()
     {
+        foreach (var tint in throwTints.Values)
+            if (tint != null)
+                Destroy(tint);
         if (Instance == this)
             Instance = null;
     }
@@ -276,7 +283,7 @@ public class Well : MonoBehaviour, IWallResourceStore
     }
 
     // Model gelene kadar kullanılan basit kütük: gövde + açık renkli kesik uçlar.
-    static GameObject CreateLog()
+    GameObject CreateLog()
     {
         var log = new GameObject("Log");
         var capsule = log.AddComponent<CapsuleCollider>();
@@ -297,7 +304,7 @@ public class Well : MonoBehaviour, IWallResourceStore
         return log;
     }
 
-    static GameObject CreateStone()
+    GameObject CreateStone()
     {
         var stone = new GameObject("Stone");
         stone.AddComponent<SphereCollider>().radius = 0.22f;
@@ -306,14 +313,34 @@ public class Well : MonoBehaviour, IWallResourceStore
         return stone;
     }
 
-    static Transform Visual(PrimitiveType type, Transform parent, Color color)
+    Transform Visual(PrimitiveType type, Transform parent, Color color)
     {
         var go = GameObject.CreatePrimitive(type);
         Destroy(go.GetComponent<Collider>());
         go.transform.SetParent(parent, false);
-        var block = new MaterialPropertyBlock();
-        block.SetColor("_BaseColor", color);
-        go.GetComponent<Renderer>().SetPropertyBlock(block);
+        var tint = Tint(color);
+        if (tint != null)
+            go.GetComponent<Renderer>().sharedMaterial = tint;
         return go.transform;
+    }
+
+    // CreatePrimitive uses the built-in default material. That shader is not in a URP player, so the
+    // thrown log and stone render pink. A material already used by the scene keeps its shader in the build.
+    Material Tint(Color color)
+    {
+        if (throwTints.TryGetValue(color, out var tint))
+            return tint;
+
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Unlit");
+        tint = throwMaterial != null ? new Material(throwMaterial) : shader != null ? new Material(shader) : null;
+        if (tint == null)
+            return null;
+        tint.color = color;
+        if (tint.HasProperty("_BaseMap"))
+            tint.SetTexture("_BaseMap", Texture2D.whiteTexture);
+        if (tint.HasProperty("_MainTex"))
+            tint.SetTexture("_MainTex", Texture2D.whiteTexture);
+        throwTints.Add(color, tint);
+        return tint;
     }
 }

@@ -25954,6 +25954,7 @@ MonoBehaviour:
   spinSpeed: 420
   pickupTimeout: 6
   throwPrefabs: []
+  throwMaterial: {fileID: 2100000, guid: 8608a2c3fecca27489e749a343983910, type: 2}
   amounts: 0000000000000000i
 --- !u!43 &2145382667
 Mesh:

@@ -41,6 +41,8 @@ Son güncelleme: 2026-10-18 (main: ana menüde Tide Town logosu ve oyun ikonu, "
 
 ## Son durum (yapılanlar)
 
+- **Uçan kütük ve taş pembe (18 Ekim 2026):** `Well` atışları `CreatePrimitive` ile çiziliyordu; o varsayılan shader URP derlemesine girmediği için build'de pembe kalıyorlardı. Artık sahnedeki URP malzemesinden (`Flat`) renkli kopya kullanıyorlar.
+
 - **Tide Town logosu ve oyun ikonu (18 Ekim 2026, main, commit yok):** Kullanıcı logo resmini verdi: "bunu başlangıç logosu ve oyun ikonu olarak ayarla, Köyü tsunamiden koruyu da kaldır".
   - Logoyu ekipten biri çizdi (kullanıcı teyit etti), THIRD_PARTY.md'ye eklenmedi. Resim zaten saydam arka planlıydı; saydam kenarları kırpılıp `Assets/UI/Menu/Logo.png` (960x825, mipmap açık) ve kareye ortalanmış `Assets/UI/Icons/GameIcon.png` (1024x1024) yapıldı.
   - Ana menü (`SampleScene` > Main Menu > Main Page > Logo): eski dalga amblemi, "Tide Town" yazısı ve "KÖYÜ TSUNAMİDEN KORU" alt başlığı silindi; yerine logo resmi (`Image`, oranı korunuyor) geldi. Logo 465x400, (0, 300): üst kenardan 40 içeride, Oyna'nın 78 üstünde. `MainMenuSetup.BuildMainPage` de aynı düzeni kuruyor; sahneye bir kez `Tools > BigEs > Logo ve İkonu Uygula` (`MainMenuSetup.ApplyLogoAndIcon`, ikinci çalıştırmada bir şey yapmaz) ile uygulandı.
