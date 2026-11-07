@@ -75,7 +75,7 @@ public static class EconomyPrefabs
 
         var gatherer = new SerializedObject(root.AddComponent<Gatherer>());
         gatherer.FindProperty("resourceType").enumValueIndex = (int)ResourceType.Stone;
-        gatherer.FindProperty("carryCapacity").intValue = 8;
+        gatherer.FindProperty("carryCapacity").intValue = 12;
         gatherer.FindProperty("harvestDuration").floatValue = 3f;
         gatherer.FindProperty("moveSpeed").floatValue = 4f;
         gatherer.FindProperty("turnSpeed").floatValue = 180f;

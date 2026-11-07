@@ -64,7 +64,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Gatherer
   resourceType: 1
   home: {fileID: 0}
-  carryCapacity: 8
+  carryCapacity: 12
   harvestDuration: 3
   moveSpeed: 4
   turnSpeed: 180
