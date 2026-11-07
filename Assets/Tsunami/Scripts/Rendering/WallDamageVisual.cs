@@ -11,15 +11,17 @@ namespace Tsunami
         readonly List<Vector3> restPositions = new List<Vector3>(12);
         readonly List<Vector3> sizes = new List<Vector3>(12);
         Renderer[] sources;
-        float damage;
+        int shownStage = -1;
         GameObject standingSeal;
         public Renderer[] SourceRenderers => sources ??= GetComponentsInChildren<Renderer>(true);
         public int FragmentCount => fragments.Count;
 
         public void SetDamage(float fraction)
         {
-            damage = Mathf.Clamp01(fraction);
-            if (damage < .15f)
+            int stage = fraction < .15f ? 0 : fraction < .4f ? 1 : fraction < .7f ? 2 : 3;
+            if (stage == shownStage) return;
+            shownStage = stage;
+            if (stage == 0)
             {
                 foreach (var source in SourceRenderers) if (source) source.enabled = true;
                 foreach (var fragment in fragments) if (fragment) fragment.SetActive(false);
@@ -29,7 +31,6 @@ namespace Tsunami
             EnsureFragments();
             if (standingSeal != null) standingSeal.SetActive(true);
             foreach (var source in SourceRenderers) if (source) source.enabled = false;
-            int stage = damage < .4f ? 1 : damage < .7f ? 2 : 3;
             for (int i = 0; i < fragments.Count; i++)
             {
                 var piece = fragments[i];
@@ -92,20 +93,24 @@ namespace Tsunami
             }
         }
 
-        public IReadOnlyList<GameObject> DetachFragments()
+        public IReadOnlyList<GameObject> DetachFragments(int maxPieces = 12)
         {
+            if (maxPieces <= 0) return System.Array.Empty<GameObject>();
             EnsureFragments();
             if (standingSeal != null) standingSeal.SetActive(false);
             foreach (var source in SourceRenderers) if (source) source.enabled = false;
-            foreach (var piece in fragments)
+            int count = Mathf.Min(maxPieces, fragments.Count);
+            // Only selected pieces leave the standing object; the rest are removed with its root.
+            var detached = new GameObject[count];
+            for (int i = 0; i < count; i++)
             {
+                var piece = fragments[i * fragments.Count / count];
                 if (!piece) continue;
                 piece.SetActive(true);
                 piece.transform.SetParent(null, true);
-                piece.GetComponent<Collider>().enabled = true;
+                detached[i] = piece;
             }
-            return fragments;
+            return detached;
         }
     }
-
 }

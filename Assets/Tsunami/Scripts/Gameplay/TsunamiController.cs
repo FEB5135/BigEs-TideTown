@@ -64,9 +64,9 @@ namespace Tsunami
                  "between releaseDelayMin and releaseDelayMax.")]
         [SerializeField] Wave[] waves =
         {
-            new Wave { height = 15f, delay = 180f },
-            new Wave { height = 20f, delay = 180f },
-            new Wave { height = 25f, delay = 120f }
+            new Wave { height = 15f, delay = 120f },
+            new Wave { height = 20f, delay = 120f },
+            new Wave { height = 25f, delay = 90f }
         };
         [Tooltip("Seconds after its release that a wave counts as in progress: the villagers shelter and the storm " +
                  "stays. Afterwards they come out until the next wave; after the last one WavesFinished is raised.")]
@@ -363,7 +363,8 @@ namespace Tsunami
             }
             float from = Mathf.Max(before, drainStart);
             float left = end - from;
-            simulation.DrainLand(waveAge >= end ? 1f : Mathf.Clamp01((waveAge - from) / left));
+            float keep = Mathf.Clamp01((end - waveAge) / left);
+            simulation.DrainLand(1f - keep * keep);
             if (waveAge >= end) waveAge = -1f;
         }
 

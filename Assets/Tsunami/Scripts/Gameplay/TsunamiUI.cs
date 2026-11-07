@@ -155,24 +155,30 @@ namespace Tsunami
             if (calm && !calmCountdown) prepareUntil = Time.time + prepareNoticeTime;
             calmCountdown = calm;
             if (countdownText == null) return;
+            float remaining = controller.NextReleaseRemaining;
+            bool finalWaveWarning = controller.UsesWaves && controller.NextReleaseScheduled &&
+                                    remaining > 0f && remaining <= finalCountdown;
             int key = -1;
-            if (controller.State == TsunamiState.Warning)
-            {
-                float left = controller.WarningRemaining;
-                if (controller.WaveCount == 0 || left <= finalCountdown) key = Mathf.CeilToInt(left);
-            }
-            else if (controller.NextReleaseScheduled &&
-                     controller.NextReleaseRemaining <= StormNoticeLeadSeconds &&
-                     controller.NextReleaseRemaining > StormNoticeLeadSeconds - StormNoticeDuration) key = 3000;
-            else if (controller.State == TsunamiState.Running && controller.Simulation != null && controller.Simulation.SimTime < 6.0) key = 1000;
-            else if (calm && Time.time < prepareUntil) key = 2000;
+            if (finalWaveWarning)
+                key = Mathf.CeilToInt(remaining);
+            else if (controller.State == TsunamiState.Warning && !controller.UsesWaves)
+                key = Mathf.CeilToInt(controller.WarningRemaining);
+            else if (controller.NextReleaseScheduled && remaining <= StormNoticeLeadSeconds &&
+                     remaining > StormNoticeLeadSeconds - StormNoticeDuration)
+                key = 3000;
+            else if (!controller.UsesWaves && controller.State == TsunamiState.Running &&
+                     controller.Simulation != null && controller.Simulation.SimTime < 6.0)
+                key = 1000;
+            else if (calm && Time.time < prepareUntil)
+                key = 2000;
             if (key == shownKey) return;
             shownKey = key;
-            string wave = controller.WaveCount > 0 ? $"{controller.WavesReleased}. DALGA" : "TSUNAMİ";
             if (key == 3000) countdownText.text = "Kara bulutlar yaklaşıyor";
             else if (key == 2000) countdownText.text = $"{controller.WavesReleased + 1}. DALGAYA HAZIRLAN!";
-            else if (key == 1000) countdownText.text = $"{wave} GELİYOR";
-            else if (key >= 0) countdownText.text = controller.WaveCount > 0 ? $"{wave} ({controller.WaveHeight:0} m)\n{key}" : $"TSUNAMİ UYARISI\n{key}";
+            else if (key == 1000) countdownText.text = "TSUNAMİ GELİYOR";
+            else if (finalWaveWarning)
+                countdownText.text = $"{controller.WavesReleased + 1}. DALGA GELİYOR ({controller.NextWaveHeight:0} m)\n{key}";
+            else if (key >= 0) countdownText.text = $"TSUNAMİ UYARISI\n{key}";
             else countdownText.text = string.Empty;
         }
 

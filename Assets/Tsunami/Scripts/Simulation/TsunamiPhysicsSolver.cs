@@ -293,25 +293,38 @@ namespace Tsunami
         /// Water on land (every cell that is dry when the sea is at rest) seeps into the ground: each such cell keeps
         /// (1 - fraction) of its water, and its flow slows with it. The sea itself is not touched.
         /// </summary>
-        public void DrainLand(float fraction)
+        public bool DrainLand(float fraction)
         {
+            if (!(fraction > 0f)) return false;
             float keep = 1f - Math.Clamp(fraction, 0f, 1f);
+            float momentumKeep = keep * keep;
+            float maxChange = 0f;
             for (int i = 0; i < Depth.Length; i++)
             {
-                if (InitiallyWet[i] || Depth[i] <= 0f) continue;
-                float h = Depth[i] * keep;
-                if (h < DryDepth)
+                float before = Depth[i];
+                if (InitiallyWet[i] || before <= 0f) continue;
+                float h = before * keep;
+                if (h <= DryDepth)
                 {
-                    Depth[i] = 0f;
+                    h = 0f;
                     Qx[i] = Qz[i] = 0f;
                     VelocityX[i] = VelocityZ[i] = Speed[i] = 0f;
-                    continue;
+                }
+                else
+                {
+                    // Removing only a proportional share of momentum would leave velocity unchanged.
+                    Qx[i] *= momentumKeep;
+                    Qz[i] *= momentumKeep;
+                    float u = Qx[i] / h, v = Qz[i] / h;
+                    VelocityX[i] = u;
+                    VelocityZ[i] = v;
+                    Speed[i] = MathF.Sqrt(u * u + v * v);
                 }
                 Depth[i] = h;
-                Qx[i] *= keep;
-                Qz[i] *= keep;
+                maxChange = MathF.Max(maxChange, before - h);
             }
-            MaxDepthChange = 1f; // redraw the surface
+            MaxDepthChange = MathF.Max(MaxDepthChange, maxChange);
+            return maxChange > 0f;
         }
 
         /// <summary>

@@ -62,7 +62,7 @@ namespace Tsunami
         [Header("Wall durability (game model)")]
         [Tooltip("Hit points and kN.s-to-damage scales. Loads come from water density, depth and normal velocity; these rates are gameplay tuning, not structural certification.")]
         [SerializeField] WallDamageSettings wallDamage = WallDamageSettings.Default;
-        [Tooltip("Maximum detached wall segments kept as physical debris. The oldest is removed first.")]
+        [Tooltip("Maximum visible debris pieces. Extra pieces are skipped during large collapses.")]
         [SerializeField, Range(0, 64)] int maxDebris = 20;
         [SerializeField, Range(0.5f, 30f)] float debrisLifetime = 8f;
         [SerializeField, Range(0f, 2f)] float debrisImpulseScale = 0.18f;
@@ -90,14 +90,15 @@ namespace Tsunami
             public bool breakQueued;
         }
 
+        const int FractureBuildsPerFrame = 4;
+        const int DebrisPiecesPerFrame = 9;
+        int effectFrame = -1, fractureBuilds, debrisPieces;
+
         sealed class DebrisRecord
         {
             public GameObject gameObject;
-            public Rigidbody body;
+            public Vector3 velocity, spin;
             public float remaining;
-            public bool paused;
-            public Vector3 pausedLinearVelocity;
-            public Vector3 pausedAngularVelocity;
         }
 
         public int WallSegments { get; private set; }
@@ -268,42 +269,39 @@ namespace Tsunami
 
         void Update()
         {
-            for (int i = 0; i < pendingBreaks.Count; i++)
+            if (pendingBreaks.Count > 0)
             {
-                var key = pendingBreaks[i];
-                if (wallController != null && wallController.TryDetachDestroyedWall(key.edge, key.floor, out _)) continue;
-                if (segments.TryGetValue(key, out SegmentState state)) state.breakQueued = false;
+                if (wallController != null) wallController.DetachDestroyedWalls(pendingBreaks);
+                foreach (var key in pendingBreaks)
+                    if (segments.TryGetValue(key, out SegmentState state)) state.breakQueued = false;
+                pendingBreaks.Clear();
             }
-            pendingBreaks.Clear();
 
+            if (simulation != null && simulation.Paused) return;
+            float dt = Time.deltaTime;
             for (int i = debris.Count - 1; i >= 0; i--)
             {
                 DebrisRecord item = debris[i];
-                if (item.gameObject != null)
+                item.remaining -= dt;
+                if (item.gameObject != null && item.remaining > 0f)
                 {
-                    bool pauseDebris = simulation != null && simulation.Paused;
-                    if (item.paused != pauseDebris && item.body != null)
-                    {
-                        if (pauseDebris)
-                        {
-                            item.pausedLinearVelocity = item.body.linearVelocity;
-                            item.pausedAngularVelocity = item.body.angularVelocity;
-                            item.body.isKinematic = true;
-                        }
-                        else
-                        {
-                            item.body.isKinematic = false;
-                            item.body.linearVelocity = item.pausedLinearVelocity;
-                            item.body.angularVelocity = item.pausedAngularVelocity;
-                        }
-                        item.paused = pauseDebris;
-                    }
-                    if (!pauseDebris) item.remaining -= Time.deltaTime;
-                    if (item.remaining > 0f) continue;
+                    item.velocity += Vector3.down * (9.81f * dt);
+                    var piece = item.gameObject.transform;
+                    piece.position += item.velocity * dt;
+                    piece.Rotate(item.spin * dt, Space.World);
+                    continue;
                 }
                 if (item.gameObject != null) Destroy(item.gameObject);
                 debris.RemoveAt(i);
             }
+        }
+
+        void RefreshEffectBudget()
+        {
+            if (effectFrame == Time.frameCount) return;
+            effectFrame = Time.frameCount;
+            fractureBuilds = 0;
+            debrisPieces = 0;
         }
 
         public void SetApproach(Vector3 through, Vector3 target)
@@ -472,7 +470,17 @@ namespace Tsunami
             var settings = SettingsFor(state.tier);
             bool broken = state.damage.Apply(sample.ImpactForceNewtons, sample.SustainedForceNewtons,
                     sample.SolverTimestep, settings, out _, out _);
-            if (state.visual != null) state.visual.SetDamage(state.damage.Damage / settings.durability);
+            if (state.visual != null && !broken)
+            {
+                float fraction = state.damage.Damage / settings.durability;
+                RefreshEffectBudget();
+                bool needsFragments = fraction >= .15f && state.visual.FragmentCount == 0;
+                if (!needsFragments || fractureBuilds < FractureBuildsPerFrame)
+                {
+                    if (needsFragments) fractureBuilds++;
+                    state.visual.SetDamage(fraction);
+                }
+            }
             if (!broken) return;
             state.breakQueued = true;
             pendingBreaks.Add((state.edge, state.floor));
@@ -536,7 +544,7 @@ namespace Tsunami
             // Upgrading/rebinding replaces an owner's old barrier rather than leaking a duplicate crest.
             if (segments.TryGetValue(key, out var previous) && previous.handle.IsValid)
                 simulation.RemoveWallSegment(previous.handle);
-            WallSegmentHandle handle = simulation.AddWallSegment(NodePosition(edge.A), NodePosition(edge.B), top, bottom, true);
+            WallSegmentHandle handle = simulation.AddWallSegment(NodePosition(edge.A), NodePosition(edge.B), top, bottom, record.Tier != WallTier.Timber);
             if (!handle.IsValid) return;
             if (!segments.TryGetValue(key, out SegmentState state))
             {
@@ -563,7 +571,7 @@ namespace Tsunami
         WallDamageSettings SettingsFor(WallTier tier)
         {
             var settings = wallDamage.Validated();
-            settings.durability *= tier == WallTier.Reinforced ? 3.5f : tier == WallTier.Stone ? 2f : 1f;
+            settings.durability *= tier == WallTier.Reinforced ? 3.5f : tier == WallTier.Stone ? 2f : 0.5f;
             return settings;
         }
 
@@ -582,37 +590,31 @@ namespace Tsunami
         void CreateDebris(GameObject instance, SegmentState state)
         {
             if (instance == null) return;
-            if (maxDebris <= 0) { Destroy(instance); return; }
-            // Disable the intact collider immediately; the root is discarded after its pieces detach.
-            foreach (var collider in instance.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
-            var visual = state.visual != null ? state.visual : instance.AddComponent<WallDamageVisual>();
-            var pieces = visual.DetachFragments();
-            WallLoadSample load = state.lastLoad;
-            float effectiveLoad = Mathf.Max(load.ImpactForceNewtons, load.SustainedForceNewtons * .25f);
-            float impulse = Mathf.Clamp(effectiveLoad * .001f * debrisImpulseScale, .2f, 6f);
-            Vector3 direction = load.LoadNormal.sqrMagnitude > .5f ? load.LoadNormal : instance.transform.right;
-            for (int i = 0; i < pieces.Count; i++)
+            RefreshEffectBudget();
+            int count = Mathf.Min(3, maxDebris - debris.Count, DebrisPiecesPerFrame - debrisPieces);
+            var visual = state.visual;
+            if (count > 0 && visual != null && visual.FragmentCount > 0)
             {
-                var piece = pieces[i];
-                if (!piece) continue;
-                while (debris.Count >= maxDebris)
+                var pieces = visual.DetachFragments(count);
+                WallLoadSample load = state.lastLoad;
+                float effectiveLoad = Mathf.Max(load.ImpactForceNewtons, load.SustainedForceNewtons * .25f);
+                float impulse = Mathf.Clamp(effectiveLoad * .001f * debrisImpulseScale, .2f, 6f);
+                Vector3 direction = load.LoadNormal.sqrMagnitude > .5f ? load.LoadNormal : instance.transform.right;
+                for (int i = 0; i < pieces.Count; i++)
                 {
-                    if (debris[0].gameObject != null)
+                    if (!pieces[i]) continue;
+                    debris.Add(new DebrisRecord
                     {
-                        debris[0].gameObject.SetActive(false);
-                        Destroy(debris[0].gameObject);
-                    }
-                    debris.RemoveAt(0);
+                        gameObject = pieces[i],
+                        velocity = (direction + Vector3.up * (.35f + i * .12f)) * impulse,
+                        spin = new Vector3(direction.z, .4f, -direction.x) * impulse * (i % 2 == 0 ? 45f : -45f),
+                        remaining = Mathf.Min(debrisLifetime, 1.25f)
+                    });
+                    debrisPieces++;
                 }
-                var body = piece.AddComponent<Rigidbody>();
-                body.mass = 2f;
-                body.linearDamping = .6f;
-                body.angularDamping = .8f;
-                body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-                body.AddForce((direction + Vector3.up * (.35f + i % 3 * .12f)) * impulse, ForceMode.Impulse);
-                body.AddTorque(new Vector3(direction.z, .4f, -direction.x) * impulse * (i % 2 == 0 ? .25f : -.25f), ForceMode.Impulse);
-                debris.Add(new DebrisRecord { gameObject = piece, body = body, remaining = debrisLifetime });
             }
+            // No new collider or rigidbody: hydraulic removal already happened synchronously.
+            instance.SetActive(false);
             Destroy(instance);
         }
         void ClearDebris()

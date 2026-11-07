@@ -24554,11 +24554,11 @@ MonoBehaviour:
   releaseDelayMax: 180
   waves:
   - height: 15
-    delay: 180
-  - height: 20
-    delay: 180
-  - height: 25
     delay: 120
+  - height: 20
+    delay: 120
+  - height: 25
+    delay: 90
   waveDuration: 60
   drainStart: 45
   drainDuration: 15

@@ -48,7 +48,8 @@ namespace Tsunami.EditorTools
                 CheckDamagedSeal(); passed++;
                 CheckContactDamageDisabled(); passed++;
                 CheckImpactDamagePreserved(); passed++;
-                Write($"PASS: {passed}/14 water checks. Wall seals, destruction/rebuilding, damaged seal, no continuous contact damage (including legacy settings), and preserved impact damage verified.");
+                CheckLandDrain(); passed++;
+                Write($"PASS: {passed}/15 water checks. Wall seals, destruction/rebuilding, damaged seal, no continuous contact damage (including legacy settings), and preserved impact damage verified.");
             }
             catch (Exception error) { Write($"FAIL after {passed} checks: {error}"); throw; }
         }
@@ -106,11 +107,32 @@ namespace Tsunami.EditorTools
                 var seal = root.transform.Find("Standing wall seal");
                 Require(seal != null && seal.gameObject.activeSelf && seal.GetComponent<Renderer>().enabled,
                     "Damaged but standing wall has an open core.");
-                var pieces = visual.DetachFragments();
+                var pieces = visual.DetachFragments(3);
+                Require(pieces.Count == 3, "Collapse exceeded its debris budget.");
+                foreach (var piece in pieces)
+                    Require(piece != null && piece.transform.parent == null && !piece.GetComponent<Collider>().enabled,
+                        "Visual debris was not detached cleanly or participates in collision.");
                 Require(!seal.gameObject.activeSelf, "Destroyed wall left a standing seal.");
                 foreach (var piece in pieces) UnityEngine.Object.DestroyImmediate(piece);
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        static void CheckLandDrain()
+        {
+            var solver = new TsunamiPhysicsSolver(16, 1);
+            solver.InitiallyWet[0] = true;
+            solver.Depth[0] = solver.Depth[1] = 4f;
+            solver.Qx[0] = solver.Qx[1] = 8f;
+            solver.Qz[1] = -4f;
+            Require(solver.DrainLand(.5f), "Wet land was not drained.");
+            Require(solver.Depth[0] == 4f && solver.Qx[0] == 8f, "Drain changed the ocean.");
+            Require(solver.Depth[1] == 2f && solver.Qx[1] == 2f && solver.Qz[1] == -1f &&
+                    solver.VelocityX[1] == 1f && solver.VelocityZ[1] == -.5f,
+                "Receding water retained its velocity or had stale flow data.");
+            Require(solver.DrainLand(1f) && solver.Depth[1] == 0f && solver.Qx[1] == 0f &&
+                    solver.Qz[1] == 0f && solver.Speed[1] == 0f, "Dry land retained flow.");
+            Require(!solver.DrainLand(1f), "Already dry land triggered another update.");
         }
 
         static void CheckDiagonalLoop()

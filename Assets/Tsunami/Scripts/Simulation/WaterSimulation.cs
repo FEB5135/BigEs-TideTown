@@ -603,8 +603,7 @@ namespace Tsunami
         /// <summary>Water left on land seeps away: each land cell keeps (1 - fraction) of it (see the solver).</summary>
         public void DrainLand(float fraction)
         {
-            Solver.DrainLand(fraction);
-            StepCount++;
+            if (Solver.DrainLand(fraction)) StepCount++;
         }
 
         /// <summary>Total water volume in the grid (m^3). Diagnostic; iterates every cell.</summary>

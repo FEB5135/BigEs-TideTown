@@ -574,14 +574,27 @@ namespace IdleTown.Construction
 
         public bool TryDetachDestroyedWall(WallEdge edge, int floor, out GameObject instance)
         {
-            instance = null;
-            if (buildInProgress || !model.TryGet(edge, floor, out _)) return false;
-            // Unsupported upper floors fall too. Detach top-down so event observers never see floating supports.
-            for (int upper = maxFloors - 1; upper > floor; upper--)
-                DetachSingle(edge, upper, out _);
-            var removed = DetachSingle(edge, floor, out instance);
+            bool removed = DetachDestroyedStack(edge, floor, out instance);
             if (removed) RebuildJointPosts();
             return removed;
+        }
+
+        public void DetachDestroyedWalls(IReadOnlyList<(WallEdge edge, int floor)> walls)
+        {
+            bool removed = false;
+            foreach (var wall in walls)
+                removed |= DetachDestroyedStack(wall.edge, wall.floor, out _);
+            if (removed) RebuildJointPosts();
+        }
+
+        bool DetachDestroyedStack(WallEdge edge, int floor, out GameObject instance)
+        {
+            instance = null;
+            if (buildInProgress || !model.TryGet(edge, floor, out _)) return false;
+            // Unsupported upper floors fall too. Detach top-down.
+            for (int upper = maxFloors - 1; upper > floor; upper--)
+                DetachSingle(edge, upper, out _);
+            return DetachSingle(edge, floor, out instance);
         }
 
         bool DetachSingle(WallEdge edge, int floor, out GameObject instance)
