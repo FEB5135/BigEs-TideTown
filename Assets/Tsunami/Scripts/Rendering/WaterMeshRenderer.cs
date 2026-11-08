@@ -27,6 +27,10 @@ namespace Tsunami
         Vector2[] flows; // UV1: simulated velocity (m/s) so the shader can stream foam with the water
         float[] smoothedY;
         int lastStep = -1;
+        float nextSurfaceUpload;
+        static readonly Unity.Profiling.ProfilerMarker SurfaceMarker = new("TideTown.WaterSurface");
+        const UnityEngine.Rendering.MeshUpdateFlags UploadFlags =
+            UnityEngine.Rendering.MeshUpdateFlags.DontRecalculateBounds;
         int lastTerrainVersion = -1;
         int lastOceanVersion = -1;
 
@@ -52,6 +56,7 @@ namespace Tsunami
             smoothedY = new float[count];
             mesh = new Mesh { name = "Flood Water (generated)", hideFlags = HideFlags.DontSave };
             mesh.MarkDynamic();
+            nextSurfaceUpload = 0f;
             mesh.indexFormat = count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
             Fill();
             mesh.SetVertices(vertices);
@@ -88,20 +93,27 @@ namespace Tsunami
             bool terrainChanged = terrain.Version != lastTerrainVersion;
             bool oceanChanged = simulation.OpenOceanVersion != lastOceanVersion;
             if (simulation.StepCount == lastStep && !terrainChanged && !oceanChanged) return;
+            // The large gameplay grid is cosmetic here; simulation and damage still run at their own cadence.
+            if (Application.isPlaying && vertices.Length > 128 * 128 && !terrainChanged && !oceanChanged &&
+                simulation.WaterMoving && Time.unscaledTime < nextSurfaceUpload) return;
             lastStep = simulation.StepCount;
             // Calm water: nothing to re-upload (saves the whole mesh update most of the time).
-            if (!terrainChanged && !oceanChanged && !simulation.WaterMoving) return;
+            if (!terrainChanged && !oceanChanged && !simulation.WaterMoving && !simulation.RestingBetweenWaves) return;
             // In edit mode the island can be regenerated from the Inspector: refill the calm sea to match.
             if (!Application.isPlaying && terrainChanged) simulation.ResetWater();
             // The map adapter can move the grid at runtime (new ocean side after the WFC map is built).
             if (terrainChanged) transform.SetPositionAndRotation(terrain.transform.position, Quaternion.identity);
             lastTerrainVersion = terrain.Version;
             lastOceanVersion = simulation.OpenOceanVersion;
-            Fill();
-            mesh.SetVertices(vertices);
-            mesh.SetNormals(normals);
-            mesh.SetUVs(0, uvs);
-            mesh.SetUVs(1, flows);
+            nextSurfaceUpload = Time.unscaledTime + 1f / 30f;
+            using (SurfaceMarker.Auto())
+            {
+                Fill();
+                mesh.SetVertices(vertices, 0, vertices.Length, UploadFlags);
+                mesh.SetNormals(normals, 0, normals.Length, UploadFlags);
+                mesh.SetUVs(0, uvs, 0, uvs.Length, UploadFlags);
+                mesh.SetUVs(1, flows, 0, flows.Length, UploadFlags);
+            }
         }
 
         void Fill()

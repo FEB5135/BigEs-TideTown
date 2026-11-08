@@ -249,6 +249,21 @@ namespace Tsunami
         /// Removes all motion and fills the sea that is connected to the domain edge up to SeaLevel
         /// (inland hollows below sea level stay dry). Walls are kept.
         /// </summary>
+        public bool IsNearStillWater()
+        {
+            const float heightTolerance = .05f;
+            const float speedTolerance = .15f;
+            for (int i = 0; i < Depth.Length; i++)
+            {
+                float depth = Depth[i];
+                if (MathF.Abs(depth - stillDepth[i]) > heightTolerance) return false;
+                if (depth <= .01f) continue;
+                float maxDischarge = depth * speedTolerance;
+                if (Qx[i] * Qx[i] + Qz[i] * Qz[i] > maxDischarge * maxDischarge) return false;
+            }
+            return true;
+        }
+
         public void ResetToSeaLevel(float[] terrain)
         {
             if (terrain == null || terrain.Length != Size * Size) throw new ArgumentException("terrain size");

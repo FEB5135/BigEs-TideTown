@@ -54,6 +54,7 @@ namespace IdleTown.Construction
         readonly WallConstructionModel model = new();
         readonly List<WallEdge> previewPath = new();
         readonly Dictionary<WallInstanceKey, GameObject> wallInstances = new();
+        WallRenderBatches renderBatches;
         IWallResourceStore resourceStore;
         LineRenderer previewLine;
         Material previewMaterial;
@@ -542,11 +543,18 @@ namespace IdleTown.Construction
                     wallInstances[new WallInstanceKey(path[i], floor)] = stagedWalls[i];
                     if (replacedWalls[i] != null)
                     {
+                        renderBatches?.Remove(replacedWalls[i]);
                         replacedWalls[i].SetActive(false);
                         DestroyObject(replacedWalls[i]);
                     }
                 }
                 stagingRoot.SetActive(true);
+                if (Application.isPlaying && wallPrefab == null)
+                {
+                    renderBatches ??= new WallRenderBatches(transform);
+                    for (int i = 0; i < stagedWalls.Count; i++)
+                        renderBatches.Set(stagedWalls[i], path[i].A);
+                }
 
                 reason = string.Empty;
                 NotifyWallBuilt(path, floor, tier, stagedWalls);
@@ -608,6 +616,7 @@ namespace IdleTown.Construction
             Transform oldParent = instance != null ? instance.transform.parent : null;
             if (instance != null)
             {
+                renderBatches?.Remove(instance);
                 // The standing barrier is gone immediately, even if a subscriber keeps its art as debris.
                 foreach (var collider in instance.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
                 instance.transform.SetParent(null, true);
@@ -1218,7 +1227,12 @@ namespace IdleTown.Construction
             foreach (var pair in jointPosts)
                 if (!wanted.ContainsKey(pair.Key))
                 {
-                    if (pair.Value != null) { pair.Value.SetActive(false); DestroyObject(pair.Value); }
+                    if (pair.Value != null)
+                    {
+                        renderBatches?.Remove(pair.Value);
+                        pair.Value.SetActive(false);
+                        DestroyObject(pair.Value);
+                    }
                     removed.Add(pair.Key);
                 }
             foreach (var key in removed) jointPosts.Remove(key);
@@ -1235,10 +1249,18 @@ namespace IdleTown.Construction
                 float fill = fills[pair.Key];
                 float postHeight = wallHeight + (pair.Key.floor == 0 ? fill : 0);
                 float postOffset = pair.Key.floor == 0 ? fill * .5f : fill;
-                post.transform.SetPositionAndRotation(NodePosition(pair.Key.node,
-                        FloorBaseHeight(pair.Key.floor) + wallHeight * .5f) + world.transform.up * postOffset, world.transform.rotation);
-                post.transform.localScale = new Vector3(JointHalfWidth * 2, postHeight, JointHalfWidth * 2);
-                post.GetComponent<MeshRenderer>().sharedMaterials = art.Palette(pair.Value);
+                var position = NodePosition(pair.Key.node, FloorBaseHeight(pair.Key.floor) + wallHeight * .5f)
+                    + world.transform.up * postOffset;
+                var rotation = world.transform.rotation;
+                var scale = new Vector3(JointHalfWidth * 2, postHeight, JointHalfWidth * 2);
+                var renderer = post.GetComponent<MeshRenderer>();
+                var materials = art.Palette(pair.Value);
+                if (post.transform.position == position && post.transform.rotation == rotation
+                    && post.transform.localScale == scale && renderer.sharedMaterial == materials[0]) continue;
+                post.transform.SetPositionAndRotation(position, rotation);
+                post.transform.localScale = scale;
+                renderer.sharedMaterials = materials;
+                renderBatches?.Set(post, pair.Key.node);
             }
         }
 
@@ -1404,8 +1426,11 @@ namespace IdleTown.Construction
             DestroyObject(stagingRoot);
         }
 
+        void LateUpdate() => renderBatches?.Update();
+
         void OnDestroy()
         {
+            renderBatches?.Dispose();
             if (demolitionOutlineMaterial != null) DestroyObject(demolitionOutlineMaterial);
             art.Dispose();
             if (ghostMaterial != null) DestroyObject(ghostMaterial);

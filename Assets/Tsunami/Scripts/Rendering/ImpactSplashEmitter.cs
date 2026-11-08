@@ -51,11 +51,14 @@ namespace Tsunami
         ParticleSystem.EmitParams ep;
         int wallImpactFrame = -1;
         int wallImpactsThisFrame;
-        ImpactFaceEmissionGate wallFaceGate;
-        int wallFaceGateSize;
+        const int TotalImpactBudget = 12;
+        float nextAmbientScan;
 
         void Awake()
         {
+            maxDroplets = Mathf.Min(maxDroplets, 480);
+            maxMist = Mathf.Min(maxMist, 80);
+            maxFoam = Mathf.Min(maxFoam, 180);
             droplets = GetComponent<ParticleSystem>();
             Configure(droplets, maxDroplets, 1f, 0.6f);
             var mistGO = new GameObject("Mist", typeof(ParticleSystem));
@@ -134,7 +137,8 @@ namespace Tsunami
             SetPaused(droplets, paused);
             SetPaused(mist, paused);
             SetPaused(foam, paused);
-            if (paused || !simulation.WaterMoving) return;
+            if (paused || !simulation.WaterMoving || Time.unscaledTime < nextAmbientScan) return;
+            nextAmbientScan = Time.unscaledTime + 1f / 30f;
 
             TerrainGrid terrain = simulation.Terrain;
             TsunamiPhysicsSolver s = simulation.Solver;
@@ -142,11 +146,12 @@ namespace Tsunami
             float[] blend = simulation.EdgeBlendField; // the outer band is drawn as calm open ocean
             int n = s.Size, count = n * n;
             int budget = Mathf.Min(cellsPerFrame, count);
-            int impacts = 0;
+            int impacts = wallImpactFrame == Time.frameCount ? wallImpactsThisFrame : 0;
+            int impactLimit = Mathf.Min(maxImpactsPerFrame, TotalImpactBudget);
             float half = (n - 1) * 0.5f, cell = s.CellSize;
             Vector3 origin = terrain.transform.position;
 
-            for (int k = 0; k < budget && impacts < maxImpactsPerFrame; k++)
+            for (int k = 0; k < budget && impacts < impactLimit; k++)
             {
                 int i = cursor;
                 cursor = (cursor + 1) % count;
@@ -169,7 +174,7 @@ namespace Tsunami
             if (village != null && Time.time >= nextHouseCheck)
             {
                 nextHouseCheck = Time.time + houseInterval;
-                for (int b = 0; b < village.TotalCount && impacts < maxImpactsPerFrame; b++)
+                for (int b = 0; b < village.TotalCount && impacts < impactLimit; b++)
                 {
                     if (!village.GetBuilding(b, out Vector3 pos, out float radius, out float roof)) continue;
                     HouseSplash(terrain, s, pos, radius, roof, ref impacts);
@@ -182,13 +187,6 @@ namespace Tsunami
             // Wall events are indexed by registered barrier faces and carry the real segment's projected contact
             // point/normal. The generic cell scan explicitly skips those faces, so each wall impact emits once.
             if (!enabled || simulation.Paused || sample.WaterDepth < minDepth || sample.InflowSpeed < minImpactSpeed) return;
-            int size = simulation.Solver.Size;
-            if (wallFaceGate == null || wallFaceGateSize != size)
-            {
-                wallFaceGate = new ImpactFaceEmissionGate(size * size);
-                wallFaceGateSize = size;
-            }
-            if (!wallFaceGate.ShouldEmit(sample.SampleSequence, sample.FaceIndex, sample.AlongX)) return;
             if (wallImpactFrame != Time.frameCount)
             {
                 wallImpactFrame = Time.frameCount;
@@ -225,8 +223,8 @@ namespace Tsunami
         void Splash(Vector3 face, Vector3 into, Vector3 along, float width, float impactSpeed, float obstacleRise)
         {
             float up = Mathf.Min(maxUpSpeed, impactSpeed * upPerImpact);
-            int drops = 2 + Mathf.Min(6, Mathf.FloorToInt(impactSpeed / 3f));
-            for (int k = 0; k < drops && droplets.particleCount < maxDroplets; k++)
+            int drops = Mathf.Min(maxDroplets - droplets.particleCount, 2 + Mathf.Min(3, Mathf.FloorToInt(impactSpeed / 3f)));
+            for (int k = 0; k < drops; k++)
             {
                 ep.position = face + along * ((Random.value - 0.5f) * width) - into * (Random.value * 0.6f);
                 ep.velocity = Vector3.up * (up * Random.Range(0.6f, 1.25f))
@@ -237,8 +235,8 @@ namespace Tsunami
                 ep.startColor = dropletColor;
                 droplets.Emit(ep, 1);
             }
-            int foamCount = 1 + Mathf.Min(4, Mathf.FloorToInt(impactSpeed / 4f));
-            for (int k = 0; k < foamCount && foam.particleCount < maxFoam; k++)
+            int foamCount = Mathf.Min(maxFoam - foam.particleCount, 1 + Mathf.Min(2, Mathf.FloorToInt(impactSpeed / 4f)));
+            for (int k = 0; k < foamCount; k++)
             {
                 ep.position = face + along * ((Random.value - 0.5f) * width) - into * Random.Range(0.05f, 0.35f);
                 ep.velocity = Vector3.up * Random.Range(0.3f, 1.2f) - into * (impactSpeed * Random.Range(0.05f, 0.18f));
@@ -247,7 +245,7 @@ namespace Tsunami
                 ep.startColor = dropletColor;
                 foam.Emit(ep, 1);
             }
-            if (mist.particleCount < maxMist && Random.value < 0.5f)
+            if (Random.value < 0.35f && mist.particleCount < maxMist)
             {
                 ep.position = face + Vector3.up * Mathf.Clamp(obstacleRise * 0.5f, 0.5f, 3f) - into * 0.5f;
                 ep.velocity = Vector3.up * (up * 0.25f) - into * (impactSpeed * 0.15f);

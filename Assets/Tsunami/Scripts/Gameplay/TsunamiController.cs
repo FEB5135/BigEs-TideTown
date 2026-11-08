@@ -231,6 +231,9 @@ namespace Tsunami
             if (!gameStarted && FindAnyObjectByType<MainMenu>() == null) OnGameStarted();
         }
 
+        bool awaitingWaveDrain;
+        float nextWaterRestCheck;
+
         void Update()
         {
             // The countdown to the next release runs before the first tsunami and, with waves, while one is in
@@ -255,6 +258,12 @@ namespace Tsunami
                     if (UsesWaves && wavesReleased >= waves.Length) WavesFinished?.Invoke();
                     else AimNextWave(); // the land is dry again: the ocean can move to the next wave's corner
                 }
+            }
+            if (awaitingWaveDrain && waveAge < 0f && !InDanger && State == TsunamiState.Running
+                && Time.time >= nextWaterRestCheck)
+            {
+                nextWaterRestCheck = Time.time + 1f;
+                awaitingWaveDrain = !simulation.TryRestBetweenWaves();
             }
             if (State != TsunamiState.Warning) return;
             if (incomingRun)
@@ -338,6 +347,7 @@ namespace Tsunami
             else SendWave();
             dangerRemaining = waveDuration;
             waveAge = 0f;
+            awaitingWaveDrain = true;
             if (wavesReleased < waves.Length)
             {
                 releaseRemaining = Mathf.Max(0f, waves[wavesReleased].delay);
@@ -468,6 +478,7 @@ namespace Tsunami
             aimedWave = -1;
             dangerRemaining = 0f;
             waveAge = -1f;
+            awaitingWaveDrain = false;
             SetState(TsunamiState.Idle);
             SimulationReset?.Invoke();
             ScheduleRelease();

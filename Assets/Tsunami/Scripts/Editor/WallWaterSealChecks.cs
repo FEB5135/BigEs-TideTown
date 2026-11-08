@@ -49,9 +49,28 @@ namespace Tsunami.EditorTools
                 CheckContactDamageDisabled(); passed++;
                 CheckImpactDamagePreserved(); passed++;
                 CheckLandDrain(); passed++;
-                Write($"PASS: {passed}/15 water checks. Wall seals, destruction/rebuilding, damaged seal, no continuous contact damage (including legacy settings), and preserved impact damage verified.");
+                CheckImpactBudget(); passed++;
+                CheckStillWaterDetection(); passed++;
+                Write($"PASS: {passed}/17 water checks. Wall seals, destruction/rebuilding, damaged seal, no continuous contact damage (including legacy settings), and preserved impact damage verified.");
             }
             catch (Exception error) { Write($"FAIL after {passed} checks: {error}"); throw; }
+        }
+
+        static void CheckStillWaterDetection()
+        {
+            var solver = new TsunamiPhysicsSolver(16, 1) { SeaLevel = 1f };
+            var bed = new float[256];
+            bed[17] = 2f;
+            solver.ResetToSeaLevel(bed);
+            Require(solver.IsNearStillWater(), "Still sea did not qualify for rest.");
+            solver.Depth[17] = .2f;
+            Require(!solver.IsNearStillWater(), "Residual flooding qualified for rest.");
+            solver.Depth[17] = 0f;
+            solver.Qx[0] = .2f;
+            Require(!solver.IsNearStillWater(), "Moving water qualified for rest.");
+            solver.Qx[0] = 0f;
+            solver.Depth[0] += .1f;
+            Require(!solver.IsNearStillWater(), "A residual swell qualified for rest.");
         }
 
         static void CheckContactDamageDisabled()
@@ -114,6 +133,60 @@ namespace Tsunami.EditorTools
                         "Visual debris was not detached cleanly or participates in collision.");
                 Require(!seal.gameObject.activeSelf, "Destroyed wall left a standing seal.");
                 foreach (var piece in pieces) UnityEngine.Object.DestroyImmediate(piece);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        static void CheckImpactBudget()
+        {
+            var root = new GameObject("Wall impact stress check");
+            root.SetActive(false);
+            try
+            {
+                const int n = 32;
+                var terrain = root.AddComponent<TerrainGrid>();
+                terrain.UseExternalHeights(n, 1f, new float[n * n]);
+                var simulation = root.AddComponent<WaterSimulation>();
+                var solver = simulation.Solver;
+                Array.Fill(solver.Depth, 1f);
+                Array.Fill(solver.VelocityX, 4f);
+                var handles = new WallSegmentHandle[128];
+                Vector3 cornerOffset = new Vector3(-.5f, 0f, -.5f);
+                for (int x = 1; x <= 8; x++)
+                for (int z = 1; z <= 16; z++)
+                {
+                    var a = terrain.GridToWorld(x, z) + cornerOffset;
+                    var b = terrain.GridToWorld(x, z + 1) + cornerOffset;
+                    int i = (x - 1) * 16 + z - 1;
+                    handles[i] = simulation.AddWallSegment(a, b, 2f, 0f);
+                    Require(handles[i].IsValid, "Stress check wall could not register.");
+                }
+                int loads = 0, splashes = 0;
+                var faces = new System.Collections.Generic.HashSet<(bool, int)>();
+                simulation.WallLoadSampled += sample =>
+                {
+                    Require(sample.HasDirectionalImpact && Mathf.Approximately(sample.SolverTimestep, .02f),
+                        "Cosmetic budget changed physical load sampling.");
+                    loads++;
+                };
+                simulation.WallFaceImpactSampled += sample =>
+                {
+                    Require(faces.Add((sample.AlongX, sample.FaceIndex)), "Duplicate splash on one face this frame.");
+                    splashes++;
+                };
+                const System.Reflection.BindingFlags flags =
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                var type = typeof(WaterSimulation);
+                var sampleLoads = type.GetMethod("SampleWallLoads", flags);
+                type.GetField("wallSplashFrame", flags).SetValue(simulation, 1L);
+                for (int step = 0; step < 4; step++) sampleLoads.Invoke(simulation, new object[] { .02f });
+                Require(loads == 512 && splashes == 8, $"Expected 512 loads and 8 splashes; got {loads}/{splashes}.");
+                Require(simulation.RemoveWallSegment(handles[42]) && simulation.RemoveWallSegment(handles[127]) &&
+                    !simulation.RemoveWallSegment(handles[42]), "Wall removal corrupted the sampling list.");
+                loads = 0;
+                sampleLoads.Invoke(simulation, new object[] { .02f });
+                Require(loads == 126 && splashes == 8, "Removed walls were sampled or the visual budget reset mid-frame.");
+                Debug.Log("[WallWaterSeal] Stress check: 128 walls, 512 physical loads, 8 visual splashes.");
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }

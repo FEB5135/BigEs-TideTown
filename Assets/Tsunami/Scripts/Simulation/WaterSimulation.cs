@@ -134,13 +134,19 @@ namespace Tsunami
         readonly Dictionary<int, RegisteredWall> walls = new Dictionary<int, RegisteredWall>();
         readonly List<RegisteredWall> wallIteration = new List<RegisteredWall>();
         int nextWallHandle = 1;
-        long impactSampleSequence;
+        const int WallSplashBudget = 8;
+        int wallSplashCount;
+        int wallSplashCursor, wallSampleStart;
+        long wallSplashFrame;
+        ImpactFaceEmissionGate wallSplashGate;
+        int wallSplashGridSize;
+        static readonly Unity.Profiling.ProfilerMarker WallLoadMarker = new("TideTown.WallLoads");
 
         const float WaterDensity = 1000f;
 
         sealed class RegisteredWall
         {
-            public int id;
+            public int id, iterationIndex;
             public Vector3 worldA, worldB;
             public float topLocal, bottomLocal;
             public bool impermeable;
@@ -236,15 +242,20 @@ namespace Tsunami
             solver.SpongeStrength = spongeStrength;
         }
 
+        public bool RestingBetweenWaves { get; private set; }
+
         void Update()
         {
             StepsLastFrame = 0;
             SolverMsLastFrame = 0f;
             RunningSlow = false;
-            if (solver == null || paused) return;
+            if (solver == null || paused || RestingBetweenWaves) return;
 
             pendingSimTime += Time.deltaTime * timeScale;
             float[] h = terrain.Heights;
+            wallSplashCount = 0;
+            wallSplashFrame++;
+            wallSampleStart = wallIteration.Count == 0 ? 0 : wallSplashCursor % wallIteration.Count;
             budget.Restart();
             int steps = 0;
             while (pendingSimTime > 1e-5 && steps < maxStepsPerFrame && budget.Elapsed.TotalMilliseconds < frameBudgetMs)
@@ -252,7 +263,7 @@ namespace Tsunami
                 float dt = solver.Step(h, Mathf.Min(maxTimestep, (float)pendingSimTime));
                 if (dt <= 0f) break;
                 pendingSimTime -= dt;
-                SampleWallLoads(dt);
+                using (WallLoadMarker.Auto()) SampleWallLoads(dt);
                 steps++;
             }
             if (pendingSimTime > maxTimestep)
@@ -269,6 +280,7 @@ namespace Tsunami
         /// <summary>Removes all motion and refills the sea to the still-water level. Walls are kept.</summary>
         public void ResetWater()
         {
+            RestingBetweenWaves = false;
             EnsureInitialized();
             PushSettings();
             solver.ResetToSeaLevel(terrain.Heights);
@@ -276,11 +288,23 @@ namespace Tsunami
             StepCount++;
         }
 
+        /// <summary>Stops stepping once a finished wave has drained and the remaining water is near still.</summary>
+        public bool TryRestBetweenWaves()
+        {
+            if (solver == null || !solver.IsNearStillWater()) return false;
+            solver.Incoming = default;
+            pendingSimTime = 0;
+            RestingBetweenWaves = true;
+            StepCount++;
+            return true;
+        }
+
         /// <summary>Adds an initial sea-surface disturbance centred on a world position.</summary>
         public double AddSource(Vector3 worldCentre, Vector2 travelDirection, float amplitude, float lengthRadius,
             float widthRadius, SourceProfile profile, SourceMotion motion)
         {
             EnsureInitialized();
+            RestingBetweenWaves = false;
             Vector3 local = worldCentre - terrain.transform.position;
             Vector2 d = travelDirection.sqrMagnitude > 1e-6f ? travelDirection.normalized : Vector2.right;
             double added = solver.AddSource(new TsunamiSource
@@ -294,7 +318,7 @@ namespace Tsunami
         }
 
         /// <summary>True when any cell's depth changed noticeably in the last step (water not at rest).</summary>
-        public bool WaterMoving => solver != null && solver.MaxDepthChange > 1e-5f;
+        public bool WaterMoving => !RestingBetweenWaves && solver != null && solver.MaxDepthChange > 1e-5f;
 
         /// <summary>Changes whenever the still open ocean around the domain changes (reset, sea level).</summary>
         public int OpenOceanVersion => solver != null ? solver.OpenOceanVersion : 0;
@@ -337,6 +361,7 @@ namespace Tsunami
             float startShare, float growTime, float lengthRadius, float widthRadius)
         {
             EnsureInitialized();
+            RestingBetweenWaves = false;
             Vector3 local = crestWorldAtStart - terrain.transform.position;
             Vector2 d = travelDirection.sqrMagnitude > 1e-6f ? travelDirection.normalized : Vector2.right;
             solver.Incoming = new IncomingWave
@@ -442,6 +467,7 @@ namespace Tsunami
             WallBarrierRasterizer.Trace(a.x, a.y, b.x, b.y, (x,z,alongX) => AddFace(x,z,alongX,top,wall));
             if (wall.faces.Count == 0) return default;
             walls.Add(id, wall);
+            wall.iterationIndex = wallIteration.Count;
             wallIteration.Add(wall);
             return new WallSegmentHandle(id);
         }
@@ -458,9 +484,12 @@ namespace Tsunami
         public bool RemoveWallSegment(WallSegmentHandle handle)
         {
             EnsureInitialized();
-            if (!handle.IsValid || !walls.Remove(handle.Value)) return false;
-            for (int i = 0; i < wallIteration.Count; i++)
-                if (wallIteration[i].id == handle.Value) { wallIteration.RemoveAt(i); break; }
+            if (!handle.IsValid || !walls.Remove(handle.Value, out var wall)) return false;
+            int last = wallIteration.Count - 1;
+            var tail = wallIteration[last];
+            wallIteration[wall.iterationIndex] = tail;
+            tail.iterationIndex = wall.iterationIndex;
+            wallIteration.RemoveAt(last);
             solver.RemoveBarrierOwner(handle.Value);
             return true;
         }
@@ -481,11 +510,16 @@ namespace Tsunami
             if ((loadCallback == null && impactCallback == null) || wallIteration.Count == 0) return;
             float[] bed = terrain.Heights;
             int n = solver.Size;
-            impactSampleSequence++;
-            if (impactSampleSequence <= 0) impactSampleSequence = 1;
+            if (impactCallback != null && (wallSplashGate == null || wallSplashGridSize != n))
+            {
+                wallSplashGate = new ImpactFaceEmissionGate(n * n);
+                wallSplashGridSize = n;
+            }
             for (int w = 0; w < wallIteration.Count; w++)
             {
-                RegisteredWall wall = wallIteration[w];
+                int index = wallSampleStart + w;
+                if (index >= wallIteration.Count) index -= wallIteration.Count;
+                RegisteredWall wall = wallIteration[index];
                 float impact = 0f, sustained = 0f;
                 float strongestImpact = 0f, strongestHydro = 0f;
                 WallFace impactFace = default, hydroFace = default;
@@ -499,6 +533,7 @@ namespace Tsunami
                     float lowInto = face.alongX ? solver.VelocityX[low] : solver.VelocityZ[low];
                     float highInto = face.alongX ? -solver.VelocityX[high] : -solver.VelocityZ[high];
                     float lowDepth = solver.Depth[low], highDepth = solver.Depth[high];
+                    if (lowDepth <= 0f && highDepth <= 0f) continue;
                     float lowSurface = bed[low] + lowDepth, highSurface = bed[high] + highDepth;
                     float lowBottom = Mathf.Max(bed[low], wall.bottomLocal);
                     float highBottom = Mathf.Max(bed[high], wall.bottomLocal);
@@ -526,9 +561,18 @@ namespace Tsunami
                             impactGridInto = gridInto;
                             impactSurface = sampleSurface;
                         }
-                        if (impactCallback != null)
+                        // Cosmetics are optional; do not project a contact or dispatch an event
+                        // for a submerged wall, a duplicate face, or after the frame budget is used.
+                        if (impactCallback != null && wallSplashCount < WallSplashBudget &&
+                            sampleDepth >= .3f && sampleSpeed >= 2.5f &&
+                            sampleSurface <= wall.topLocal + .15f &&
+                            wallSplashGate.ShouldEmit(wallSplashFrame, low, face.alongX))
+                        {
+                            wallSplashCount++;
+                            wallSplashCursor = (wallSampleStart + w + 1) % wallIteration.Count;
                             EmitFaceImpact(impactCallback, wall, face, low, gridInto, sampleSurface, sampleDepth,
                                 sampleSpeed, faceImpact);
+                        }
                     }
 
                     if (load.SustainedForceNewtons > strongestHydro)
@@ -558,7 +602,7 @@ namespace Tsunami
         {
             SegmentContact(wall, face, gridInto, surfaceLocal, false, out Vector3 position, out Vector3 realNormal);
             WallImpactDelivery.Deliver(callback, new WallFaceImpactSample(new WallSegmentHandle(wall.id), position,
-                realNormal, gridInto, depth, speed, solver.CellSize, force, impactSampleSequence, faceIndex,
+                realNormal, gridInto, depth, speed, solver.CellSize, force, wallSplashFrame, faceIndex,
                 face.alongX));
         }
 

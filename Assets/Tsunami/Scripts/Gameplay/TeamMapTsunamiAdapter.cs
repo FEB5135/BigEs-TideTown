@@ -82,10 +82,10 @@ namespace Tsunami
             public WallEdge edge;
             public int floor;
             public WallTier tier;
+            public WallDamageSettings damageSettings;
             public WallDamageVisual visual;
             public WallSegmentHandle handle;
             public readonly WallDamageState damage = new WallDamageState();
-            public WallFaceImpactSample lastImpact;
             public WallLoadSample lastLoad;
             public bool breakQueued;
         }
@@ -239,7 +239,6 @@ namespace Tsunami
             wallController.WallTierBuilt += OnWallBuilt;
             wallController.WallTierRemoved += OnWallRemoved;
             simulation.WallLoadSampled += OnWallLoad;
-            simulation.WallFaceImpactSampled += OnWallFaceImpact;
             simulation.WallRegistryInvalidated += OnWallRegistryInvalidated;
             tsunamiController = transform.parent != null
                 ? transform.parent.GetComponentInChildren<TsunamiController>(true)
@@ -256,7 +255,6 @@ namespace Tsunami
                 wallController.WallTierRemoved -= OnWallRemoved;
             }
             if (subscribed && simulation != null) simulation.WallLoadSampled -= OnWallLoad;
-            if (subscribed && simulation != null) simulation.WallFaceImpactSampled -= OnWallFaceImpact;
             if (subscribed && simulation != null) simulation.WallRegistryInvalidated -= OnWallRegistryInvalidated;
             if (subscribed && tsunamiController != null) tsunamiController.SimulationReset -= ResetStandingWallDamage;
             subscribed = false;
@@ -467,7 +465,7 @@ namespace Tsunami
         {
             if (!segmentsByHandle.TryGetValue(sample.Handle, out SegmentState state) || state.breakQueued) return;
             state.lastLoad = sample;
-            var settings = SettingsFor(state.tier);
+            var settings = state.damageSettings;
             bool broken = state.damage.Apply(sample.ImpactForceNewtons, sample.SustainedForceNewtons,
                     sample.SolverTimestep, settings, out _, out _);
             if (state.visual != null && !broken)
@@ -484,11 +482,6 @@ namespace Tsunami
             if (!broken) return;
             state.breakQueued = true;
             pendingBreaks.Add((state.edge, state.floor));
-        }
-
-        void OnWallFaceImpact(WallFaceImpactSample sample)
-        {
-            if (segmentsByHandle.TryGetValue(sample.Handle, out SegmentState state)) state.lastImpact = sample;
         }
 
         void OnWallRegistryInvalidated()
@@ -558,10 +551,11 @@ namespace Tsunami
             state.handle = handle;
             if (state.tier != record.Tier) state.damage.Reset();
             state.tier = record.Tier;
+            state.damageSettings = SettingsFor(record.Tier);
             if (instance != null)
             {
                 state.visual = instance.GetComponent<WallDamageVisual>() ?? instance.AddComponent<WallDamageVisual>();
-                state.visual.SetDamage(state.damage.Damage / SettingsFor(state.tier).durability);
+                state.visual.SetDamage(state.damage.Damage / state.damageSettings.durability);
             }
             state.breakQueued = false;
             segmentsByHandle[handle] = state;
