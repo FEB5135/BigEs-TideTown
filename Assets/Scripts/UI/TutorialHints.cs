@@ -176,7 +176,7 @@ public class TutorialHints : MonoBehaviour
         new Step
         {
             title = "ETRAFA BAK",
-            body = "Sağ tıkla sürükleyerek haritayı kaydır, fare tekerleğiyle yaklaş ve uzaklaş.",
+            body = "W, A, S ve D tuşlarıyla haritada gezin. Fare tekerleğiyle yaklaş ve uzaklaş.",
             begin = () =>
             {
                 if (isoCamera == null) return;

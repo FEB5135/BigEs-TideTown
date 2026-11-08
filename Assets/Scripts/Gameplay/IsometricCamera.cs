@@ -3,7 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 // 45 derece izometrik bakış. Fare tekerleği ile min-max mesafe arasında yakınlaşır/uzaklaşır,
-// sağ tıkla sürükleyince harita kayar (zemin imlecin altında sabit kalır).
+// WASD, kamerayı ekran yönlerine göre kaydırır.
 [RequireComponent(typeof(Camera))]
 public class IsometricCamera : MonoBehaviour
 {
@@ -20,19 +20,15 @@ public class IsometricCamera : MonoBehaviour
     [SerializeField] float zoomStep = 8f;
     [SerializeField] float zoomSmoothTime = 0.12f;
 
-    [Header("Kaydırma (sağ tık)")]
+    [Header("Kaydırma (WASD)")]
     [Tooltip("Odak noktasının gidebileceği alanın merkezi.")]
     [SerializeField] Vector3 panCenter = Vector3.zero;
     [Tooltip("Merkezden X ve Z yönünde en fazla ne kadar kayabileceği.")]
     [SerializeField] Vector2 panExtents = new Vector2(120f, 120f);
-    [Tooltip("Kapalı: harita imleçle birlikte sürüklenir. Açık: kamera imlecin gittiği yöne kayar.")]
-    [SerializeField] bool invertPan;
+    [SerializeField, Min(0f)] float panSpeed = 35f;
 
-    Camera cam;
     float targetDistance;
     float zoomVelocity;
-    bool panning;
-    Vector2 lastPointer;
 
     public Vector3 FocusPoint
     {
@@ -64,7 +60,6 @@ public class IsometricCamera : MonoBehaviour
 
     void Awake()
     {
-        cam = GetComponent<Camera>();
         distance = Mathf.Clamp(distance, minDistance, maxDistance);
         targetDistance = distance;
         Apply();
@@ -72,57 +67,35 @@ public class IsometricCamera : MonoBehaviour
 
     void LateUpdate()
     {
-        var mouse = Mouse.current;
-        if (!InputEnabled)
+        if (InputEnabled)
         {
-            panning = false;
-            if (mouse != null)
-                lastPointer = mouse.position.ReadValue();
-        }
-        else if (mouse != null)
-        {
-            float scroll = mouse.scroll.ReadValue().y;
-            bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-            if (scroll != 0f && !overUI)
-                targetDistance = Mathf.Clamp(targetDistance - Mathf.Sign(scroll) * zoomStep, minDistance, maxDistance);
+            if (Mouse.current is { } mouse)
+            {
+                float scroll = mouse.scroll.ReadValue().y;
+                bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+                if (scroll != 0f && !overUI)
+                    targetDistance = Mathf.Clamp(targetDistance - Mathf.Sign(scroll) * zoomStep, minDistance, maxDistance);
+            }
 
-            Pan(mouse, overUI);
+            if (Keyboard.current is { } keyboard)
+                Pan(keyboard, Time.unscaledDeltaTime);
         }
 
-        // Gerçek zamanla: tutorial oyunu durdurduğunda (timeScale 0) da yakınlaşma çalışsın.
+        // Gerçek zamanla: tutorial oyunu durdurduğunda da kamera çalışsın.
         distance = Mathf.SmoothDamp(distance, targetDistance, ref zoomVelocity, zoomSmoothTime, Mathf.Infinity, Time.unscaledDeltaTime);
         Apply();
     }
 
-    void Pan(Mouse mouse, bool overUI)
+    void Pan(Keyboard keyboard, float deltaTime)
     {
-        var pointer = mouse.position.ReadValue();
-        if (mouse.rightButton.wasPressedThisFrame && !overUI)
-            panning = true;
-        if (!mouse.rightButton.isPressed)
-            panning = false;
+        float horizontal = (keyboard.dKey.isPressed ? 1f : 0f) - (keyboard.aKey.isPressed ? 1f : 0f);
+        float vertical = (keyboard.wKey.isPressed ? 1f : 0f) - (keyboard.sKey.isPressed ? 1f : 0f);
+        var direction = Vector3.ClampMagnitude(new Vector3(horizontal, 0f, vertical), 1f);
+        if (direction == Vector3.zero) return;
 
-        if (panning && TryGroundPoint(lastPointer, out var from) && TryGroundPoint(pointer, out var to))
-        {
-            focusPoint += invertPan ? to - from : from - to;
-            focusPoint.x = Mathf.Clamp(focusPoint.x, panCenter.x - panExtents.x, panCenter.x + panExtents.x);
-            focusPoint.z = Mathf.Clamp(focusPoint.z, panCenter.z - panExtents.y, panCenter.z + panExtents.y);
-        }
-        lastPointer = pointer;
-    }
-
-    // Ekran noktasının odak yüksekliğindeki yatay düzlemdeki karşılığı.
-    bool TryGroundPoint(Vector2 screenPoint, out Vector3 point)
-    {
-        var ray = cam.ScreenPointToRay(screenPoint);
-        var ground = new Plane(Vector3.up, new Vector3(0f, focusPoint.y, 0f));
-        if (ground.Raycast(ray, out float enter))
-        {
-            point = ray.GetPoint(enter);
-            return true;
-        }
-        point = default;
-        return false;
+        focusPoint += Quaternion.Euler(0f, yaw, 0f) * direction * (panSpeed * deltaTime);
+        focusPoint.x = Mathf.Clamp(focusPoint.x, panCenter.x - panExtents.x, panCenter.x + panExtents.x);
+        focusPoint.z = Mathf.Clamp(focusPoint.z, panCenter.z - panExtents.y, panCenter.z + panExtents.y);
     }
 
     void Apply()
